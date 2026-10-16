@@ -691,6 +691,7 @@ export const RESOURCES = {
       }),
       fromApi: (row) => ({
         ...base.fromApi(row),
+        formalInvoiceAmount: row.formal_invoice_amount !== undefined ? num(row.formal_invoice_amount) : (row.formalInvoiceAmount !== undefined ? num(row.formalInvoiceAmount) : undefined),
         ...linkIn(row, {
           vehicleNo: 'vehicleNumber',
           salesOrderId: 'salesOrder',

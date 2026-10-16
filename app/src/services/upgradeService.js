@@ -17,6 +17,12 @@ export async function convertEstimateToChallan(estimateId) {
   });
 }
 
+export async function convertEstimateToOrder(estimateId) {
+  return apiClient(`/sales/estimates/${estimateId}/convert-to-order/`, {
+    method: 'POST',
+  });
+}
+
 export async function captureContractSignature(contractId, { role, signature, signatoryName, signatoryEmail }) {
   return apiClient(`/crm/contracts/${contractId}/capture-signature/`, {
     method: 'POST',

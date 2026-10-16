@@ -171,7 +171,7 @@ const NAV = [
     icon: BarChart3,
     children: [
       { label: 'Estimates', icon: FileText, to: '/sales/estimates' },
-      { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
+      // { label: 'Quotations', icon: FileText, to: '/sales/quotations' }, // Hidden: Quotation removed per workflow update
       { label: 'Sales Orders', icon: ShoppingCart, to: '/sales/orders' },
       { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },

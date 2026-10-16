@@ -32,7 +32,7 @@ const challanGuide = {
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
 export const DeliveryChallansPage = () => {
-    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId, companyProfile } = useERP();
+    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId, companyProfile, formatCurrency } = useERP();
     const location = useLocation();
     const navigate = useNavigate();
     React.useEffect(() => {
@@ -71,6 +71,9 @@ export const DeliveryChallansPage = () => {
             const availableSerials = isSerial ? (mi.serialNumbers || []) : [];
             return {
                 ...it,
+                rate: Number(it.rate ?? 0),
+                tax: Number(it.tax ?? it.tax_pct ?? 18),
+                amount: Number(it.amount ?? (defaultDispatchQty * Number(it.rate ?? 0))),
                 orderedQty,
                 deliveredQty,
                 remainingQty,
@@ -181,6 +184,10 @@ export const DeliveryChallansPage = () => {
             return;
         }
 
+        const formalInvoiceAmount = order?.formalInvoiceAmount !== undefined
+            ? Number(order.formalInvoiceAmount)
+            : Number(order?.amount || 0);
+
         const created = addDeliveryChallan({
             ...(draftChallan ? { ...draftChallan, id: draftChallan.id } : {}),
             challanNumber: draftChallan?.challanNumber || `DC-2026-${String(deliveryChallans.length + 45).padStart(3, '0')}`,
@@ -192,6 +199,7 @@ export const DeliveryChallansPage = () => {
             customerId: order?.customerId,
             customer: order?.customer || 'Walk-in Customer',
             dispatchDate: new Date().toISOString().split('T')[0],
+            formalInvoiceAmount,
             transporter,
             vehicleNo,
             weighbridgeSlip,
@@ -218,7 +226,7 @@ export const DeliveryChallansPage = () => {
                 docs.push({
                     type: 'Sales Order',
                     number: order.orderNumber,
-                    amount: order.amount,
+                    amount: order.formalInvoiceAmount !== undefined ? Number(order.formalInvoiceAmount) : order.amount,
                     date: order.date,
                     status: order.stage,
                 });
@@ -230,16 +238,6 @@ export const DeliveryChallansPage = () => {
                         amount: inv.total,
                         date: inv.date,
                         status: inv.status,
-                    });
-                    const payments = paymentIns.filter((p) => p.invoiceId === inv.id || p.invoiceNumber === inv.invoiceNumber);
-                    payments.forEach((p) => {
-                        docs.push({
-                            type: 'Payment',
-                            number: p.receiptNumber,
-                            amount: p.amount,
-                            date: p.date,
-                            status: 'Settled',
-                        });
                     });
                 });
             }
@@ -309,6 +307,29 @@ export const DeliveryChallansPage = () => {
                 </span>
               </div>
             ),
+        },
+        {
+            key: 'formalInvoiceAmount',
+            header: 'Formal Invoice Amount',
+            align: 'right',
+            width: '15%',
+            render: (c) => {
+                const linkedOrder = salesOrders.find(
+                    (o) => o.id === c.salesOrderId || o.orderNumber === (c.salesOrderNumber || c.linkedSo)
+                );
+                const formalAmt = Number(
+                    c.formalInvoiceAmount !== undefined
+                        ? c.formalInvoiceAmount
+                        : linkedOrder?.formalInvoiceAmount !== undefined
+                            ? linkedOrder.formalInvoiceAmount
+                            : (linkedOrder?.amount || c.amount || c.total || 0)
+                );
+                return (
+                    <span className="font-mono font-bold text-blue-900 dark:text-blue-300 whitespace-nowrap">
+                        {formatCurrency(formalAmt)}
+                    </span>
+                );
+            },
         },
         {
             key: 'items',
@@ -799,6 +820,19 @@ export const DeliveryChallansPage = () => {
             </div>
 
             <div className="space-y-6 overflow-y-auto pr-1 flex-1">
+              {(() => {
+                const selectedLinkedOrder = salesOrders.find(
+                  (o) => o.id === selectedChallan.salesOrderId || o.orderNumber === (selectedChallan.salesOrderNumber || selectedChallan.linkedSo)
+                );
+                const selectedFormalInvoiceAmt = Number(
+                  selectedChallan.formalInvoiceAmount !== undefined
+                    ? selectedChallan.formalInvoiceAmount
+                    : selectedLinkedOrder?.formalInvoiceAmount !== undefined
+                      ? selectedLinkedOrder.formalInvoiceAmount
+                      : (selectedLinkedOrder?.amount || selectedChallan.amount || selectedChallan.total || 0)
+                );
+                return (
+                  <>
               {/* Shipper & Consignee Header */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div className="space-y-1">
@@ -826,7 +860,7 @@ export const DeliveryChallansPage = () => {
               </div>
 
               {/* Carrier Logistics Details */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white p-3 rounded-xl border border-slate-200">
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Transporter</span>
                   <p className="font-semibold text-slate-800">{selectedChallan.transporter || '—'}</p>
@@ -840,8 +874,12 @@ export const DeliveryChallansPage = () => {
                   <p className="font-semibold text-slate-800">{formatDateDDMMYYYY(selectedChallan.dispatchDate || selectedChallan.date)}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Dispatch Type</span>
-                  <p className="font-semibold text-emerald-700">Non-Commercial Waybill</p>
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Formal Invoice Amount</span>
+                  <p className="font-mono font-bold text-blue-900">{formatCurrency(selectedFormalInvoiceAmt)}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Consignment Type</span>
+                  <p className="font-semibold text-emerald-700">Goods Waybill</p>
                 </div>
               </div>
 
@@ -1055,7 +1093,7 @@ export const DeliveryChallansPage = () => {
               })()}
               */}
 
-              {/* Clean Manifest Table (No Commercial Prices/Taxes) */}
+              {/* Goods Manifest Item Table with Formal Pricing */}
               <div className="space-y-2">
                 <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                   <h4 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-1.5">
@@ -1065,42 +1103,64 @@ export const DeliveryChallansPage = () => {
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
-                    <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+                  <table className="w-full min-w-[700px] lg:min-w-0 text-left text-xs text-slate-600">
+                    <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[10px]">
                       <tr>
-                        <th className="py-2.5 px-3 w-12 text-center">#</th>
+                        <th className="py-2.5 px-3 w-10 text-center">#</th>
                         <th className="py-2.5 px-3">Item Description</th>
-                        <th className="py-2.5 px-3 w-32">SKU / Code</th>
-                        <th className="py-2.5 px-3 w-28 text-center">Dispatched Qty</th>
+                        <th className="py-2.5 px-3 w-28">SKU / Code</th>
+                        <th className="py-2.5 px-3 w-24 text-center">Dispatched Qty</th>
+                        <th className="py-2.5 px-3 w-24 text-right">Unit Rate</th>
+                        <th className="py-2.5 px-3 w-16 text-center">Tax %</th>
+                        <th className="py-2.5 px-3 w-28 text-right">Formal Amount</th>
                         <th className="py-2.5 px-3">Serial Numbers</th>
-                        <th className="py-2.5 px-3 w-28 text-center">Packaging</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
-                      {(selectedChallan.items || []).map((it, idx) => (
-                        <tr key={it.id || idx} className="hover:bg-slate-50/60">
-                          <td className="p-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                          <td className="p-2.5 font-semibold text-slate-800">{it.description || it.name}</td>
-                          <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || '—'}</td>
-                          <td className="p-2.5 text-center font-bold text-slate-900">{it.qty}</td>
-                          <td className="p-2.5">
-                            {it.selectedSerials && it.selectedSerials.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {it.selectedSerials.map((s) => (
-                                  <span key={s} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-mono text-[10px]">
-                                    {s}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 font-mono text-[10px]">Standard Tracked</span>
-                            )}
-                          </td>
-                          <td className="p-2.5 text-center text-slate-500 text-[11px]">Carton / Sealed</td>
-                        </tr>
-                      ))}
+                      {(selectedChallan.items || []).map((it, idx) => {
+                        const qty = Number(it.qty || it.dispatchedQty || it.quantity || 1);
+                        const orderLine = selectedLinkedOrder?.items?.find((oi) => oi.itemId === it.itemId || (it.itemSku && oi.itemSku === it.itemSku) || (it.name && oi.name === it.name));
+                        const rate = Number(it.rate !== undefined ? it.rate : (orderLine?.rate ?? 0));
+                        const taxRate = Number(it.tax !== undefined ? it.tax : (it.tax_pct !== undefined ? it.tax_pct : (orderLine?.tax ?? orderLine?.tax_pct ?? 18)));
+                        const lineAmt = Number(it.amount !== undefined ? it.amount : (orderLine?.amount ?? (qty * rate)));
+                        return (
+                          <tr key={it.id || idx} className="hover:bg-slate-50/60">
+                            <td className="p-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
+                            <td className="p-2.5">
+                              <p className="font-semibold text-slate-800">{it.description || it.name}</p>
+                              {lineSpecText(it) && <p className="text-[10px] text-slate-400">{lineSpecText(it)}</p>}
+                            </td>
+                            <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || '—'}</td>
+                            <td className="p-2.5 text-center font-bold text-slate-900">{qty} {it.uom || it.unit || ''}</td>
+                            <td className="p-2.5 text-right font-mono text-slate-700">{formatCurrency(rate)}</td>
+                            <td className="p-2.5 text-center font-mono text-slate-600">{taxRate}%</td>
+                            <td className="p-2.5 text-right font-mono font-bold text-blue-900">{formatCurrency(lineAmt)}</td>
+                            <td className="p-2.5">
+                              {it.selectedSerials && it.selectedSerials.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {it.selectedSerials.map((s) => (
+                                    <span key={s} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-mono text-[10px]">
+                                      {s}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-[10px]">Standard Tracked</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
+                  <div className="flex flex-wrap items-center justify-between p-3 bg-slate-50 border-t border-slate-200 text-xs gap-2">
+                    <span className="text-slate-600">
+                      Total Dispatched Units: <strong className="font-mono font-bold text-slate-900">{(selectedChallan.items || []).reduce((acc, it) => acc + Number(it.qty || 1), 0)} pcs</strong>
+                    </span>
+                    <span className="text-slate-600">
+                      Formal Invoice Total: <strong className="font-mono font-bold text-blue-900">{formatCurrency(selectedFormalInvoiceAmt)}</strong>
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1122,6 +1182,9 @@ export const DeliveryChallansPage = () => {
                   <p className="text-[10px] text-slate-400">Received complete quantity in good order and condition.</p>
                 </div>
               </div>
+                  </>
+                );
+              })()}
             </div>
 
             <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">

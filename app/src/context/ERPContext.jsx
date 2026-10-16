@@ -3241,6 +3241,7 @@ export const ERPProvider = ({ children, }) => {
             transporter: '',
             vehicleNo: '',
             status: 'In Transit',
+            formalInvoiceAmount: order.formalInvoiceAmount !== undefined ? Number(order.formalInvoiceAmount) : Number(order.amount || 0),
             items: dispatchLines,
             lineItems: dispatchLines,
         };
@@ -3425,6 +3426,7 @@ export const ERPProvider = ({ children, }) => {
             netWeight: challan.grossWeight !== undefined && challan.tareWeight !== undefined
                 ? Number(challan.grossWeight) - Number(challan.tareWeight) : challan.netWeight,
             status: challan.status || 'In Transit',
+            formalInvoiceAmount: challan.formalInvoiceAmount !== undefined ? Number(challan.formalInvoiceAmount) : undefined,
             items: challanItems,
             lineItems: challanItems,
         };

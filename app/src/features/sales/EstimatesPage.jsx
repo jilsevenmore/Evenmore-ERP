@@ -12,7 +12,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { FormSection } from '../../components/common/FormSection';
 import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
-import { importEstimatesExcel, convertEstimateToChallan } from '../../services/upgradeService';
+import { importEstimatesExcel, convertEstimateToChallan, convertEstimateToOrder } from '../../services/upgradeService';
 import PartySelector from '../../components/common/PartySelector';
 
 
@@ -24,19 +24,19 @@ function logLeadActivity(leadId, title, color) {
 
 const estimateGuide = {
     title: 'Sales Estimates',
-    subtitle: 'Pre-quotation cost estimates and 1-click conversion to Quotations.',
-    purpose: 'An Estimate is a preliminary, non-binding cost indication shared with a prospect before a formal Quotation. Once the prospect accepts the estimate, it converts directly into a Quotation without re-entering line items.',
+    subtitle: 'Cost estimates and 1-click conversion to Sales Orders.',
+    purpose: 'An Estimate is a preliminary cost indication shared with a prospect. Once accepted, it converts directly into a Sales Order without re-entering line items.',
     keyTerms: [
         { term: 'Estimate', definition: 'A rough cost indication valid for a short window (e.g. 15 days).' },
         { term: 'Estimate Value', definition: 'The total monetary value of all open estimates awaiting prospect response.' },
-        { term: '1-Click Quotation Conversion', definition: 'Automatically converts an accepted estimate into a formal Quotation.' },
+        { term: '1-Click Sales Order Conversion', definition: 'Automatically converts an accepted estimate into a Sales Order.' },
     ],
     tips: [
-        'Click "Convert to Quotation" to instantly create a formal Quotation from an accepted estimate.',
+        'Click "Convert" to instantly create a Sales Order from an accepted estimate.',
         'Use the Clone button to duplicate any existing estimate for a quick client variation.',
         'Click the Estimate number to view line item details and print the estimate voucher.',
     ],
-    workflow: ['Estimate Created', 'Prospect Review', 'Convert to Quotation', 'Customer Approval', 'Sales Order'],
+    workflow: ['Estimate Created', 'Prospect Review', 'Convert to Sales Order', 'Delivery Challan / Invoice'],
 };
 
 export const EstimatesPage = () => {
@@ -45,7 +45,8 @@ export const EstimatesPage = () => {
         addEstimate,
         updateEstimate,
         customers = [],
-        addQuotation,
+        addSalesOrder,
+        salesOrders = [],
         addInventoryItem,
         formatCurrency,
         formatDateDDMMYYYY,
@@ -180,12 +181,20 @@ export const EstimatesPage = () => {
     const approvedEstimates = estimates.filter((e) => isApprovedEstimate(e));
     const rejectedEstimates = estimates.filter((e) => isRejectedEstimate(e));
 
-    const handleConvert = (estimateId) => {
+    const handleConvert = async (estimateId) => {
         const estimate = estimates.find((e) => e.id === estimateId);
         if (!estimate) return;
-        const nextQuote = {
-            id: `quo-${Date.now()}`,
-            quoteNumber: `QUO-2026-${String(Date.now()).slice(-3)}`,
+
+        let serverOrder = null;
+        try {
+            serverOrder = await convertEstimateToOrder(estimate.id);
+        } catch (err) {
+            // Local fallback handled below
+        }
+
+        const nextOrder = {
+            id: serverOrder?.id || `so-${Date.now()}`,
+            orderNumber: serverOrder?.orderNumber || serverOrder?.order_number || `SO-2026-${String(salesOrders.length + 101).padStart(4, '0')}`,
             estimateRef: estimate.estimateNumber,
             sourceEstimateId: estimate.id,
             sourceEstimateNumber: estimate.estimateNumber,
@@ -203,17 +212,29 @@ export const EstimatesPage = () => {
             leadId: estimate.leadId || '',
             leadName: estimate.leadName || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            validUntil: '30 Days',
+            deliveryDate: '',
             amount: estimate.amount,
+            totalSalesValue: estimate.amount,
+            formalInvoiceAmount: estimate.amount,
+            cashAmount: 0,
+            stage: 'Draft',
             status: 'Draft',
-            items: estimate.items || [],
+            paymentStatus: 'Unpaid',
+            items: (estimate.items || []).map((it, idx) => ({
+                ...it,
+                id: it.id || `item-${Date.now()}-${idx}`,
+                orderedQty: Number(it.qty || it.orderedQty || 1),
+                qty: Number(it.qty || it.orderedQty || 1),
+                rate: Number(it.rate || 0),
+                amount: Number(it.amount || ((it.qty || 1) * (it.rate || 0))),
+            })),
         };
-        addQuotation(nextQuote);
+        addSalesOrder(nextOrder);
         updateEstimate(estimate.id, { status: 'Converted' });
         if (estimate.leadId) {
-            logLeadActivity(estimate.leadId, `Estimate ${estimate.estimateNumber} converted to Quotation ${nextQuote.quoteNumber}`, '#10b981');
+            logLeadActivity(estimate.leadId, `Estimate ${estimate.estimateNumber} converted to Sales Order ${nextOrder.orderNumber}`, '#10b981');
         }
-        navigate('/sales/quotations');
+        navigate('/sales/orders');
     };
 
     const handleClone = (estimate) => {
@@ -362,7 +383,7 @@ export const EstimatesPage = () => {
                         </button>
                         {e.status === 'Converted' ? (
                             <button
-                                onClick={() => navigate('/sales/quotations')}
+                                onClick={() => navigate('/sales/orders')}
                                 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
                             >
                                 <CheckCircle2 size={12} /> Converted
@@ -372,7 +393,7 @@ export const EstimatesPage = () => {
                                 <button
                                     onClick={() => handleConvert(e.id)}
                                     className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
-                                    title="Convert to Quotation"
+                                    title="Convert to Sales Order"
                                 >
                                     Convert <ArrowRight size={12} />
                                 </button>
@@ -543,7 +564,7 @@ export const EstimatesPage = () => {
         <div className="space-y-6">
             <PageHeader
                 title="Sales Estimates"
-                subtitle="Share preliminary cost estimates, import historical records, and convert accepted ones directly into formal Quotations or Delivery Challans."
+                subtitle="Share preliminary cost estimates, import historical records, and convert accepted ones directly into Sales Orders or Delivery Challans."
                 guide={estimateGuide}
                 actions={
                     <div className="flex items-center gap-2">
@@ -617,9 +638,9 @@ export const EstimatesPage = () => {
                 <StatCard label="Total Estimates" value={estimates.length} icon={FileText} />
                 <StatCard label="Open Estimate Value" value={formatCurrency(totalValue)} />
                 <StatCard
-                    label="Converted to Quotation"
+                    label="Converted to Sales Order"
                     value={`${convertedEstimates.length} Estimates`}
-                    trend={{ positive: true, text: 'Direct quotation conversion' }}
+                    trend={{ positive: true, text: 'Direct sales order conversion' }}
                 />
                 <StatCard
                     label="Rejected Estimates"
@@ -871,7 +892,7 @@ export const EstimatesPage = () => {
                                             setSelectedEstimate(null);
                                         }}
                                     >
-                                        Convert to Quotation
+                                        Convert to Sales Order
                                     </Button>
                                 )}
                                 <Button variant="outline" onClick={() => setSelectedEstimate(null)}>

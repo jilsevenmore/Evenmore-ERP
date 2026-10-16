@@ -345,9 +345,10 @@ const router = createBrowserRouter([
       { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
 
       // ── Sales ─────────────────────────────────────────────
-      { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },
+      { path: 'sales', element: <Navigate to="/sales/estimates" replace /> },
       { path: 'sales/estimates', element: <Page component={EstimatesPage} /> },
-      { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
+      // { path: 'sales/quotations', element: <Page component={QuotationsPage} /> }, // Hidden: Quotation removed per workflow update
+      { path: 'sales/quotations', element: <Navigate to="/sales/orders" replace /> },
       { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
       { path: 'sales/proforma', element: <Page component={ProformaInvoicesPage} /> },
       { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },
@@ -453,6 +454,7 @@ const router = createBrowserRouter([
       // { path: 'hrms/recruitment/career', element: <Page component={Career} /> }, // Hidden: Career Portal out of scope
       { path: 'hrms/recruitment/questions', element: <Page component={CustomQuestions} /> },
       { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> },
+      { path: 'hrms/recruitment/pipeline', element: <Navigate to="/hrms/recruitment/candidates" replace /> },
       { path: 'hrms/performance', element: <Page component={PerformanceDashboard} /> },
       { path: 'hrms/performance/indicators', element: <Page component={Indicators} /> },
       { path: 'hrms/performance/kpi-data', element: <Page component={KpiData} /> },
