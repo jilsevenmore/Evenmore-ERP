@@ -36,6 +36,7 @@ import { useAppStore } from '../../stores/appStore';
 import { canOpenPath, canUse } from '../../utils/navAccess';
 import { usePunchActions } from '../../features/hrms/attendance/usePunchActions';
 import { useERP } from '../../context/ERPContext';
+import { usePmsStore, getProjectRowMeta, computeUpcomingDeadlines } from '../../stores/pmsStore';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 import { useIdleReady } from '../../hooks/useIdleReady';
 import { markEventNotificationRead, markAllNotificationsRead } from '../../services/crmEventNotifications';
@@ -230,6 +231,62 @@ export default function Topbar() {
     return list.filter((n) => canOpenPath(n.path, grantedPermissions || []));
   }, [lowStockItems, /* pendingZoneRequests, */ inTransitChallans, overdueInvoices, grantedPermissions]);
 
+  const pmsProjects = usePmsStore((s) => s.projects) || [];
+
+  const pmsNotifications = useMemo(() => {
+    const list = [];
+    const now = Date.now();
+
+    for (const p of pmsProjects) {
+      if (p.status === 'Completed') continue;
+
+      const meta = getProjectRowMeta(p, now);
+      const codeOrId = p.code || p.id;
+      const path = `/pms/projects/${codeOrId}`;
+
+      // 1. Delayed Project Alert
+      if (p.status === 'Delayed' || (meta.projectDelayMs > 0 && p.status !== 'Completed')) {
+        list.push({
+          id: `pms-delay-${p.id}`,
+          title: `Project Delayed: ${codeOrId}`,
+          desc: `${p.customerName || 'Customer'} project is delayed (${meta.projectDelayLabel || 'Overdue'}). Current stage: ${meta.currentStage?.name || 'In Progress'}.`,
+          time: 'Delayed',
+          unread: true,
+          tone: 'urgent',
+          category: 'pms',
+          path,
+        });
+      }
+      // 2. Deadline Approaching Alert (due in <= 3 days)
+      else if (meta.remainingMs > 0 && meta.remainingMs <= 3 * 24 * 60 * 60 * 1000) {
+        list.push({
+          id: `pms-deadline-${p.id}`,
+          title: `Deadline Approaching: ${codeOrId}`,
+          desc: `${p.customerName || 'Customer'} project deadline is near (${meta.remainingLabel}).`,
+          time: 'Due Soon',
+          unread: true,
+          tone: 'warning',
+          category: 'pms',
+          path,
+        });
+      }
+      // 3. New Project Arrived (Draft or created recently within 3 days)
+      else if (p.status === 'Draft' || (p.createdAt && (now - new Date(p.createdAt).getTime() <= 3 * 24 * 60 * 60 * 1000))) {
+        list.push({
+          id: `pms-new-${p.id}`,
+          title: `New Project Arrived: ${codeOrId}`,
+          desc: `${p.customerName || 'Customer'} - ${p.productDetails?.productName || 'Order'} ready for stage execution.`,
+          time: 'New',
+          unread: true,
+          tone: 'info',
+          category: 'pms',
+          path,
+        });
+      }
+    }
+    return list.filter((n) => canOpenPath(n.path, grantedPermissions || []));
+  }, [pmsProjects, grantedPermissions]);
+
   // Bell: one list, every notification tagged with its module.
   const [notifModule, setNotifModule] = useState('all');
   const [expandedModules, setExpandedModules] = useState({});
@@ -239,12 +296,13 @@ export default function Topbar() {
   const moduleNotifs = useMemo(() => {
     const rows = [
       ...erpNotifications,
+      ...pmsNotifications,
       ...(crmDigest.reminders || []),
       // The in-transit challan alert is already among the Sales alerts.
       ...(crmDigest.notifications || []).filter((n) => n.bucket !== 'challan'),
     ];
     return rows.map((n) => ({ ...n, module: notificationModule(n) }));
-  }, [erpNotifications, crmDigest]);
+  }, [erpNotifications, pmsNotifications, crmDigest]);
 
   const moduleGroups = useMemo(
     () => NOTIF_MODULES

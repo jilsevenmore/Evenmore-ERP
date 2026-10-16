@@ -7,6 +7,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { TaskFilterBar } from './components/TaskFilterBar';
 import { TaskCardItem } from './components/TaskCardItem';
 import { TaskDetailModal } from './components/TaskDetailModal';
+import { PMSNotificationAlerts } from '../components/PMSNotificationAlerts';
 import { PmsToast } from '../components/PmsToast';
 import { 
   fetchDelegatedTasks, 
@@ -223,6 +224,8 @@ export default function MyTasksPage() {
           )
         }
       />
+
+      <PMSNotificationAlerts />
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 text-xs">

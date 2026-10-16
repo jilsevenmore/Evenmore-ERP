@@ -8,6 +8,7 @@ import {
 } from '../../../stores/pmsStore';
 import { TimelineFilterBar } from './components/TimelineFilterBar';
 import { TimelineGanttChart } from './components/TimelineGanttChart';
+import { PMSNotificationAlerts } from '../components/PMSNotificationAlerts';
 
 /**
  * TimelinePage (/pms/timeline) — the cross-project Gantt.
@@ -66,6 +67,8 @@ export default function TimelinePage() {
         title="Timeline & Gantt"
         subtitle="Stage spans across every active project on one shared time axis."
       />
+
+      <PMSNotificationAlerts />
 
       <TimelineFilterBar
         filters={filters}

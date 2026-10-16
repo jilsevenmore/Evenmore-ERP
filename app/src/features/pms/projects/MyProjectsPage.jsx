@@ -13,6 +13,7 @@ import { pullMyProjects } from '../../../services/pmsSync';
 import { ProjectFilterBar } from './components/ProjectFilterBar';
 import { ProjectsTable } from './components/ProjectsTable';
 import { DeleteProjectModal } from './components/DeleteProjectModal';
+import { PMSNotificationAlerts } from '../components/PMSNotificationAlerts';
 import { PmsToast } from '../components/PmsToast';
 
 /**
@@ -67,6 +68,10 @@ export default function MyProjectsPage() {
             ? `Projects ${currentUser?.name} is assigned to — as project manager, stage owner, task assignee or team member.`
             : 'Projects you are assigned to — as project manager, stage owner, task assignee or team member.'
         }
+      />
+
+      <PMSNotificationAlerts
+        onFilterDelayed={() => setFilters((prev) => ({ ...prev, delayedOnly: true }))}
       />
 
       <ProjectFilterBar

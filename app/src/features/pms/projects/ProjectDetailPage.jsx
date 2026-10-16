@@ -19,6 +19,8 @@ import { CreateTaskModal } from './components/CreateTaskModal';
 import { StageHandoffModal } from '../components/StageHandoffModal';
 import { CompleteProjectModal } from './components/CompleteProjectModal';
 import { DeleteProjectModal } from './components/DeleteProjectModal';
+import { EditPlannedDurationModal } from './components/EditPlannedDurationModal';
+import { PMSNotificationAlerts } from '../components/PMSNotificationAlerts';
 import { PmsToast } from '../components/PmsToast';
 import { MessengerTab } from '../messenger/MessengerTab';
 import { useProjectMessenger } from '../messenger/useProjectMessenger';
@@ -63,6 +65,7 @@ export default function ProjectDetailPage() {
   const [focusStageId, setFocusStageId] = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDurationOpen, setIsDurationOpen] = useState(false);
   const [assignStageId, setAssignStageId] = useState(null); // null = closed
   const [createTaskStageId, setCreateTaskStageId] = useState(null); // null = closed
   const [handoffStageId, setHandoffStageId] = useState(null);
@@ -200,7 +203,10 @@ export default function ProjectDetailPage() {
         onLogDelay={() => navigate(`/pms/delays?project=${project.id}`)}
         onCompleteProject={() => setConfirmComplete(true)}
         onDeleteProject={canDelete ? () => setIsDeleteOpen(true) : null}
+        onEditDuration={canDelete && project.status !== 'Completed' ? () => setIsDurationOpen(true) : null}
       />
+
+      <PMSNotificationAlerts project={project} />
 
       {/* Tabs */}
       <div className="border-b border-[#dce5f4] overflow-x-auto">
@@ -341,6 +347,12 @@ export default function ProjectDetailPage() {
           await deleteProject(project.id);
           navigate('/pms/projects');
         }}
+      />
+
+      <EditPlannedDurationModal
+        isOpen={isDurationOpen}
+        project={project}
+        onClose={() => setIsDurationOpen(false)}
       />
 
       <PmsToast />
