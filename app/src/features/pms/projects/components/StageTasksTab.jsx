@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { CheckCircle2, Circle, Ban, Loader, Plus, Filter, Check, Trash2 } from 'lucide-react';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
-import { Button } from '../../../../components/ui/Button';
 
 /**
  * StageTasksTab — the stage-wise task checklist.
@@ -167,8 +166,8 @@ export function StageTasksTab({ project, onToggleTask, onDeleteTask, onTaskProgr
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {totalTasks > 0 && (
+        {totalTasks > 0 && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowAllStages(!showAllStages)}
@@ -177,18 +176,8 @@ export function StageTasksTab({ project, onToggleTask, onDeleteTask, onTaskProgr
               <Filter size={12} />
               {showAllStages ? 'Stages with tasks only' : 'Show all stages'}
             </button>
-          )}
-
-          {!readOnly && (
-            <Button
-              size="sm"
-              icon={Plus}
-              onClick={() => onAddTask?.()}
-            >
-              Add Task
-            </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {displayedStages.length === 0 ? (
@@ -197,13 +186,6 @@ export function StageTasksTab({ project, onToggleTask, onDeleteTask, onTaskProgr
             variant="tasks"
             title="No tasks yet"
             description="Tasks appear here once they are added to a stage. You can add a task to any stage."
-            action={
-              !readOnly && (
-                <Button size="sm" icon={Plus} onClick={() => onAddTask?.()}>
-                  Add Task
-                </Button>
-              )
-            }
           />
         </div>
       ) : (
@@ -254,17 +236,8 @@ export function StageTasksTab({ project, onToggleTask, onDeleteTask, onTaskProgr
               </header>
 
               {tasks.length === 0 ? (
-                <div className="py-3 px-4 text-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                <div className="py-3 px-4 text-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50">
                   <span className="text-xs text-slate-400">No tasks in this stage yet.</span>
-                  {!readOnly && (
-                    <button
-                      type="button"
-                      onClick={() => onAddTask?.(stage.id)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700"
-                    >
-                      <Plus size={12} /> Add Task
-                    </button>
-                  )}
                 </div>
               ) : (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
