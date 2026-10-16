@@ -154,10 +154,15 @@ export function computeProjectCompletionPct(stages = []) {
   return clampPct(sum / stages.length);
 }
 
-/** Project start + the sum of every stage's planned duration. */
-export function computeProjectExpectedCompletion(startDate, stages = []) {
+/** Project start + planned duration, falling back to sum of stage durations. */
+export function computeProjectExpectedCompletion(startDate, stages = [], plannedDuration = null, durationUnit = "Days") {
   const start = toDate(startDate);
-  if (!start || stages.length === 0) return null;
+  if (!start) return null;
+  if (plannedDuration != null && Number(plannedDuration) > 0) {
+    const ms = durationToMs(plannedDuration, durationUnit);
+    if (ms > 0) return new Date(start.getTime() + ms).toISOString();
+  }
+  if (stages.length === 0) return null;
   const totalMs = stages.reduce(
     (acc, s) => acc + durationToMs(s.plannedDuration, s.durationUnit),
     0
@@ -268,7 +273,7 @@ export function recalcProject(project, now = Date.now(), atRiskThresholdPct = 70
     stages,
     overallCompletionPct: computeProjectCompletionPct(stages),
     expectedCompletionDate:
-      computeProjectExpectedCompletion(project.startDate, stages) ??
+      computeProjectExpectedCompletion(project.startDate, stages, project.plannedDuration, project.durationUnit) ??
       project.expectedCompletionDate ??
       null,
   };
@@ -2057,7 +2062,11 @@ const usePmsStoreBase = create((set, get) => ({
     startDate,
     stageConfigIds = null,
     stageWeights = null,
+    stageDurations = null,
+    stageDurationUnits = null,
     specifications = "",
+    plannedDuration = null,
+    durationUnit = "Days",
   }) => {
     if (!order) throw new Error("A CRM order is required to create a project.");
     if (!projectManager) throw new Error("A project manager is required.");
@@ -2074,7 +2083,11 @@ const usePmsStoreBase = create((set, get) => ({
       startDate: startDate || new Date().toISOString(),
       stageConfigIds,
       stageWeights,
+      stageDurations,
+      stageDurationUnits,
       specifications,
+      plannedDuration: plannedDuration !== null && plannedDuration !== '' && !isNaN(Number(plannedDuration)) ? Number(plannedDuration) : undefined,
+      durationUnit: durationUnit || 'Days',
     });
 
     const project = created?.project || created;
@@ -2148,7 +2161,7 @@ const usePmsStoreBase = create((set, get) => ({
 
   updateProject: (projectId, patch) => {
     set((st) => applyToProject(st, projectId, (p) => ({ ...p, ...patch })));
-    pushProject(projectId, () => pmsSync.update("projects", projectId, patch));
+    return pushProject(projectId, () => pmsSync.update("projects", projectId, patch));
   },
 
   deleteProject: async (projectId) => {
