@@ -3,7 +3,7 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, Building2, DollarSign, Clock, X, Eye, FileSpreadsheet } from 'lucide-react';
+import { Plus, Building2, IndianRupee, Clock, X, Eye, FileSpreadsheet } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 const vendorGuide = {
     title: 'Vendor Master & Supplier Directory',
@@ -172,7 +172,7 @@ export const VendorsPage = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total Suppliers" value={vendors.length} icon={Building2}/>
-        <StatCard label="Accounts Payable" value={formatCurrency(totalPayable)} icon={DollarSign}/>
+        <StatCard label="Accounts Payable" value={formatCurrency(totalPayable)} icon={IndianRupee}/>
         <StatCard label="Standard Terms" value="Net 30 / Net 45" icon={Clock}/>
       </div>
 

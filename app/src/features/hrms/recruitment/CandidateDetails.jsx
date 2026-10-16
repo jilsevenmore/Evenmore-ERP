@@ -102,6 +102,17 @@ export default function CandidateDetails() {
     showToast(`Offer letter confirmed and issued for ${c.name}`);
   };
 
+  const handleAcceptOffer = (offerData) => {
+    const existingIndex = offers.findIndex((o) => o.id === offerData.id || o.candidateId === offerData.candidateId);
+    if (existingIndex >= 0) {
+      updateOffer(offers[existingIndex].id, { ...offerData, status: "Accepted" });
+    } else {
+      addOffer({ ...offerData, status: "Accepted" });
+    }
+    changeStage(c.id, "Hired");
+    showToast(`Offer accepted! ${c.name} converted to Hired and added to Employee Directory.`);
+  };
+
   const handleUpdateOffer = (offerData) => {
     updateOffer(offerData.id, offerData);
     showToast(`Offer letter updated for ${c.name}`);
@@ -191,19 +202,23 @@ export default function CandidateDetails() {
 
           {/* Action Toolbar */}
           <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0">
-            <div className="flex items-center gap-1 bg-soft border border-border rounded-xl px-2 py-1">
+            <div className="inline-flex items-center gap-1.5 h-[30px] px-2.5 bg-soft border border-border rounded-xl">
               <span className="text-[10px] uppercase font-bold text-muted">Stage:</span>
               <select
                 value={c.stage}
                 onChange={(e) => {
                   const newStage = e.target.value;
                   changeStage(c.id, newStage);
-                  showToast(`Candidate stage updated to ${newStage}`);
+                  if (newStage === "Hired") {
+                    showToast(`${c.name} hired and added to Employee Directory!`);
+                  } else {
+                    showToast(`Candidate stage updated to ${newStage}`);
+                  }
                   if (newStage === "Offer") {
                     openOfferLetter();
                   }
                 }}
-                className="h-9 px-2 bg-transparent text-xs font-semibold text-text focus:outline-none cursor-pointer"
+                className="h-full bg-transparent text-xs font-semibold text-text focus:outline-none cursor-pointer"
               >
                 <option>Applied</option>
                 <option>Screening</option>
@@ -214,6 +229,17 @@ export default function CandidateDetails() {
                 <option>Rejected</option>
               </select>
             </div>
+
+            {c.stage === "Hired" && (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={UserCheck}
+                onClick={() => navigate("/hrms/employees", { state: { search: c.name } })}
+              >
+                View in Employees
+              </Button>
+            )}
 
             <Button
               size="sm"
@@ -463,6 +489,7 @@ export default function CandidateDetails() {
         onClose={() => setIsOfferModalOpen(false)}
         offer={activeOffer}
         onConfirmOffer={handleConfirmOffer}
+        onAcceptOffer={handleAcceptOffer}
         onUpdateOffer={handleUpdateOffer}
       />
     </div>

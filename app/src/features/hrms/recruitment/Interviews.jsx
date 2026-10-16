@@ -105,8 +105,25 @@ function getCategory(type) {
   );
 }
 
+const INTERVIEWS_GUIDE = {
+  title: "Interview Schedules & Evaluations",
+  subtitle: "Coordinate panel evaluations, technical coding assessments, and feedback logging.",
+  purpose: "Manage structured evaluation rounds, launch meeting rooms, and log scores that feed directly into shortlisting decisions.",
+  workflow: [
+    "Schedule Interview Slot",
+    "Assign Panel Interviewers",
+    "Generate Video Meeting Link",
+    "Conduct & Assess Candidate",
+    "Log Scorecard & Feedback",
+  ],
+  keyTerms: [
+    { term: "Interview Type", definition: "Categorization: Technical, HR Round, Managerial, Final, or Coding Assessment." },
+    { term: "Calendar Mode", definition: "Interactive monthly overview to prevent panelist double-booking." },
+  ],
+};
+
 export default function Interviews() {
-  const { interviews, addInterview, candidates, jobs } = useRecruitmentStore();
+  const { interviews, addInterview, updateCandidate, candidates, jobs, changeStage } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const location = useLocation();
@@ -114,7 +131,6 @@ export default function Interviews() {
   const [view, setView] = useState("List");
   const [typeFilter, setTypeFilter] = useState("All");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
   const [activeYear, setActiveYear] = useState(() => new Date().getFullYear());
   const [activeMonth, setActiveMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -211,7 +227,13 @@ export default function Interviews() {
       status: "Scheduled",
       meetingLink: form.meetingLink,
     });
-    showToast("Interview scheduled successfully.");
+    if (cand) {
+      if (!cand.stage || cand.stage === "Applied" || cand.stage === "Screening") {
+        changeStage(cand.id, "Interview");
+      }
+      updateCandidate(cand.id, { interviewStatus: "Scheduled" });
+    }
+    showToast(`Interview scheduled for ${cand?.name || "Candidate"}.`);
     setDrawerOpen(false);
   }
 
@@ -309,19 +331,23 @@ export default function Interviews() {
     {
       key: "actions",
       header: "Actions",
+      align: "right",
       render: (r) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-end gap-1.5">
           <button
+            type="button"
             onClick={() => navigate(`/hrms/recruitment/interviews/${r.id}`)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 dark:text-slate-200 hover:text-navy dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition"
+            className="p-1.5 rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-400 dark:text-slate-500 transition cursor-pointer"
+            title="View Details & Score"
           >
-            <Eye size={12} />
-            <span>View</span>
+            <Eye size={15} />
           </button>
           {r.meetingLink && (
             <button
+              type="button"
               onClick={() => window.open(r.meetingLink || "#", "_blank")}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-xl transition"
+              className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-lg transition cursor-pointer"
+              title="Launch Live Video Interview"
             >
               <ExternalLink size={12} />
               <span>Join</span>
@@ -343,26 +369,17 @@ export default function Interviews() {
           { label: "Recruitment", path: "/hrms/recruitment" },
           { label: "Interviews" },
         ]}
+        guide={INTERVIEWS_GUIDE}
         actions={
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-muted hover:text-text hover:bg-soft text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <HelpCircle size={14} />
-              <span>Guide</span>
-            </button>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => setDrawerOpen(true)}
-              className="shadow-xs whitespace-nowrap font-medium"
-            >
-              Schedule Interview
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => setDrawerOpen(true)}
+            className="shadow-xs whitespace-nowrap font-medium"
+          >
+            Schedule Interview
+          </Button>
         }
       />
 
@@ -1048,67 +1065,6 @@ export default function Interviews() {
           </label>
         </div>
       </Modal>
-
-      {/* Guide Modal */}
-      {guideOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
-          onClick={() => setGuideOpen(false)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto text-[13px] text-slate-600 dark:text-slate-300 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600">
-                  <HelpCircle size={18} />
-                </div>
-                <h3 className="text-[16px] font-bold text-slate-900 dark:text-white">
-                  Interviews Guide
-                </h3>
-              </div>
-              <button
-                onClick={() => setGuideOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  1. Multi-Stage Scheduling
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Assign technical, HR, and managerial rounds. Add meeting links to enable direct one-click access for interviewers and candidates.
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  2. Calendar & List Modes
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Switch between standard table and a monthly calendar grid to avoid double booking panel interviewers.
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  3. Feedback & Scoring
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Click 'View' on any session to score the candidate and log evaluation feedback.
-                </p>
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end">
-              <Button size="sm" onClick={() => setGuideOpen(false)}>
-                Got it
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

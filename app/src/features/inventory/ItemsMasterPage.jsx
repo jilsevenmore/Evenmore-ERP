@@ -116,7 +116,7 @@ export const ItemsMasterPage = () => {
     };
 
     // Detect depleted items in current view
-    const lowStockItems = displayItems.filter((i) => (i.availableQty ?? i.stock ?? 0) <= (i.reorderLevel || 5));
+    const lowStockItems = displayItems.filter((i) => (i.liveAvailable ?? i.availableQty ?? i.stock ?? 0) <= (i.reorderLevel || 5));
 
     const handleBulkSmartRestock = () => {
         if (lowStockItems.length === 0) return;
@@ -127,12 +127,15 @@ export const ItemsMasterPage = () => {
         }
         
         const restockItems = lowStockItems.map((it) => {
-            const deficit = Math.max(10, (it.reorderLevel || 10) * 2 - (it.availableQty ?? it.stock ?? 0));
+            const currentStock = it.liveAvailable ?? it.availableQty ?? it.stock ?? 0;
+            const deficit = Math.max(10, (it.reorderLevel || 10) * 2 - currentStock);
             const unitRate = Number(it.costPrice ?? it.unitCost) || 0;
             return {
                 id: `li-restock-${Date.now()}-${it.id}`,
                 itemId: it.id,
                 itemSku: it.sku,
+                itemName: it.name,
+                name: it.name,
                 description: it.name,
                 qty: deficit,
                 rate: unitRate,
@@ -182,53 +185,72 @@ export const ItemsMasterPage = () => {
             header: 'Description & Taxonomy',
             width: '26%',
             render: (i) => (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-text hover:text-primary hover:underline">
-                      {i.name}
-                    </Link>
-                    {i.itemType && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
-                        {i.itemType}
-                      </span>
-                    )}
-                    {(i.gradeName || i.metalGrade) && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
-                        {i.gradeName || i.metalGrade}
-                      </span>
-                    )}
-                    {i.finishCoating && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                        {i.finishCoating}
-                      </span>
-                    )}
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 mt-0.5">
+                    {(i.imageUrl || i.image) ? (
+                      <img
+                        src={i.imageUrl || i.image}
+                        alt={i.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-full h-full flex items-center justify-center text-slate-400 ${(i.imageUrl || i.image) ? 'hidden' : ''}`}>
+                      <Package size={18} />
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-[11px] text-muted flex-wrap">
-                    <span className="font-medium text-text-secondary">{i.category}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-0.5">
-                      <MapPin size={10} className="text-muted"/> {i.location || '—'}
-                    </span>
-
-                    {/* Metal Dimensions Specs */}
-                    {(i.diameter || i.legA || i.hasTubeSpec || i.sheetThickness || i.specification || i.dimensions) && (
-                      <>
-                        <span>•</span>
-                        <span className="font-mono text-sky-800 dark:text-sky-300 text-[10px] bg-sky-50 dark:bg-sky-500/15 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-500/30">
-                          {i.specification || i.dimensions || (
-                            <>
-                              {i.diameter ? `Ø${i.diameter}mm` : ''}
-                              {i.legA && i.legB && !i.webThickness ? `L ${i.legA}×${i.legB}×${i.sheetThickness || i.wallThickness || ''}mm` : ''}
-                              {i.legA && i.legB && i.webThickness ? `${i.legA}×${i.legB}mm (Web:${i.webThickness}mm, Flg:${i.flangeThickness}mm)` : ''}
-                              {i.hasTubeSpec ? `${i.tubeProfile || 'Round'} OD:${i.outerDiameter || `${i.outerWidth}×${i.outerHeight}`}×${i.wallThickness}mm` : ''}
-                              {!i.hasTubeSpec && !i.diameter && !i.legA && i.sheetThickness ? `${i.sheetThickness}mm (${i.sheetLength || ''}×${i.sheetWidth || ''}mm)` : ''}
-                            </>
-                          )}
-                          {(i.weightPerPiece || i.theoreticalWeight) ? ` [${Number(i.weightPerPiece || i.theoreticalWeight).toFixed(2)} kg]` : ''}
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-text hover:text-primary hover:underline">
+                        {i.name}
+                      </Link>
+                      {i.itemType && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
+                          {i.itemType}
                         </span>
-                      </>
-                    )}
+                      )}
+                      {(i.gradeName || i.metalGrade) && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                          {i.gradeName || i.metalGrade}
+                        </span>
+                      )}
+                      {i.finishCoating && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {i.finishCoating}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11px] text-muted flex-wrap">
+                      <span className="font-medium text-text-secondary">{i.category}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-0.5">
+                        <MapPin size={10} className="text-muted"/> {i.location || '—'}
+                      </span>
+
+                      {/* Metal Dimensions Specs */}
+                      {(i.diameter || i.legA || i.hasTubeSpec || i.sheetThickness || i.specification || i.dimensions) && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono text-sky-800 dark:text-sky-300 text-[10px] bg-sky-50 dark:bg-sky-500/15 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-500/30">
+                            {i.specification || i.dimensions || (
+                              <>
+                                {i.diameter ? `Ø${i.diameter}mm` : ''}
+                                {i.legA && i.legB && !i.webThickness ? `L ${i.legA}×${i.legB}×${i.sheetThickness || i.wallThickness || ''}mm` : ''}
+                                {i.legA && i.legB && i.webThickness ? `${i.legA}×${i.legB}mm (Web:${i.webThickness}mm, Flg:${i.flangeThickness}mm)` : ''}
+                                {i.hasTubeSpec ? `${i.tubeProfile || 'Round'} OD:${i.outerDiameter || `${i.outerWidth}×${i.outerHeight}`}×${i.wallThickness}mm` : ''}
+                                {!i.hasTubeSpec && !i.diameter && !i.legA && i.sheetThickness ? `${i.sheetThickness}mm (${i.sheetLength || ''}×${i.sheetWidth || ''}mm)` : ''}
+                              </>
+                            )}
+                            {(i.weightPerPiece || i.theoreticalWeight) ? ` [${Number(i.weightPerPiece || i.theoreticalWeight).toFixed(2)} kg]` : ''}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
             ),
@@ -377,7 +399,7 @@ export const ItemsMasterPage = () => {
         },
     ];
 
-    const totalCatalogValue = displayItems.reduce((sum, it) => sum + ((it.availableQty ?? it.stock ?? 0) * (it.costPrice ?? it.unitCost ?? 0)), 0);
+    const totalCatalogValue = displayItems.reduce((sum, it) => sum + ((it.liveAvailable ?? it.availableQty ?? it.stock ?? 0) * (it.costPrice ?? it.unitCost ?? 0)), 0);
     const uniqueCategoriesCount = new Set(displayItems.map(i => i.category)).size;
 
     const guideConfig = {

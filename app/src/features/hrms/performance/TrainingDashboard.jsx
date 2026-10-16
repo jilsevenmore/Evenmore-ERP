@@ -44,9 +44,17 @@ export default function TrainingDashboard({ initialTab }) {
     setSearchParams(tabKey === "overview" ? {} : { tab: tabKey });
   };
 
+  const getParticipantCount = (p) => {
+    if (Array.isArray(p)) return p.length;
+    if (typeof p === "number") return p;
+    if (typeof p === "string" && !isNaN(Number(p))) return Number(p);
+    if (p && typeof p === "object") return 1;
+    return 0;
+  };
+
   const totalTrainings = trainings.length;
   const activeTrainings = trainings.filter((t) => t.stage !== "Cancelled");
-  const totalEnrolled = trainings.reduce((sum, t) => sum + (Number(t.participants) || 0), 0);
+  const totalEnrolled = trainings.reduce((sum, t) => sum + getParticipantCount(t.participants), 0);
   const upcomingCount = trainings.filter((t) =>
     ["Scheduled", "Trainer Assigned", "Requested"].includes(t.stage)
   ).length;
@@ -63,7 +71,7 @@ export default function TrainingDashboard({ initialTab }) {
     { label: "Enrolled", value: String(totalEnrolled), icon: Users, color: "bg-[#f0fdf4]", iconColor: "text-[#15803d]" },
     { label: "Upcoming", value: String(upcomingCount), icon: Clock, color: "bg-[#fffbeb]", iconColor: "text-[#b45309]" },
     { label: "Completion", value: `${completionRate}%`, icon: TrendingUp, color: "bg-[#faf5ff]", iconColor: "text-[#7c3aed]" },
-    { label: "Certificates", value: String(trainings.filter((t) => ["Completed", "Evaluated"].includes(t.stage)).reduce((sum, t) => sum + (Number(t.certificates ?? t.participants) || 0), 0)), icon: Award, color: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
+    { label: "Certificates", value: String(trainings.filter((t) => ["Completed", "Evaluated"].includes(t.stage)).reduce((sum, t) => sum + (t.certificates != null ? Number(t.certificates) || 0 : getParticipantCount(t.participants)), 0)), icon: Award, color: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
   ];
 
   const recentPrograms = trainings.slice(0, 6);
@@ -93,9 +101,9 @@ export default function TrainingDashboard({ initialTab }) {
     .map((t) => ({
       id: t.id,
       program: t.name || t.title || "Training",
-      session: t.session || t.type || t.name || "Session",
+      session: t.session || t.type || t.name || t.title || "Session",
       date: [t.start || t.startDate, t.time].filter(Boolean).join(", ") || "—",
-      trainer: t.trainer || "Unassigned",
+      trainer: t.trainer || t.trainerName || "Unassigned",
     }));
 
   const tabs = [
@@ -278,22 +286,28 @@ export default function TrainingDashboard({ initialTab }) {
                         </td>
                       </tr>
                     )}
-                    {recentPrograms.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/50 transition">
-                        <td className="py-3 font-semibold text-slate-800">{p.name}</td>
-                        <td className="py-3 text-slate-600">
-                          <div className="flex items-center gap-1.5">
-                            {p.avatar ? (
-                              <img src={p.avatar} alt="" className="w-5 h-5 rounded-full" />
-                            ) : null}
-                            <span>{p.trainer}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 text-slate-500 text-[12px]">{p.start}</td>
-                        <td className="py-3 text-slate-700 font-medium">{p.participants}</td>
-                        <td className="py-3 text-right">{statusBadge(p.stage || p.status)}</td>
-                      </tr>
-                    ))}
+                    {recentPrograms.map((p) => {
+                      const participantCount = getParticipantCount(p.participants);
+                      const programName = p.name || p.title || "Untitled Program";
+                      const trainerName = p.trainer || p.trainerName || "Unassigned";
+                      const dateDisplay = p.start || p.startDate || "—";
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/50 transition">
+                          <td className="py-3 font-semibold text-slate-800">{programName}</td>
+                          <td className="py-3 text-slate-600">
+                            <div className="flex items-center gap-1.5">
+                              {p.avatar ? (
+                                <img src={p.avatar} alt="" className="w-5 h-5 rounded-full" />
+                              ) : null}
+                              <span>{trainerName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 text-slate-500 text-[12px]">{dateDisplay}</td>
+                          <td className="py-3 text-slate-700 font-medium">{participantCount}</td>
+                          <td className="py-3 text-right">{statusBadge(p.stage || p.status)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

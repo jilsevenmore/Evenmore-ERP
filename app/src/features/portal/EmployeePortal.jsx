@@ -35,16 +35,40 @@ import {
   HelpCircle,
   Send,
   ClipboardList,
+  Award,
+  TrendingUp,
+  ArrowRightLeft,
+  UserMinus,
+  UploadCloud,
+  Download,
+  Check,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useAttendanceStore } from '../../stores/attendanceStore';
 import { useAssetStore } from '../../stores/assetStore';
+import { useDocumentStore } from '../../stores/documentStore';
 import { api } from '../../services/api';
 import { hrmsSync } from '../../services/hrmsSync';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/hrms/Badge';
 import { EarlyPunchOutModal } from '../hrms/attendance/components/EarlyPunchOutModal';
 import { usePunchActions } from '../hrms/attendance/usePunchActions';
+import {
+  fetchEmployeeTransfers,
+  fetchEmployeePromotions,
+  fetchEmployeeWarnings,
+  fetchEmployeeAwards,
+} from '../../services/upgradeService';
+
+const PORTAL_DOC_CATEGORIES = [
+  'Identity',
+  'Contract',
+  'Financial',
+  'Compliance',
+  'Legal',
+  'Educational',
+  'General',
+];
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -164,10 +188,39 @@ export default function EmployeePortal() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load Leave Types & Asset Categories
+  // Resignation State & Helpers
+  const [myResignations, setMyResignations] = useState([]);
+  const [isResignationModalOpen, setIsResignationModalOpen] = useState(false);
+
+  const computeLWD = (days) => {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(days));
+    return d.toISOString().slice(0, 10);
+  };
+
+  const [resignationForm, setResignationForm] = useState({
+    noticePeriodDays: 30,
+    noticePeriod: '30 Days',
+    lastWorkingDay: computeLWD(30),
+    handoverToId: '',
+    handoverTo: '',
+    category: 'Better Career Opportunity',
+    reason: '',
+    confirmed: false,
+  });
+
+  const fetchMyResignations = () => {
+    hrmsSync.pull('resignations').then((rows) => {
+      const list = Array.isArray(rows) ? rows : rows?.results || [];
+      setMyResignations(list);
+    }).catch((err) => console.warn('Failed to fetch resignations:', err));
+  };
+
+  // Load Leave Types & Asset Categories & Resignations
   useEffect(() => {
     fetchTodayPunch();
     hydrateAssets?.();
+    fetchMyResignations();
 
     // Pull leave types
     hrmsSync.pull('leaveTypes').then((rows) => {
@@ -214,6 +267,221 @@ export default function EmployeePortal() {
   const colleagues = useMemo(() => {
     return employees.filter((e) => e.id !== currentEmployee?.id);
   }, [employees, currentEmployee]);
+
+  // Employee Lifecycle Records (Promotions, Transfers, Warnings, Awards)
+  const [myTransfers, setMyTransfers] = useState([]);
+  const [myPromotions, setMyPromotions] = useState([]);
+  const [myWarnings, setMyWarnings] = useState([]);
+  const [myAwards, setMyAwards] = useState([]);
+
+  useEffect(() => {
+    if (!currentEmployee?.id) return;
+    Promise.all([
+      fetchEmployeeTransfers(currentEmployee.id).catch(() => []),
+      fetchEmployeePromotions(currentEmployee.id).catch(() => []),
+      fetchEmployeeWarnings(currentEmployee.id).catch(() => []),
+      fetchEmployeeAwards(currentEmployee.id).catch(() => []),
+    ]).then(([t, p, w, a]) => {
+      setMyTransfers(Array.isArray(t?.data) ? t.data : Array.isArray(t) ? t : []);
+      setMyPromotions(Array.isArray(p?.data) ? p.data : Array.isArray(p) ? p : []);
+      setMyWarnings(Array.isArray(w?.data) ? w.data : Array.isArray(w) ? w : []);
+      setMyAwards(Array.isArray(a?.data) ? a.data : Array.isArray(a) ? a : []);
+    });
+  }, [currentEmployee?.id]);
+
+  // Document Submission State & Helpers
+  const { documents, uploadDocument, addDocument } = useDocumentStore();
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [previewDocModal, setPreviewDocModal] = useState(null);
+  const [docCategoryFilter, setDocCategoryFilter] = useState('All');
+  const [docUploadForm, setDocUploadForm] = useState({
+    title: '',
+    category: 'Identity',
+    expiry: '',
+    description: '',
+    fileName: '',
+    fileData: '',
+    fileSize: '',
+  });
+
+  const getDocAuthCategory = (docOrCat) => {
+    const cat = typeof docOrCat === 'string' ? docOrCat : (docOrCat?.category || '');
+    const lower = String(cat).trim().toLowerCase();
+    if (lower === 'identity') return 'Identity';
+    if (lower === 'contract') return 'Contract';
+    if (lower === 'financial') return 'Financial';
+    if (lower === 'compliance' || lower === 'security') return 'Compliance';
+    if (lower === 'legal') return 'Legal';
+    if (lower === 'educational' || lower === 'education') return 'Educational';
+    if (lower === 'general' || lower === 'policy') return 'General';
+    return 'General';
+  };
+
+  useEffect(() => {
+    useDocumentStore.getState().hydrate();
+  }, []);
+
+  const myDocuments = useMemo(() => {
+    const empId = currentEmployee?.id;
+    const empCode = currentEmployee?.employee_code || currentEmployee?.employeeId || employeeCode;
+    const empNameLower = String(employeeName || '').toLowerCase().trim();
+
+    return documents.filter((d) => {
+      if (d.employee === 'All Staff' || d.employeeId === 'ALL') return false;
+      if (empId && d.employeeId && String(d.employeeId) === String(empId)) return true;
+      if (empCode && ((d.employeeCode && String(d.employeeCode) === String(empCode)) || (d.employeeId && String(d.employeeId) === String(empCode)))) return true;
+      if (empNameLower && d.employee && String(d.employee).toLowerCase().trim() === empNameLower) return true;
+      return false;
+    });
+  }, [documents, currentEmployee, employeeName, employeeCode]);
+
+  const myDocCategoryCounts = useMemo(() => {
+    const counts = { All: myDocuments.length };
+    PORTAL_DOC_CATEGORIES.forEach((c) => {
+      counts[c] = 0;
+    });
+    myDocuments.forEach((d) => {
+      const cat = getDocAuthCategory(d);
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [myDocuments]);
+
+  const filteredMyPortalDocs = useMemo(() => {
+    return myDocuments.filter((doc) => {
+      const authCat = getDocAuthCategory(doc);
+      if (docCategoryFilter !== 'All' && authCat !== docCategoryFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+          String(doc.title || '').toLowerCase().includes(q) ||
+          authCat.toLowerCase().includes(q) ||
+          String(doc.fileName || '').toLowerCase().includes(q) ||
+          String(doc.description || '').toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
+      return true;
+    });
+  }, [myDocuments, docCategoryFilter, searchQuery]);
+
+  const handlePdfFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      showToast?.('Only PDF format documents are allowed.', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
+    if (file.size > 15 * 1024 * 1024) {
+      showToast?.('File size exceeds the 15 MB limit.', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Data = reader.result;
+      const cleanName = file.name.replace(/\.[^/.]+$/, '');
+      const defaultTitle = cleanName
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+      setDocUploadForm((prev) => ({
+        ...prev,
+        fileName: file.name,
+        fileData: base64Data,
+        fileSize: `${sizeInMb} MB`,
+        title: prev.title.trim() ? prev.title : defaultTitle,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmitDocument = async (e) => {
+    e.preventDefault();
+    if (!docUploadForm.fileData) {
+      showToast?.('Please select a PDF document from your device.', 'error');
+      return;
+    }
+    if (!docUploadForm.title.trim()) {
+      showToast?.('Please specify a title for the document.', 'error');
+      return;
+    }
+    if (!docUploadForm.category) {
+      showToast?.('Please select a document category.', 'error');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        title: docUploadForm.title.trim(),
+        category: docUploadForm.category,
+        expiry: docUploadForm.expiry || null,
+        description: docUploadForm.description.trim() || undefined,
+        fileName: docUploadForm.fileName,
+        fileData: docUploadForm.fileData,
+        fileType: 'PDF',
+        fileSize: docUploadForm.fileSize,
+        employee: employeeName,
+        employeeId: currentEmployee?.id || undefined,
+        tags: [docUploadForm.category, 'Employee Upload'],
+      };
+
+      await uploadDocument(payload);
+      showToast?.(`Document "${docUploadForm.title.trim()}" uploaded successfully!`);
+      setIsDocModalOpen(false);
+      setDocUploadForm({
+        title: '',
+        category: 'Identity',
+        expiry: '',
+        description: '',
+        fileName: '',
+        fileData: '',
+        fileSize: '',
+      });
+      useDocumentStore.getState().hydrate();
+    } catch (err) {
+      console.error(err);
+      showToast?.('Failed to upload document. Please ensure it is a valid PDF.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadDoc = (doc) => {
+    if (doc.fileUrl) {
+      const a = document.createElement('a');
+      a.href = doc.fileUrl;
+      a.download = doc.fileName || `${doc.title || 'document'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+    if (doc.fileData && doc.fileData.startsWith('data:')) {
+      const a = document.createElement('a');
+      a.href = doc.fileData;
+      a.download = doc.fileName || `${doc.title || 'document'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+    showToast?.(`Downloading ${doc.title}.pdf`);
+  };
+
+  const activeResignation = useMemo(() => {
+    return (
+      myResignations.find((r) => {
+        const st = String(r.status || '').toLowerCase();
+        return !['rejected', 'cancelled', 'relieved', 'settled', 'completed'].includes(st);
+      }) || null
+    );
+  }, [myResignations]);
 
   // Combine all requests into a unified list
   const unifiedRequests = useMemo(() => {
@@ -298,9 +566,39 @@ export default function EmployeePortal() {
       }
     });
 
+    // 4. Resignation Requests
+    myResignations.forEach((r) => {
+      const isMine =
+        !currentEmployee ||
+        r.employeeId === currentEmployee.id ||
+        r.employeeCode === currentEmployee.employeeCode ||
+        r.employee === currentEmployee.name ||
+        r.employeeName === employeeName;
+      if (isMine || myResignations.length <= 10) {
+        list.push({
+          id: r.id,
+          rawId: r.id,
+          requestType: 'RESIGNATION',
+          typeName: 'Voluntary Resignation Notice',
+          date: r.submittedDate || r.submittedOn || r.created_at,
+          dateDisplay: formatDate(r.submittedDate || r.submittedOn || r.created_at),
+          timeDetails: `Notice: ${r.noticePeriod || 'Standard'} • LWD: ${formatDate(r.lastWorkingDay)}`,
+          reason: r.reason || 'Voluntary resignation notice',
+          status: r.status || 'Pending Review',
+          remark: r.remark || '',
+          approver: r.approver || r.approverName || 'HR Admin / Reporting Head',
+          handoverTo: r.handoverTo || 'Pending Assignment',
+          lastWorkingDay: r.lastWorkingDay,
+          created_at: r.created_at || r.submittedDate || todayISO(),
+          verificationModule: 'HRMS › Organization › Resignations (/hrms/organization)',
+          raw: r,
+        });
+      }
+    });
+
     // Sort descending by creation date or date
     return list.sort((a, b) => String(b.created_at || b.date).localeCompare(String(a.created_at || a.date)));
-  }, [leaves, assetRequests, attendanceRequests, currentEmployee, employeeName]);
+  }, [leaves, assetRequests, attendanceRequests, myResignations, currentEmployee, employeeName]);
 
   // Filtered requests
   const filteredRequests = useMemo(() => {
@@ -731,6 +1029,74 @@ export default function EmployeePortal() {
     }
   };
 
+  // 8. Submit Voluntary Resignation Notice
+  const handleSubmitResignation = async (e) => {
+    e?.preventDefault?.();
+    if (!resignationForm.reason.trim()) {
+      showToast?.('Please specify a detailed reason for resignation.', 'error');
+      return;
+    }
+    if (!resignationForm.confirmed) {
+      showToast?.('Please acknowledge the resignation declaration checkbox.', 'error');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const handoverEmp = colleagues.find((c) => c.id === resignationForm.handoverToId);
+      const effectiveLWD = resignationForm.lastWorkingDay || computeLWD(resignationForm.noticePeriodDays);
+
+      const payload = {
+        employeeId: currentEmployee?.id || undefined,
+        employee: currentEmployee?.name || employeeName,
+        submittedDate: todayISO(),
+        submittedOn: todayISO(),
+        noticePeriod: `${resignationForm.noticePeriodDays} Days`,
+        noticePeriodDays: Number(resignationForm.noticePeriodDays),
+        lastWorkingDay: effectiveLWD,
+        handoverToId: resignationForm.handoverToId || undefined,
+        handoverTo: handoverEmp?.name || resignationForm.handoverTo || undefined,
+        reason: `${resignationForm.category ? `[${resignationForm.category}] ` : ''}${resignationForm.reason.trim()}`,
+      };
+
+      await hrmsSync.create('resignations', payload);
+      showToast?.('Voluntary resignation notice submitted successfully. Sent to HR Admin for verification!');
+      setIsResignationModalOpen(false);
+      setResignationForm({
+        noticePeriodDays: 30,
+        noticePeriod: '30 Days',
+        lastWorkingDay: computeLWD(30),
+        handoverToId: '',
+        handoverTo: '',
+        category: 'Better Career Opportunity',
+        reason: '',
+        confirmed: false,
+      });
+      fetchMyResignations();
+    } catch (err) {
+      const msg = err?.payload?.message || err?.response?.data?.message || err?.message || 'Failed to submit resignation notice';
+      showToast?.(msg, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelResignation = async (resigId) => {
+    if (!window.confirm('Are you sure you want to withdraw/cancel your voluntary resignation notice?')) return;
+    try {
+      setIsSubmitting(true);
+      await api.post(`/hrms/resignations/${resigId}/cancel/`, { reason: 'Withdrawn by employee' });
+      showToast?.('Resignation notice has been withdrawn successfully.', 'success');
+      fetchMyResignations();
+      setIsResignationModalOpen(false);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to withdraw resignation notice';
+      showToast?.(msg, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const s = String(status || '').toLowerCase();
     if (s.includes('approved')) {
@@ -740,10 +1106,17 @@ export default function EmployeePortal() {
         </span>
       );
     }
-    if (s.includes('reject')) {
+    if (s.includes('notice') || s.includes('clearance') || s.includes('interview')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <Clock size={12} /> {status}
+        </span>
+      );
+    }
+    if (s.includes('reject') || s.includes('cancel')) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-          <XCircle size={12} /> Rejected by HR
+          <XCircle size={12} /> {status || 'Rejected by HR'}
         </span>
       );
     }
@@ -770,6 +1143,8 @@ export default function EmployeePortal() {
         return <Laptop size={15} className="text-cyan-600" />;
       case 'GENERAL':
         return <ClipboardList size={15} className="text-emerald-600" />;
+      case 'RESIGNATION':
+        return <LogOut size={15} className="text-rose-600" />;
       default:
         return <FileText size={15} className="text-slate-600" />;
     }
@@ -877,7 +1252,7 @@ export default function EmployeePortal() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* 1. Request Full Day Leave */}
           <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs hover:border-indigo-300 hover:shadow-sm transition-all group flex flex-col justify-between">
             <div>
@@ -1017,32 +1392,89 @@ export default function EmployeePortal() {
           </div>
 
           {/* 7. Other Reasons & General Requirements */}
-          <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs hover:border-emerald-300 hover:shadow-sm transition-all group flex flex-col justify-between md:col-span-2 lg:col-span-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start sm:items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <ClipboardList size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-900 text-[15px]">Other Reason / Requirement Request</h3>
-                    <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                      HR Verification
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted mt-0.5 leading-relaxed">
-                    Need special equipment, stationary, HR documents, schedule adjustments, or have any other workplace requirement? Submit it here directly for HR review and approval.
-                  </p>
-                </div>
+          <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs hover:border-emerald-300 hover:shadow-sm transition-all group flex flex-col justify-between">
+            <div>
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                <ClipboardList size={20} />
               </div>
-              <button
-                type="button"
-                onClick={() => setIsGeneralModalOpen(true)}
-                className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shrink-0 shadow-xs"
-              >
-                <Plus size={15} /> Make Other Request / Requirement
-              </button>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 text-[14.5px]">Other Requirement</h3>
+                <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">General</span>
+              </div>
+              <p className="text-xs text-muted mt-1 leading-relaxed">
+                Special equipment, document requests, facility issues, or work adjustments.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsGeneralModalOpen(true)}
+              className="mt-4 w-full h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus size={14} /> Make Request
+            </button>
+          </div>
+
+          {/* 8. Voluntary Resignation Notice */}
+          <div className={`bg-white border rounded-2xl p-5 shadow-xs transition-all group flex flex-col justify-between ${
+            activeResignation ? 'border-amber-300 ring-1 ring-amber-200 hover:border-amber-400' : 'border-bdr hover:border-rose-300 hover:shadow-sm'
+          }`}>
+            <div>
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 group-hover:scale-105 transition-transform ${
+                activeResignation ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-rose-50 border border-rose-100 text-rose-600'
+              }`}>
+                <LogOut size={20} />
+              </div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 text-[14.5px]">Voluntary Resignation</h3>
+                <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${
+                  activeResignation
+                    ? 'text-amber-800 bg-amber-50 border border-amber-200'
+                    : 'text-rose-700 bg-rose-50'
+                }`}>
+                  {activeResignation ? activeResignation.status : 'Formal Notice'}
+                </span>
+              </div>
+              <p className="text-xs text-muted mt-1 leading-relaxed">
+                {activeResignation
+                  ? `Notice active: Last working day ${formatDate(activeResignation.lastWorkingDay || activeResignation.lastWorkingDate)}.`
+                  : 'Submit formal voluntary resignation notice with handover plan and exit clearance.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsResignationModalOpen(true)}
+              className={`mt-4 w-full h-9 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                activeResignation
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
+                  : 'bg-rose-50 hover:bg-rose-100 text-rose-700'
+              }`}
+            >
+              {activeResignation ? <Eye size={14} /> : <Plus size={14} />}
+              {activeResignation ? 'View Notice & Handover' : 'Submit Resignation'}
+            </button>
+          </div>
+
+          {/* 9. Employee Document Upload */}
+          <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs hover:border-emerald-300 hover:shadow-sm transition-all group flex flex-col justify-between">
+            <div>
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                <UploadCloud size={20} />
+              </div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 text-[14.5px]">Upload Document</h3>
+                <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">PDF Only</span>
+              </div>
+              <p className="text-xs text-muted mt-1 leading-relaxed">
+                Submit identity cards, signed agreements, degrees, bank forms, or compliance certificates.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsDocModalOpen(true)}
+              className="mt-4 w-full h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus size={14} /> Upload PDF Document
+            </button>
           </div>
         </div>
       </div>
@@ -1076,24 +1508,73 @@ export default function EmployeePortal() {
         </div>
       </div>
 
+      {/* Recognition & Milestone Notification Banner */}
+      {(myAwards.length > 0 || myPromotions.length > 0) && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-emerald-500/10 border border-amber-300 dark:border-amber-700/50 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm shrink-0">
+              <Award size={20} />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">
+                {myAwards.length > 0 ? `Honored with: ${myAwards[0].award_name || myAwards[0].title}` : `Promoted: ${myPromotions[0].toDesignationTitle || myPromotions[0].new_designation}`}
+              </h4>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {myAwards.length > 0
+                  ? (myAwards[0].citation || 'Congratulations on your outstanding contribution and achievement!')
+                  : `Effective from ${myPromotions[0].effective_date || myPromotions[0].effectiveDate}. Congratulations!`}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('CAREER')}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+          >
+            View Career Milestones ({myTransfers.length + myPromotions.length + myWarnings.length + myAwards.length})
+          </button>
+        </div>
+      )}
+
       {/* Central Requests History Register */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
         {/* Table Header & Controls */}
         <div className="p-5 border-b border-bdr flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-bold text-slate-900">My Requests & HR Verification Status</h2>
+            <h2 className="text-base font-bold text-slate-900">
+              {activeTab === 'CAREER'
+                ? 'My Career Milestones, Promotions & Notices'
+                : activeTab === 'DOCUMENTS'
+                ? 'My Personal Documents & Vault Records'
+                : 'My Requests & HR Verification Status'}
+            </h2>
             <p className="text-xs text-muted mt-0.5">
-              Live status of your submitted requests. Every request is verified by HR / Reporting Supervisors.
+              {activeTab === 'CAREER'
+                ? 'Official record of promotions, department transfers, awards, and formal conduct notices.'
+                : activeTab === 'DOCUMENTS'
+                ? 'Your uploaded PDF verification documents, certificates, and contracts saved to the HRMS Vault.'
+                : 'Live status of your submitted requests. Every request is verified by HR / Reporting Supervisors.'}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {activeTab === 'DOCUMENTS' && (
+              <button
+                type="button"
+                onClick={() => setIsDocModalOpen(true)}
+                className="btn-primary h-9 px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+              >
+                <UploadCloud size={14} />
+                <span>Upload PDF</span>
+              </button>
+            )}
+
             {/* Search Input */}
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search requests…"
+                placeholder={activeTab === 'DOCUMENTS' ? 'Search documents…' : 'Search requests…'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-9 pl-9 pr-3 rounded-xl bg-slate-50 border border-bdr text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-primary w-48 sm:w-56"
@@ -1101,16 +1582,18 @@ export default function EmployeePortal() {
             </div>
 
             {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary cursor-pointer"
-            >
-              <option value="ALL">All HR Statuses</option>
-              <option value="Pending">Pending HR Review</option>
-              <option value="Approved">Approved by HR</option>
-              <option value="Rejected">Rejected by HR</option>
-            </select>
+            {activeTab !== 'CAREER' && activeTab !== 'DOCUMENTS' && (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary cursor-pointer"
+              >
+                <option value="ALL">All HR Statuses</option>
+                <option value="Pending">Pending HR Review</option>
+                <option value="Approved">Approved by HR</option>
+                <option value="Rejected">Rejected by HR</option>
+              </select>
+            )}
           </div>
         </div>
 
@@ -1118,6 +1601,7 @@ export default function EmployeePortal() {
         <div className="flex items-center gap-1 px-5 pt-3 border-b border-bdr bg-slate-50/50 overflow-x-auto">
           {[
             { id: 'ALL', label: 'All Requests', count: unifiedRequests.length },
+            { id: 'DOCUMENTS', label: 'My Documents', count: myDocuments.length },
             { id: 'LEAVE', label: 'Leaves', count: unifiedRequests.filter((r) => r.requestType === 'LEAVE').length },
             { id: 'HALFDAY', label: 'Half Day', count: unifiedRequests.filter((r) => r.requestType === 'HALFDAY').length },
             { id: 'EARLY', label: 'Early Leave', count: unifiedRequests.filter((r) => r.requestType === 'EARLY').length },
@@ -1125,6 +1609,8 @@ export default function EmployeePortal() {
             { id: 'WFH', label: 'Work From Home', count: unifiedRequests.filter((r) => r.requestType === 'WFH').length },
             { id: 'ASSET', label: 'Assets & IT', count: unifiedRequests.filter((r) => r.requestType === 'ASSET').length },
             { id: 'GENERAL', label: 'Other Requirements', count: unifiedRequests.filter((r) => r.requestType === 'GENERAL').length },
+            { id: 'RESIGNATION', label: 'Resignation & Exit', count: unifiedRequests.filter((r) => r.requestType === 'RESIGNATION').length },
+            { id: 'CAREER', label: 'Career & Milestones', count: myTransfers.length + myPromotions.length + myWarnings.length + myAwards.length },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1144,9 +1630,319 @@ export default function EmployeePortal() {
           ))}
         </div>
 
-        {/* Requests Table */}
+        {/* Requests or Career Table */}
         <div className="overflow-x-auto">
-          {filteredRequests.length === 0 ? (
+          {activeTab === 'CAREER' ? (
+            <div className="p-6 space-y-6">
+              {/* Promotions */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <TrendingUp size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Career Progression & Role Revisions</h3>
+                    <p className="text-[11px] text-muted">Your designation upgrades and revised compensation records</p>
+                  </div>
+                </div>
+                {myPromotions.length === 0 ? (
+                  <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">No promotions recorded on file.</p>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">Previous Role</th>
+                          <th className="py-2.5 px-4">Promoted Role</th>
+                          <th className="py-2.5 px-4">Effective Date</th>
+                          <th className="py-2.5 px-4 text-right">Revised CTC</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {myPromotions.map((p, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 text-slate-600">{p.fromDesignationTitle || p.previous_designation || '—'}</td>
+                            <td className="py-2.5 px-4 font-semibold text-emerald-700">{p.toDesignationTitle || p.new_designation || '—'}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{p.effective_date || p.effectiveDate || '—'}</td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              {p.new_salary ? `Rs ${Number(p.new_salary).toLocaleString('en-IN')}` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Transfers */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                    <ArrowRightLeft size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Department & Location Transfers</h3>
+                    <p className="text-[11px] text-muted">Movement records across teams, departments, and branch locations</p>
+                  </div>
+                </div>
+                {myTransfers.length === 0 ? (
+                  <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">No transfers recorded.</p>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">From Department</th>
+                          <th className="py-2.5 px-4">To Department</th>
+                          <th className="py-2.5 px-4">Effective Date</th>
+                          <th className="py-2.5 px-4">Reason / Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {myTransfers.map((t, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 text-slate-600">{t.fromDepartmentName || t.from_department || '—'}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{t.toDepartmentName || t.to_department || '—'}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{t.effective_date || t.effectiveDate || '—'}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{t.reason || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Awards */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                    <Award size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Awards & Spot Recognitions</h3>
+                    <p className="text-[11px] text-muted">Excellence citations, performance bonuses, and honors awarded by leadership</p>
+                  </div>
+                </div>
+                {myAwards.length === 0 ? (
+                  <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">No awards recorded.</p>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">Award Title</th>
+                          <th className="py-2.5 px-4">Date Presented</th>
+                          <th className="py-2.5 px-4 text-right">Prize Amount</th>
+                          <th className="py-2.5 px-4">Citation</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {myAwards.map((a, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 font-semibold text-amber-800 flex items-center gap-1.5">
+                              <Award size={14} className="text-amber-600" /> {a.award_name || a.title || '—'}
+                            </td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{a.award_date || a.presentation_date || '—'}</td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">
+                              {(a.gift_amount || a.cash_reward) ? `Rs ${Number(a.gift_amount || a.cash_reward).toLocaleString('en-IN')}` : '—'}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600">{a.citation || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Warnings */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                    <AlertTriangle size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Official Notices & Conduct Records</h3>
+                    <p className="text-[11px] text-muted">Formal HR performance notices and advisories</p>
+                  </div>
+                </div>
+                {myWarnings.length === 0 ? (
+                  <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">No disciplinary warnings on file.</p>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">Notice Title</th>
+                          <th className="py-2.5 px-4">Severity</th>
+                          <th className="py-2.5 px-4">Date Issued</th>
+                          <th className="py-2.5 px-4">Details / Explanation</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {myWarnings.map((w, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{w.subject || w.title || '—'}</td>
+                            <td className="py-2.5 px-4">
+                              <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                (w.severity || w.warning_level) === 'Severe' || (w.severity || w.warning_level) === 'Final Written' || (w.severity || w.warning_level) === 'Suspension' ? 'bg-rose-100 text-rose-800' :
+                                (w.severity || w.warning_level) === 'Medium' || (w.severity || w.warning_level) === 'First Written' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {w.severity || w.warning_level || 'Notice'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{w.issue_date || w.warning_date || '—'}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{w.description || w.explanation || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : activeTab === 'DOCUMENTS' ? (
+            <div className="p-6">
+              {/* Category Filter Pills Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 mb-5 pb-4 border-b border-bdr/60">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDocCategoryFilter('All')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                      docCategoryFilter === 'All'
+                        ? 'bg-primary text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span>All</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      docCategoryFilter === 'All' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {myDocCategoryCounts.All}
+                    </span>
+                  </button>
+                  {PORTAL_DOC_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setDocCategoryFilter(cat)}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                        docCategoryFilter === cat
+                          ? 'bg-primary text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>{cat}</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                        docCategoryFilter === cat ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {myDocCategoryCounts[cat] || 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <span className="text-xs text-muted">
+                  Showing <b className="text-slate-800">{filteredMyPortalDocs.length}</b> of {myDocuments.length} document{myDocuments.length === 1 ? '' : 's'}
+                </span>
+              </div>
+
+              {myDocuments.length === 0 ? (
+                <div className="py-14 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto mb-3 font-bold text-xs shadow-xs">
+                    PDF
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800">No personal documents uploaded</h3>
+                  <p className="text-xs text-muted mt-1 max-w-md mx-auto">
+                    Upload your passport, Aadhaar, degree certificates, employment contract, or financial documents. Once submitted, they will appear here and in the HRMS Documents register.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsDocModalOpen(true)}
+                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90 transition shadow-xs cursor-pointer"
+                  >
+                    <UploadCloud size={14} />
+                    <span>Upload PDF Document</span>
+                  </button>
+                </div>
+              ) : filteredMyPortalDocs.length === 0 ? (
+                <div className="py-12 text-center text-muted">
+                  <FileText size={32} className="mx-auto text-slate-300 mb-2" />
+                  <p className="font-semibold text-slate-700">No documents found in category "{docCategoryFilter}"</p>
+                  <p className="text-xs text-muted mt-1">Try switching to "All" or choosing another category.</p>
+                  <button
+                    type="button"
+                    onClick={() => setDocCategoryFilter('All')}
+                    className="mt-3 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    View All Categories
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredMyPortalDocs.map((doc) => {
+                    const authoritativeCat = getDocAuthCategory(doc);
+                    return (
+                      <div
+                        key={doc.id}
+                        className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex flex-col justify-between hover:border-slate-300 hover:shadow-sm transition"
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-2.5">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold border bg-slate-50 text-slate-700 border-slate-200">
+                              {authoritativeCat}
+                            </span>
+                            <Badge tone={doc.status === 'Valid' ? 'success' : doc.status === 'Expired' ? 'danger' : 'warning'}>
+                              {doc.status || 'Valid'}
+                            </Badge>
+                          </div>
+                          <h4 className="font-bold text-slate-900 text-sm leading-snug line-clamp-1" title={doc.title}>
+                            {doc.title}
+                          </h4>
+                          <p className="text-xs text-muted mt-1 line-clamp-2 leading-relaxed">
+                            {doc.description || 'Personal document recorded under corporate compliance policies.'}
+                          </p>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-bdr/60">
+                          <div className="flex items-center justify-between text-[11px] text-muted mb-2">
+                            <span>Uploaded: <b className="text-slate-700">{doc.uploadDate || doc.updatedOn || todayISO()}</b></span>
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">PDF</span>
+                          </div>
+                          {doc.fileName && (
+                            <div className="text-[11px] font-mono text-slate-500 truncate mb-3" title={doc.fileName}>
+                              {doc.fileName}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDocModal(doc)}
+                              className="flex-1 py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1"
+                            >
+                              <Eye size={13} />
+                              <span>Preview</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadDoc(doc)}
+                              className="flex-1 py-1.5 px-3 bg-primary/10 hover:bg-primary/15 text-primary rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1"
+                            >
+                              <Download size={13} />
+                              <span>Download</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : filteredRequests.length === 0 ? (
             <div className="py-14 text-center">
               <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
                 <FileText size={20} />
@@ -1929,6 +2725,12 @@ export default function EmployeePortal() {
                   <p className="font-semibold text-slate-800 mt-0.5">{viewRequestModal.priority}</p>
                 </div>
               )}
+              {viewRequestModal.handoverTo && (
+                <div>
+                  <span className="font-bold text-slate-500 uppercase text-[10px]">Handover Assignee:</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{viewRequestModal.handoverTo}</p>
+                </div>
+              )}
               <div>
                 <span className="font-bold text-slate-500 uppercase text-[10px]">Verification Authority:</span>
                 <p className="font-semibold text-slate-800 mt-0.5">{viewRequestModal.approver}</p>
@@ -1955,6 +2757,456 @@ export default function EmployeePortal() {
           </div>
         </Modal>
       )}
+
+      {/* ── MODAL 8: Voluntary Resignation Notice ── */}
+      <Modal
+        isOpen={isResignationModalOpen}
+        onClose={() => setIsResignationModalOpen(false)}
+        title={activeResignation ? 'Voluntary Resignation Notice & Clearance Status' : 'Submit Voluntary Resignation Notice'}
+        subtitle={
+          activeResignation
+            ? 'Track your resignation review, notice period, handover assignee, and exit clearance.'
+            : 'Initiates official notice period, handover assignment, and HR Admin clearance workflow.'
+        }
+        size="lg"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <div>
+              {activeResignation && ['pending', 'pending review'].includes(String(activeResignation.status || '').toLowerCase()) && (
+                <button
+                  type="button"
+                  onClick={() => handleCancelResignation(activeResignation.id)}
+                  disabled={isSubmitting}
+                  className="px-3.5 py-2 rounded-xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 font-semibold text-xs transition cursor-pointer"
+                >
+                  Withdraw Resignation Notice
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsResignationModalOpen(false)}
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                {activeResignation ? 'Close' : 'Cancel'}
+              </button>
+              {!activeResignation && (
+                <button
+                  type="button"
+                  onClick={handleSubmitResignation}
+                  disabled={isSubmitting || !resignationForm.reason.trim() || !resignationForm.confirmed}
+                  className="btn-primary h-9 px-5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
+                  Submit Resignation Notice
+                </button>
+              )}
+            </div>
+          </div>
+        }
+      >
+        {activeResignation ? (
+          <div className="space-y-4 text-xs">
+            {/* Active Resignation Notice Banner */}
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <LogOut size={20} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="font-bold text-amber-950 text-sm">Resignation Notice Active</h4>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                    {activeResignation.status || 'Pending Review'}
+                  </span>
+                </div>
+                <p className="text-amber-800 text-xs mt-1 leading-relaxed">
+                  Your resignation notice was registered on{' '}
+                  <span className="font-bold">{formatDate(activeResignation.submittedDate || activeResignation.submittedOn)}</span>.
+                  Your notice period is <span className="font-bold">{activeResignation.noticePeriod || 'Standard'}</span> with an
+                  effective last working day of{' '}
+                  <span className="font-bold">{formatDate(activeResignation.lastWorkingDay)}</span>.
+                </p>
+              </div>
+            </div>
+
+            {/* Key Parameters Overview */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-bdr">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Handover Colleague (Assignee)</span>
+                <p className="font-bold text-slate-900 text-sm mt-1">{activeResignation.handoverTo || 'Pending Assignment'}</p>
+                <p className="text-[11px] text-muted mt-0.5">Knowledge transfer & project transition assignee</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-bdr">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted">HR Verification Queue</span>
+                <p className="font-bold text-slate-900 text-sm mt-1">HR Admin & Governance</p>
+                <p className="text-[11px] font-mono text-muted mt-0.5">/hrms/organization › Resignations</p>
+              </div>
+            </div>
+
+            {/* Reason on Record */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-bdr">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Reason on Record</span>
+              <p className="font-medium text-slate-800 mt-1 leading-relaxed whitespace-pre-wrap">
+                {activeResignation.reason || 'Voluntary resignation notice'}
+              </p>
+            </div>
+
+            {/* Exit Checklist Status if available */}
+            {Array.isArray(activeResignation.checklist) && activeResignation.checklist.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-bdr space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Exit Clearance Checklist</span>
+                <div className="space-y-1.5 mt-2">
+                  {activeResignation.checklist.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200">
+                      <span className="text-xs font-medium text-slate-800">{item.title}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        item.isCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {item.isCompleted ? 'Cleared' : 'Pending Clearance'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-[11.5px] text-blue-900 flex items-start gap-2">
+              <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <strong>HR Notice:</strong> Your resignation is linked directly to the HR Admin Resignation section.
+                HR administrators will complete your exit interview, handover sign-off, and final settlement upon reaching your last working day.
+              </div>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmitResignation} className="space-y-4 text-xs">
+            {/* Employee Profile Preview */}
+            <div className="p-3.5 bg-slate-50 border border-bdr rounded-xl flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Staff Member</span>
+                <h4 className="font-bold text-slate-900 text-sm mt-0.5">{currentEmployee?.name || employeeName}</h4>
+                <p className="text-muted text-[11px] mt-0.5">
+                  {employeeCode} • {designation} • {department}
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-semibold text-xs border border-indigo-200">
+                Auto-fills to HR Admin
+              </span>
+            </div>
+
+            {/* Notice Period and Last Working Day */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Notice Period (Days) *</label>
+                <select
+                  value={resignationForm.noticePeriodDays}
+                  onChange={(e) => {
+                    const days = Number(e.target.value);
+                    setResignationForm({
+                      ...resignationForm,
+                      noticePeriodDays: days,
+                      noticePeriod: `${days} Days`,
+                      lastWorkingDay: computeLWD(days),
+                    });
+                  }}
+                  className="w-full h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary cursor-pointer"
+                >
+                  <option value={15}>15 Days (Probation / Early Release)</option>
+                  <option value={30}>30 Days (Standard Staff Notice)</option>
+                  <option value={60}>60 Days (Managerial / Operational)</option>
+                  <option value={90}>90 Days (Executive / Specialized)</option>
+                </select>
+                <p className="text-[10.5px] text-muted mt-1">Contractual period of work before formal release.</p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Proposed Last Working Day *</label>
+                <input
+                  type="date"
+                  value={resignationForm.lastWorkingDay}
+                  onChange={(e) => setResignationForm({ ...resignationForm, lastWorkingDay: e.target.value })}
+                  className="w-full h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary"
+                  required
+                />
+                <p className="text-[10.5px] text-muted mt-1">Calculated from submission date + notice period.</p>
+              </div>
+            </div>
+
+            {/* Handover Colleague */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Handover Colleague (Knowledge Transfer Assignee)</label>
+              <select
+                value={resignationForm.handoverToId}
+                onChange={(e) => {
+                  const sel = colleagues.find((c) => c.id === e.target.value);
+                  setResignationForm({
+                    ...resignationForm,
+                    handoverToId: e.target.value,
+                    handoverTo: sel?.name || '',
+                  });
+                }}
+                className="w-full h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-medium text-slate-800 focus:outline-none focus:border-primary cursor-pointer"
+              >
+                <option value="">Select a team member for handover...</option>
+                {colleagues.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.name} ({col.employeeCode || col.empId || 'Staff'}) — {col.designation || col.role || 'Colleague'}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10.5px] text-muted mt-1">Colleague who will receive task handover and ongoing responsibilities.</p>
+            </div>
+
+            {/* Resignation Category & Reason */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Primary Reason Category *</label>
+              <select
+                value={resignationForm.category}
+                onChange={(e) => setResignationForm({ ...resignationForm, category: e.target.value })}
+                className="w-full h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-medium text-slate-800 focus:outline-none focus:border-primary cursor-pointer"
+              >
+                <option value="Better Career Opportunity">Better Career Opportunity / New Role</option>
+                <option value="Relocation / Family Reasons">Relocation / Personal & Family Reasons</option>
+                <option value="Higher Studies">Higher Studies / Educational Pursuit</option>
+                <option value="Health / Medical">Health / Medical Well-being</option>
+                <option value="Career Break / Sabbatical">Career Break / Sabbatical</option>
+                <option value="Entrepreneurship">Entrepreneurship / Personal Venture</option>
+                <option value="Other Personal Reasons">Other Personal Reasons</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Detailed Explanation & Transition Notes *</label>
+              <textarea
+                rows={3}
+                value={resignationForm.reason}
+                onChange={(e) => setResignationForm({ ...resignationForm, reason: e.target.value })}
+                placeholder="State your reasons, key project transition status, and any special requests for HR Admin..."
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-bdr text-xs font-medium text-slate-800 focus:outline-none focus:border-primary resize-none"
+                required
+              />
+            </div>
+
+            {/* Formal Declaration Checkbox */}
+            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={resignationForm.confirmed}
+                  onChange={(e) => setResignationForm({ ...resignationForm, confirmed: e.target.checked })}
+                  className="mt-0.5 rounded border-slate-300 text-primary focus:ring-primary h-4 w-4"
+                  required
+                />
+                <span className="text-[11.5px] text-slate-800 leading-snug">
+                  <strong>Formal Notice Declaration:</strong> I confirm that I am submitting this voluntary resignation notice. I understand this will be routed directly to HR Admin &amp; Management under <strong>HRMS › Organization › Resignations</strong> to initiate the exit review, handover sign-off, and clearance procedure.
+                </span>
+              </label>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ── MODAL 9: Upload Employee Document (PDF) ── */}
+      <Modal
+        isOpen={isDocModalOpen}
+        onClose={() => setIsDocModalOpen(false)}
+        title="Upload Personal Document (PDF)"
+        subtitle="Submit personal verification documents to the HRMS Vault. All submissions are automatically linked to your employee record."
+        size="md"
+        footer={
+          <div className="flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsDocModalOpen(false)}
+              className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmitDocument}
+              disabled={isSubmitting || !docUploadForm.fileData || !docUploadForm.title.trim()}
+              className="btn-primary h-9 px-5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+              Upload Document
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmitDocument} className="space-y-4 text-xs">
+          {/* File Picker & Drag-and-Drop Area */}
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              Select PDF Document * <span className="text-muted font-normal">(PDF format only, max 15MB)</span>
+            </label>
+            <div className="border-2 border-dashed border-bdr rounded-2xl p-5 text-center hover:border-primary/50 transition bg-slate-50/50">
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                id="employeePdfUploadInput"
+                onChange={handlePdfFileSelect}
+                className="hidden"
+              />
+              <label
+                htmlFor="employeePdfUploadInput"
+                className="cursor-pointer flex flex-col items-center justify-center gap-2"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold text-xs shadow-xs">
+                  PDF
+                </div>
+                {docUploadForm.fileName ? (
+                  <div>
+                    <div className="font-bold text-slate-900 text-sm">{docUploadForm.fileName}</div>
+                    <div className="text-[11px] text-muted mt-0.5">{docUploadForm.fileSize} • Click to change file</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="font-bold text-slate-800 text-xs">Click to browse or drag PDF here</div>
+                    <div className="text-[11px] text-muted mt-0.5">Official PDFs: Identity, Contract, Financial, Compliance, etc.</div>
+                  </div>
+                )}
+              </label>
+            </div>
+          </div>
+
+          {/* Document Title */}
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Document Title *</label>
+            <input
+              type="text"
+              value={docUploadForm.title}
+              onChange={(e) => setDocUploadForm({ ...docUploadForm, title: e.target.value })}
+              placeholder="e.g. Passport Copy, Degree Certificate, Signed NDA..."
+              className="w-full h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-medium text-slate-800 focus:outline-none focus:border-primary"
+              required
+            />
+          </div>
+
+          {/* Document Category (7 Required Categories) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Document Category *</label>
+              <select
+                value={docUploadForm.category}
+                onChange={(e) => setDocUploadForm({ ...docUploadForm, category: e.target.value })}
+                className="w-full h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary cursor-pointer"
+                required
+              >
+                <option value="Identity">Identity (Passport, Aadhaar, ID, License)</option>
+                <option value="Contract">Contract (Employment Agreement, Offer, NDA)</option>
+                <option value="Financial">Financial (Bank Proof, Form 16, Tax Returns)</option>
+                <option value="Compliance">Compliance (Work Authorization, Visa, Certifications)</option>
+                <option value="Legal">Legal (Declarations, Statutory Forms, Bonds)</option>
+                <option value="Educational">Educational (Degrees, Diplomas, Marksheets)</option>
+                <option value="General">General (Other Official Personnel Documents)</option>
+              </select>
+            </div>
+
+            {/* Document Expiry Date */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Document Expiry Date (Optional)</label>
+              <input
+                type="date"
+                value={docUploadForm.expiry}
+                onChange={(e) => setDocUploadForm({ ...docUploadForm, expiry: e.target.value })}
+                className="w-full h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-medium text-slate-800 focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+
+          {/* Description / Additional Notes */}
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Notes / Description (Optional)</label>
+            <textarea
+              rows={2}
+              value={docUploadForm.description}
+              onChange={(e) => setDocUploadForm({ ...docUploadForm, description: e.target.value })}
+              placeholder="Additional remarks or issuing authority details for HR record..."
+              className="w-full p-2.5 rounded-xl bg-slate-50 border border-bdr text-xs font-medium text-slate-800 focus:outline-none focus:border-primary resize-none"
+            />
+          </div>
+
+          {/* Ownership Attestation */}
+          <div className="p-3 bg-slate-50 border border-bdr rounded-xl flex items-center justify-between text-muted text-[11.5px]">
+            <span>Submitting as: <strong className="text-slate-800">{employeeName}</strong> ({employeeCode})</span>
+            <span className="text-emerald-700 font-semibold flex items-center gap-1">
+              <Check size={13} /> Session Verified
+            </span>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── MODAL 10: PDF Preview Modal ── */}
+      <Modal
+        isOpen={Boolean(previewDocModal)}
+        onClose={() => setPreviewDocModal(null)}
+        title={previewDocModal ? `PDF Document: ${previewDocModal.title}` : 'Preview Document'}
+        subtitle="Electronic document preview from Evenmore HRMS Vault"
+        size="lg"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <div className="text-xs text-muted">
+              {previewDocModal?.category} • Uploaded {previewDocModal?.uploadDate || previewDocModal?.updatedOn}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPreviewDocModal(null)}
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+              {previewDocModal && (
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDoc(previewDocModal)}
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download size={14} /> Download PDF
+                </button>
+              )}
+            </div>
+          </div>
+        }
+      >
+        {previewDocModal && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-slate-50 border border-bdr rounded-xl text-xs">
+              <div>
+                <span className="text-muted">File: </span>
+                <span className="font-mono font-semibold text-slate-800">{previewDocModal.fileName || `${previewDocModal.title}.pdf`}</span>
+              </div>
+              <Badge tone={previewDocModal.status === 'Valid' ? 'success' : 'warning'}>
+                {previewDocModal.status || 'Valid'}
+              </Badge>
+            </div>
+            {previewDocModal.fileUrl || (previewDocModal.fileData && previewDocModal.fileData.startsWith('data:')) ? (
+              <iframe
+                src={previewDocModal.fileUrl || previewDocModal.fileData}
+                title={previewDocModal.title}
+                className="w-full h-[450px] rounded-xl border border-bdr"
+              />
+            ) : (
+              <div className="p-12 text-center text-muted bg-slate-50 rounded-xl border border-bdr">
+                <FileText size={42} className="mx-auto text-slate-300 mb-2" />
+                <p className="font-semibold text-slate-800">PDF Document Ready</p>
+                <p className="text-xs text-muted mt-1">This document is stored securely in the HRMS Vault.</p>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDoc(previewDocModal)}
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90 transition cursor-pointer"
+                >
+                  <Download size={14} />
+                  Download Document File
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Early Punch Out Modal if triggered */}
       <EarlyPunchOutModal

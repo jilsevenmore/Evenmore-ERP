@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Circle, Ban, Loader, Plus, Filter, Check } from 'lucide-react';
+import { CheckCircle2, Circle, Ban, Loader, Plus, Filter, Check, Trash2 } from 'lucide-react';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
-import { Button } from '../../../../components/ui/Button';
 
 /**
  * StageTasksTab — the stage-wise task checklist.
@@ -33,7 +32,7 @@ function shortDate(value) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
-function TaskRow({ task, onToggle, readOnly }) {
+function TaskRow({ task, onToggle, onDelete, readOnly }) {
   const tone = TASK_TONES[task.status] ?? TASK_TONES['Not Started'];
   const Icon = tone.icon;
   const priority = PRIORITY_TONES[task.priority] ?? PRIORITY_TONES.Low;
@@ -90,8 +89,8 @@ function TaskRow({ task, onToggle, readOnly }) {
         </div>
       </div>
 
-      {/* Done Button */}
-      <div className="shrink-0 ml-2">
+      {/* Done & Delete Buttons */}
+      <div className="shrink-0 ml-2 flex items-center gap-1.5">
         <button
           type="button"
           onClick={() => onToggle?.(task)}
@@ -113,12 +112,23 @@ function TaskRow({ task, onToggle, readOnly }) {
             </>
           )}
         </button>
+
+        {!readOnly && onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete?.(task)}
+            title="Delete task from this project"
+            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
       </div>
     </li>
   );
 }
 
-export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStageId, onAddTask }) {
+export function StageTasksTab({ project, onToggleTask, onDeleteTask, onTaskProgress, focusStageId, onAddTask }) {
   const [showAllStages, setShowAllStages] = useState(true);
   const ordered = [...(project.stages ?? [])].sort((a, b) => a.sequence - b.sequence);
   const readOnly = project.status === 'Completed';
@@ -156,8 +166,8 @@ export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStag
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {totalTasks > 0 && (
+        {totalTasks > 0 && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowAllStages(!showAllStages)}
@@ -166,18 +176,8 @@ export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStag
               <Filter size={12} />
               {showAllStages ? 'Stages with tasks only' : 'Show all stages'}
             </button>
-          )}
-
-          {!readOnly && (
-            <Button
-              size="sm"
-              icon={Plus}
-              onClick={() => onAddTask?.()}
-            >
-              Add Task
-            </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {displayedStages.length === 0 ? (
@@ -186,13 +186,6 @@ export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStag
             variant="tasks"
             title="No tasks yet"
             description="Tasks appear here once they are added to a stage. You can add a task to any stage."
-            action={
-              !readOnly && (
-                <Button size="sm" icon={Plus} onClick={() => onAddTask?.()}>
-                  Add Task
-                </Button>
-              )
-            }
           />
         </div>
       ) : (
@@ -243,17 +236,8 @@ export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStag
               </header>
 
               {tasks.length === 0 ? (
-                <div className="py-3 px-4 text-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                <div className="py-3 px-4 text-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50">
                   <span className="text-xs text-slate-400">No tasks in this stage yet.</span>
-                  {!readOnly && (
-                    <button
-                      type="button"
-                      onClick={() => onAddTask?.(stage.id)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700"
-                    >
-                      <Plus size={12} /> Add Task
-                    </button>
-                  )}
                 </div>
               ) : (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -263,6 +247,7 @@ export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStag
                       task={task}
                       readOnly={readOnly}
                       onToggle={(t) => onToggleTask?.(stage.id, t)}
+                      onDelete={(t) => onDeleteTask?.(stage.id, t)}
                       onProgress={(t, pct) => onTaskProgress?.(stage.id, t, pct)}
                     />
                   ))}

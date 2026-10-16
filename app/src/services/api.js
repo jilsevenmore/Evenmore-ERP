@@ -48,7 +48,15 @@ export function buildQuery(params = {}) {
 
 export function getAuthToken(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
   try {
-    return storage?.getItem('evenmore_auth_token') || storage?.getItem('auth_token') || '';
+    return storage?.getItem('evenmore_auth_token') || '';
+  } catch {
+    return '';
+  }
+}
+
+export function getRefreshToken(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
+  try {
+    return storage?.getItem('evenmore_refresh_token') || '';
   } catch {
     return '';
   }
@@ -76,6 +84,42 @@ async function fetchWithTimeout(url, config, timeoutMs, externalSignal) {
     return await fetch(url, { ...config, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+let refreshPromise = null;
+
+async function attemptTokenRefresh() {
+  if (refreshPromise) return refreshPromise;
+  const refresh = getRefreshToken();
+  if (!refresh) {
+    const err = new Error('No refresh token available');
+    return Promise.reject(err);
+  }
+
+  refreshPromise = (async () => {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh }),
+    });
+    const body = await parseBodySafe(res);
+    if (!res.ok || !body?.access) {
+      throw new Error((body && (body.detail || body.message || body.error)) || 'Token refresh failed');
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('evenmore_auth_token', body.access);
+        if (body.refresh) localStorage.setItem('evenmore_refresh_token', body.refresh);
+      }
+    } catch {}
+    return body.access;
+  })();
+
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
   }
 }
 
@@ -115,6 +159,7 @@ export async function apiClient(
     clearAuthOnUnauthorized = true,
     idempotencyKey = null,
     signal = null,
+    _retried = false,
     ...customConfig
   } = {},
 ) {
@@ -140,17 +185,64 @@ export async function apiClient(
   }
 
   let attempt = 0;
+  let refreshed = _retried;
+  const isRefreshEndpoint = normalizedEp === '/auth/refresh/';
   for (;;) {
     try {
       const response = await fetchWithTimeout(url, config, timeoutMs, signal);
-      if (response.status === 401 && clearAuthOnUnauthorized) {
+      const result = await parseBodySafe(response);
+
+      const authCodes = new Set([
+        'TOKEN_INVALID', 'TOKEN_REVOKED', 'ACCOUNT_INACTIVE', 'TENANT_INACTIVE', 'TOKEN_EXPIRED',
+      ]);
+      const backendCode = (result && (result.code || result.errorCode || result.error_code)) || '';
+      const isAuthSessionFailure = !backendCode || authCodes.has(backendCode);
+      const isLoginEndpoint = normalizedEp.includes('/auth/login') || normalizedEp.includes('/auth/verify-otp');
+
+      if (
+        response.status === 401 &&
+        clearAuthOnUnauthorized &&
+        !isRefreshEndpoint &&
+        !isLoginEndpoint &&
+        !refreshed &&
+        isAuthSessionFailure &&
+        (token || getRefreshToken())
+      ) {
+        try {
+          const newAccess = await attemptTokenRefresh();
+          refreshed = true;
+          config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${newAccess}`,
+          };
+          continue;
+        } catch {
+          clearAuthTokens();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('evenmore:unauthorized'));
+          }
+          throw new ApiError('Your session has expired. Please sign in again.', {
+            status: 401,
+            endpoint: normalizedEp,
+            payload: result,
+          });
+        }
+      }
+
+      if (
+        response.status === 401 &&
+        clearAuthOnUnauthorized &&
+        !isRefreshEndpoint &&
+        !isLoginEndpoint &&
+        isAuthSessionFailure &&
+        !refreshed
+      ) {
+        // No recoverable refresh available for a genuine auth/session failure.
         clearAuthTokens();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('evenmore:unauthorized'));
         }
       }
-
-      const result = await parseBodySafe(response);
       if (response.ok) {
         return result;
       }

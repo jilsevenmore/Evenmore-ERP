@@ -1943,9 +1943,9 @@ html {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 14px 16px;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
   box-shadow: var(--shadow-card);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -1960,9 +1960,9 @@ html {
 }
 
 .stat-badge {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -1970,42 +1970,54 @@ html {
 
 .stat-body {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
   width: 100%;
-  overflow: hidden;
 }
 
 .stat-num {
-  font-size: clamp(1.2rem, 1.35vw, 1.45rem);
+  font-size: clamp(1.15rem, 1.3vw, 1.45rem);
   font-weight: 800;
   color: var(--text);
   display: block;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   line-height: 1.2;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  /* Never truncate numbers with ellipsis - full amount always visible */
+}
+
+.stat-num.is-compact {
+  font-size: clamp(0.95rem, 1.08vw, 1.18rem);
+  letter-spacing: -0.03em;
+}
+
+.stat-num.is-tight {
+  font-size: clamp(0.85rem, 0.95vw, 1.02rem);
+  letter-spacing: -0.035em;
 }
 
 .stat-label {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+  word-break: break-word;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .stat-trend {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin: 4px 0 0;
-  font-size: 0.78rem;
+  margin: 3px 0 0;
+  font-size: 0.74rem;
   font-weight: 600;
   flex-wrap: wrap;
   line-height: 1.25;
@@ -2015,6 +2027,37 @@ html {
 .stat-trend.down { color: var(--danger); }
 .stat-trend b { font-weight: 700; white-space: nowrap; }
 .stat-trend em { font-style: normal; color: var(--muted); font-weight: 400; margin-left: 2px; }
+
+/* Responsive adjustments for mid-sized/compact screens (laptop/dense grid) */
+@media (min-width: 640px) and (max-width: 1650px) {
+  .stat-card {
+    padding: 12px 14px;
+    gap: 9px;
+  }
+
+  .stat-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+  }
+
+  .stat-badge svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .stat-num {
+    font-size: clamp(1.05rem, 1.15vw, 1.28rem);
+  }
+
+  .stat-num.is-compact {
+    font-size: clamp(0.92rem, 1.02vw, 1.12rem);
+  }
+
+  .stat-num.is-tight {
+    font-size: clamp(0.82rem, 0.9vw, 0.98rem);
+  }
+}
 
 /* Phones: stat cards sit two-across, so stack the badge above the numbers. */
 @media (max-width: 639px) {
@@ -2026,21 +2069,27 @@ html {
   }
 
   .stat-badge {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
   }
 
   .stat-body { width: 100%; }
 
   .stat-num {
-    font-size: 1.15rem;
-    overflow-wrap: anywhere;
+    font-size: 1.12rem;
+  }
+
+  .stat-num.is-compact {
+    font-size: 0.98rem;
+  }
+
+  .stat-num.is-tight {
+    font-size: 0.88rem;
   }
 
   .stat-label {
     font-size: 0.72rem;
-    overflow-wrap: anywhere;
   }
 
   .stat-trend {
@@ -2972,23 +3021,25 @@ html {
 
 .dashboard-stat-copy strong {
   display: block;
-  font-size: clamp(1.25rem, 1.4vw, 1.55rem);
+  font-size: clamp(1.15rem, 1.3vw, 1.45rem);
   font-weight: 800;
   color: var(--text);
-  line-height: 1.15;
+  line-height: 1.2;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-stat-copy span {
-  display: block;
-  font-size: 0.8rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  font-size: 0.76rem;
   color: var(--muted);
-  margin-top: 3px;
-  white-space: nowrap;
+  margin-top: 2px;
+  line-height: 1.25;
+  word-break: break-word;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .dashboard-stat-trend {

@@ -70,11 +70,8 @@ export const BudgetsPage = () => {
     setLoading(true);
     try {
       const res = await fetchBudgets().catch(() => null);
-      if (res?.data && Array.isArray(res.data)) {
-        setBudgets(res.data);
-      } else if (Array.isArray(res)) {
-        setBudgets(res);
-      }
+      const items = res?.results || res?.data || (Array.isArray(res) ? res : []);
+      setBudgets(items);
 
       const summaryRes = await fetchBudgetVarianceSummary().catch(() => null);
       if (summaryRes?.data) {
@@ -110,12 +107,12 @@ export const BudgetsPage = () => {
   const handleOpenEdit = (b) => {
     setEditingBudget(b);
     setForm({
-      department_name: b.department_name || b.name || '',
+      department_name: b.department_name || b.departmentName || b.name || '',
       category: b.category || 'Operational',
       amount: String(b.amount || ''),
-      period_start: b.period_start || '',
-      period_end: b.period_end || '',
-      alert_threshold_pct: String(b.alert_threshold_pct || 80),
+      period_start: b.period_start || b.periodStart || '',
+      period_end: b.period_end || b.periodEnd || '',
+      alert_threshold_pct: String(b.alert_threshold_pct || b.alertThresholdPct || 80),
       notes: b.notes || '',
     });
     setShowModal(true);
@@ -136,11 +133,15 @@ export const BudgetsPage = () => {
     try {
       const payload = {
         department_name: form.department_name,
+        departmentName: form.department_name,
         category: form.category,
         amount: parseFloat(form.amount) || 0,
         period_start: form.period_start,
+        periodStart: form.period_start,
         period_end: form.period_end,
+        periodEnd: form.period_end,
         alert_threshold_pct: parseFloat(form.alert_threshold_pct) || 80,
+        alertThresholdPct: parseFloat(form.alert_threshold_pct) || 80,
         notes: form.notes,
       };
 
@@ -158,12 +159,16 @@ export const BudgetsPage = () => {
 
   // KPIs
   const totalAllocated = budgets.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
-  const totalSpent = budgets.reduce((sum, b) => sum + (Number(b.actual_spent) || 0), 0);
+  const totalSpent = budgets.reduce((sum, b) => sum + Number(b.actual ?? b.actual_spent ?? 0), 0);
   const totalVariance = totalAllocated - totalSpent;
   const overallUtilizationPct = totalAllocated > 0 ? Math.round((totalSpent / totalAllocated) * 100) : 0;
   const alertCount = budgets.filter((b) => {
-    const consumed = b.percent_consumed || (Number(b.amount) > 0 ? (Number(b.actual_spent || 0) / Number(b.amount)) * 100 : 0);
-    return consumed >= (b.alert_threshold_pct || 80);
+    const consumed = Number(
+      b.percent_consumed ??
+      b.percentConsumed ??
+      (Number(b.amount) > 0 ? (Number(b.actual ?? b.actual_spent ?? 0) / Number(b.amount)) * 100 : 0)
+    );
+    return consumed >= Number(b.alert_threshold_pct ?? b.alertThresholdPct ?? 80);
   }).length;
 
   const filteredBudgets = budgets.filter((b) => {
@@ -183,7 +188,7 @@ export const BudgetsPage = () => {
       accessor: 'department_name',
       render: (b) => (
         <div>
-          <p className="font-bold text-slate-900">{b.department_name || b.name || 'General'}</p>
+          <p className="font-bold text-slate-900">{b.department_name || b.departmentName || b.name || 'General'}</p>
           <span className="font-medium text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">
             {b.category || 'Operational'}
           </span>
@@ -192,13 +197,17 @@ export const BudgetsPage = () => {
     },
     {
       header: 'Budget Period',
-      render: (b) => (
-        <div className="font-mono text-slate-600 text-xs">
-          <span>{b.period_start ? formatDateDDMMYYYY(b.period_start) : '—'}</span>
-          <span className="text-slate-400 mx-1">→</span>
-          <span>{b.period_end ? formatDateDDMMYYYY(b.period_end) : '—'}</span>
-        </div>
-      ),
+      render: (b) => {
+        const start = b.period_start || b.periodStart;
+        const end = b.period_end || b.periodEnd;
+        return (
+          <div className="font-mono text-slate-600 text-xs">
+            <span>{start ? formatDateDDMMYYYY(start) : '—'}</span>
+            <span className="text-slate-400 mx-1">→</span>
+            <span>{end ? formatDateDDMMYYYY(end) : '—'}</span>
+          </div>
+        );
+      },
     },
     {
       header: 'Allocated Envelope',
@@ -212,11 +221,11 @@ export const BudgetsPage = () => {
     },
     {
       header: 'Actual Spent',
-      accessor: 'actual_spent',
+      accessor: 'actual',
       align: 'right',
       render: (b) => (
         <span className="font-mono font-semibold text-slate-700">
-          {formatCurrency(b.actual_spent || 0)}
+          {formatCurrency(b.actual ?? b.actual_spent ?? 0)}
         </span>
       ),
     },
@@ -224,7 +233,9 @@ export const BudgetsPage = () => {
       header: 'Variance (Remaining)',
       align: 'right',
       render: (b) => {
-        const remaining = (Number(b.amount) || 0) - (Number(b.actual_spent) || 0);
+        const remaining = b.variance !== undefined && b.variance !== null
+          ? Number(b.variance)
+          : (Number(b.amount) || 0) - (Number(b.actual ?? b.actual_spent ?? 0));
         return (
           <span className={`font-mono font-bold ${remaining < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
             {formatCurrency(remaining)}
@@ -236,14 +247,16 @@ export const BudgetsPage = () => {
       header: 'Live Burn Gauge',
       render: (b) => {
         const pct = Math.round(
-          b.percent_consumed !== undefined
+          b.percent_consumed !== undefined && b.percent_consumed !== null
             ? b.percent_consumed
+            : b.percentConsumed !== undefined && b.percentConsumed !== null
+            ? b.percentConsumed
             : Number(b.amount) > 0
-            ? ((Number(b.actual_spent) || 0) / Number(b.amount)) * 100
+            ? (Number(b.actual ?? b.actual_spent ?? 0) / Number(b.amount)) * 100
             : 0
         );
         const color = getGaugeColor(pct);
-        const threshold = b.alert_threshold_pct || 80;
+        const threshold = b.alert_threshold_pct || b.alertThresholdPct || 80;
 
         return (
           <div className="w-36 space-y-1">
@@ -266,13 +279,15 @@ export const BudgetsPage = () => {
       align: 'center',
       render: (b) => {
         const pct = Math.round(
-          b.percent_consumed !== undefined
+          b.percent_consumed !== undefined && b.percent_consumed !== null
             ? b.percent_consumed
+            : b.percentConsumed !== undefined && b.percentConsumed !== null
+            ? b.percentConsumed
             : Number(b.amount) > 0
-            ? ((Number(b.actual_spent) || 0) / Number(b.amount)) * 100
+            ? (Number(b.actual ?? b.actual_spent ?? 0) / Number(b.amount)) * 100
             : 0
         );
-        const threshold = b.alert_threshold_pct || 80;
+        const threshold = b.alert_threshold_pct || b.alertThresholdPct || 80;
         const isAlert = pct >= threshold;
 
         if (pct >= 100) {
@@ -391,7 +406,7 @@ export const BudgetsPage = () => {
         keyExtractor={(b) => b.id}
         searchPlaceholder="Search department, category..."
         searchFilter={(b, term) =>
-          String(b.department_name || b.name || '').toLowerCase().includes(term) ||
+          String(b.department_name || b.departmentName || b.name || '').toLowerCase().includes(term) ||
           String(b.category || '').toLowerCase().includes(term)
         }
       />

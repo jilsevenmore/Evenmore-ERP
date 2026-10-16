@@ -18,6 +18,7 @@ export default function KpiData() {
   const { kpis, addKpi, updateKpi, deleteKpi } = usePerformanceStore();
 
   const [search, setSearch] = useState("");
+  const [empFilter, setEmpFilter] = useState("All");
   const [dept, setDept] = useState("All");
   const [desig, setDesig] = useState("All");
   const [status, setStatus] = useState("All");
@@ -42,12 +43,13 @@ export default function KpiData() {
   const filtered = useMemo(() => {
     return kpis.filter((r) => {
       if (search && !`${r.name} ${r.department} ${r.designation} ${r.target} ${r.assignedEmployee || ""}`.toLowerCase().includes(search.toLowerCase())) return false;
+      if (empFilter !== "All" && r.assignedEmployee !== empFilter && r.assignedEmployee !== "All in Department") return false;
       if (dept !== "All" && r.department !== dept) return false;
       if (desig !== "All" && r.designation !== desig) return false;
       if (status !== "All" && r.status !== status) return false;
       return true;
     });
-  }, [kpis, search, dept, desig, status]);
+  }, [kpis, search, empFilter, dept, desig, status]);
 
   function validate(f) {
     const e = {};
@@ -193,6 +195,11 @@ export default function KpiData() {
         </div>
       ),
     },
+  ];
+
+  const empOpts = [
+    { value: "All", label: "All Employees" },
+    ...employees.map((e) => ({ value: e.name, label: e.name })),
   ];
 
   const deptOpts = [
@@ -353,12 +360,14 @@ export default function KpiData() {
         search={search}
         onSearch={setSearch}
         selects={[
+          { label: "Employee", value: empFilter, onChange: setEmpFilter, options: empOpts },
           { label: "Department", value: dept, onChange: setDept, options: deptOpts },
           { label: "Designation", value: desig, onChange: setDesig, options: desigOpts },
           { label: "Status", value: status, onChange: setStatus, options: statusOpts },
         ]}
         onClear={() => {
           setSearch("");
+          setEmpFilter("All");
           setDept("All");
           setDesig("All");
           setStatus("All");

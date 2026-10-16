@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, UserPlus, Send, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye, Trash2 } from 'lucide-react';
+import { ChevronRight, UserPlus, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye, Trash2, Clock } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { formatCurrency } from '../../../../utils/currencyUtils';
@@ -65,12 +65,22 @@ export function ProjectHeader({
   onLogDelay,
   onCompleteProject,
   onDeleteProject,
+  onEditDuration,
 }) {
   const priority = PRIORITY_TONES[project.priority] ?? PRIORITY_TONES.Low;
   const isClosed = project.status === 'Completed';
 
+  const priorityAccent =
+    project.priority === 'Urgent'
+      ? 'border-l-4 border-l-rose-600 bg-rose-50/20'
+      : project.priority === 'High'
+      ? 'border-l-4 border-l-orange-500 bg-orange-50/15'
+      : project.priority === 'Medium'
+      ? 'border-l-4 border-l-sky-400 bg-sky-50/10'
+      : 'border-l-4 border-l-slate-300';
+
   return (
-    <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs">
+    <section className={`rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs ${priorityAccent}`}>
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1.5 text-xs text-slate-400 font-medium mb-3">
         <Link to="/pms" className="text-blue-600 hover:underline">PMS</Link>
@@ -88,9 +98,21 @@ export function ProjectHeader({
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">{project.code || project.id}</h2>
             <StageStatusBadge status={project.status} />
             <span
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-              style={{ background: priority.bg, color: priority.fg }}
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border"
+              style={{
+                background: priority.bg,
+                color: priority.fg,
+                borderColor:
+                  project.priority === 'Urgent'
+                    ? '#fda4af'
+                    : project.priority === 'High'
+                    ? '#fed7aa'
+                    : project.priority === 'Medium'
+                    ? '#bae6fd'
+                    : '#e2e8f0',
+              }}
             >
+              {project.priority === 'Urgent' && <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping mr-0.5" />}
               {project.priority}
             </span>
             {meta?.isOverdue && (
@@ -117,6 +139,7 @@ export function ProjectHeader({
               ) : '—'],
               ['Order Value', formatCurrency(project.productDetails?.orderValue ?? 0)],
               ['Current Stage', meta?.sequenceLabel ?? '—'],
+              ['Planned Duration', project.plannedDuration ? `${project.plannedDuration} ${project.durationUnit || 'Days'}` : '—'],
             ].map(([k, v]) => (
               <div key={k} className="min-w-0">
                 <dt className="text-[10px] text-slate-400 font-medium">{k}</dt>
@@ -133,12 +156,14 @@ export function ProjectHeader({
           <Button size="sm" variant="secondary" icon={UserPlus} onClick={onAssignStage} disabled={isClosed}>
             Assign Active Stage
           </Button>
-          <Button size="sm" variant="secondary" icon={Send} onClick={onSubmitForReview} disabled={isClosed || !meta?.currentStage}>
-            Submit for Review
-          </Button>
           <Button size="sm" variant="secondary" icon={AlertTriangle} onClick={onLogDelay} disabled={isClosed}>
             Log Delay
           </Button>
+          {onEditDuration && (
+            <Button size="sm" variant="secondary" icon={Clock} onClick={onEditDuration} disabled={isClosed} title="Edit Project Planned Duration">
+              Edit Duration
+            </Button>
+          )}
           <Button size="sm" icon={CheckCircle2} onClick={onCompleteProject} disabled={isClosed}>
             {isClosed ? 'Completed' : 'Complete Project'}
           </Button>

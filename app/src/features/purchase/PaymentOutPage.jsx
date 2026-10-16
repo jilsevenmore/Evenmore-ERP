@@ -3,8 +3,9 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ArrowUpRight, CreditCard, X, DollarSign, Receipt, CheckCircle2, TrendingDown } from 'lucide-react';
+import { Plus, ArrowUpRight, CreditCard, X, IndianRupee, Receipt, CheckCircle2, TrendingDown } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const paymentOutGuide = {
     title: 'Payment Out & Vendor Disbursements',
     subtitle: 'Supplier payment authorization and Accounts Payable settlement',
@@ -33,14 +34,15 @@ const paymentOutGuide = {
     ],
 };
 export const PaymentOutPage = () => {
-    const { paymentOuts, purchaseBills, purchaseOrders, vendors, addPaymentOut, applyVendorAdvanceToBill, getVendorAdvanceBalance, getBillOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { paymentOuts, purchaseBills, purchaseOrders, vendors, bankAccounts = [], addPaymentOut, applyVendorAdvanceToBill, getVendorAdvanceBalance, getBillOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState(purchaseBills[0]?.id || '');
     const [paymentType, setPaymentType] = useState('Final'); // [PHASE-2D] 'Advance' | 'Final'
     const [selectedPoId, setSelectedPoId] = useState(purchaseOrders[0]?.id || '');
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
     const [amount, setAmount] = useState(0);
-    const [mode, setMode] = useState('ACH');
+    const [mode, setMode] = useState('Bank Wire');
+    const [bankAccountId, setBankAccountId] = useState('');
     const [reference, setReference] = useState('');
     // [PHASE-2D] advance-adjustment widget state
     const [advanceBillId, setAdvanceBillId] = useState('');
@@ -61,6 +63,7 @@ export const PaymentOutPage = () => {
             handleBillSelect(defaultBill.id);
         }
         setPaymentType('Final');
+        setBankAccountId(bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id || '');
         setShowAddModal(true);
     };
 
@@ -70,6 +73,7 @@ export const PaymentOutPage = () => {
             alert('Please enter a valid payment amount greater than zero.');
             return;
         }
+        const selectedBankId = bankAccountId || bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id;
         if (paymentType === 'Advance') {
             // ── [PHASE-2D] Advance released against a PO (no bill yet for steel on credit) ──
             const po = purchaseOrders.find((p) => p.id === selectedPoId) || purchaseOrders[0];
@@ -84,6 +88,7 @@ export const PaymentOutPage = () => {
                 paymentType: 'Advance',
                 date: getCurrentDateFormatted(),
                 mode,
+                bankAccountId: mode === 'Cash' ? undefined : selectedBankId,
                 amount: Number(amount),
                 reference: reference || `ADV-${Date.now()}`,
             });
@@ -105,8 +110,9 @@ export const PaymentOutPage = () => {
             paymentType: 'Final',
             date: getCurrentDateFormatted(),
             mode,
+            bankAccountId: mode === 'Cash' ? undefined : selectedBankId,
             amount: Number(amount),
-            reference: reference || `ACH-${Date.now()}`,
+            reference: reference || `VOU-${Date.now()}`,
         });
 
         if (res) {
@@ -217,7 +223,7 @@ export const PaymentOutPage = () => {
 
       {/* Payment Out KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={DollarSign} />
+        <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={IndianRupee} />
         <StatCard label="Total Disbursed Vouchers" value={`${paymentOuts.length} Vouchers`} icon={Receipt} trend={{ positive: true, text: 'Cleared to Ledger' }} />
         {/* [PHASE-2D] advance exposure vs applied */}
         <StatCard label="Advances Released" value={formatCurrency(totalAdvances)} icon={ArrowUpRight} tone="blue" subtext={`${totalAdvanceApplied > 0 ? formatCurrency(totalAdvanceApplied) + ' applied · ' : ''}${formatCurrency(openAdvanceBalance)} open`} />
@@ -261,7 +267,14 @@ export const PaymentOutPage = () => {
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">Amount (max advance)</label>
             <input type="number" min="0.01" step="0.01" value={advanceApplyAmt || ''}
-              onChange={(e) => setAdvanceApplyAmt(Number(e.target.value))}
+              onFocus={handleNumberInputFocus}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') { setAdvanceApplyAmt(''); return; }
+                const cleaned = sanitizeNumberInput(raw);
+                if (cleaned !== raw) e.target.value = cleaned;
+                setAdvanceApplyAmt(cleaned === '' ? '' : Number(cleaned));
+              }}
               placeholder="Amount to adjust"
               className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-900 font-mono text-xs"
             />
@@ -286,16 +299,27 @@ export const PaymentOutPage = () => {
         </div>
       </div>
 
-      <DataTable title="Vendor Disbursement Vouchers" columns={columns} data={paymentOuts} keyExtractor={(p) => p.id} searchPlaceholder="Search voucher #, vendor, or bill..." searchFilter={(p, term) => String(p.voucherNumber ?? '').toLowerCase().includes(term) ||
-            String(p.vendor ?? '').toLowerCase().includes(term) ||
-            (p.billNumber && String(p.billNumber ?? '').toLowerCase().includes(term)) ||
-            (p.reference && String(p.reference ?? '').toLowerCase().includes(term))}/>
+      <DataTable
+        title="Vendor Disbursement Vouchers"
+        columns={columns}
+        data={paymentOuts}
+        keyExtractor={(p) => p.id}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
+        searchPlaceholder="Search voucher #, vendor, or bill..."
+        searchFilter={(p, term) =>
+          String(p.voucherNumber ?? '').toLowerCase().includes(term) ||
+          String(p.vendor ?? '').toLowerCase().includes(term) ||
+          (p.billNumber && String(p.billNumber ?? '').toLowerCase().includes(term)) ||
+          (p.reference && String(p.reference ?? '').toLowerCase().includes(term))
+        }
+      />
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 text-xs max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-rose-600"/>
+                <IndianRupee className="w-5 h-5 text-rose-600"/>
                 <h3 className="font-bold text-base text-[#1F2E4A]">Issue Payment Out Voucher</h3>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -430,8 +454,16 @@ export const PaymentOutPage = () => {
                   min="0.01"
                   max={paymentType === 'Final' ? Math.max(0.01, selectedBillOutstanding.balanceDue) : undefined}
                   disabled={paymentType === 'Final' && (isCancelled || isSettled)}
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
+                  value={amount ?? ''}
+                  onFocus={handleNumberInputFocus}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') { setAmount(''); return; }
+                    const cleaned = sanitizeNumberInput(raw);
+                    if (cleaned !== raw) e.target.value = cleaned;
+                    setAmount(cleaned === '' ? '' : Number(cleaned));
+                  }}
+                  placeholder="0.00"
                   className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-900 font-mono font-bold text-sm disabled:bg-slate-100"
                 />
               </div>
@@ -440,17 +472,38 @@ export const PaymentOutPage = () => {
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Payment Channel</label>
                   <select value={mode} onChange={(e) => setMode(e.target.value)} disabled={paymentType === 'Final' && (isCancelled || isSettled)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 disabled:bg-slate-100">
+                    <option value="Bank Wire">Bank Wire / RTGS</option>
                     <option value="ACH">ACH Direct</option>
-                    <option value="Bank Wire">Bank Wire</option>
-                    <option value="Corporate Card">Corporate Card</option>
+                    <option value="UPI">UPI</option>
                     <option value="Cheque">Corporate Cheque</option>
+                    <option value="Corporate Card">Corporate Card</option>
+                    <option value="Cash">Cash</option>
                   </select>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Bank Voucher / Ref #</label>
-                  <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} disabled={paymentType === 'Final' && (isCancelled || isSettled)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono disabled:bg-slate-100"/>
+                  <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} disabled={paymentType === 'Final' && (isCancelled || isSettled)} placeholder="e.g. UTR / Ref #" className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono disabled:bg-slate-100"/>
                 </div>
               </div>
+
+              {mode !== 'Cash' && bankAccounts.length > 0 && (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Disbursing Bank Account *</label>
+                  <select
+                    value={bankAccountId}
+                    onChange={(e) => setBankAccountId(e.target.value)}
+                    disabled={paymentType === 'Final' && (isCancelled || isSettled)}
+                    className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 disabled:bg-slate-100"
+                    required
+                  >
+                    {bankAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.bankName || acc.name || 'Bank Account'} {acc.accountNumber ? `(${acc.accountNumber})` : ''} {acc.isDefault ? '— Primary' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">

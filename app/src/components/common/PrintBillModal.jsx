@@ -3,7 +3,8 @@ import { X, Printer, CheckCircle2, ShieldCheck, FileText } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { companyInitial, joinNonEmpty } from './printLetterhead';
 export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
-    const { companyProfile } = useERP();
+    const { companyProfile, formatCurrency } = useERP();
+    const money = (value) => (formatCurrency ? formatCurrency(Number(value) || 0) : `₹${(Number(value) || 0).toFixed(2)}`);
     const companyName = companyProfile?.name || '';
     const companyAddress = companyProfile?.address || '';
     const taxLine = joinNonEmpty([companyProfile?.gstin && `GSTIN: ${companyProfile.gstin}`, companyProfile?.pan && `PAN: ${companyProfile.pan}`]);
@@ -145,9 +146,9 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                   <th className="py-2.5 px-3 w-10 text-center">#</th>
                   <th className="py-2.5 px-3">Item SKU & Description</th>
                   <th className="py-2.5 px-3 text-center">Qty Received</th>
-                  <th className="py-2.5 px-3 text-right">Unit Rate ($)</th>
+                  <th className="py-2.5 px-3 text-right">Unit Rate</th>
                   <th className="py-2.5 px-3 text-center">Tax</th>
-                  <th className="py-2.5 px-3 text-right">Total Amount ($)</th>
+                  <th className="py-2.5 px-3 text-right">Total Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -157,10 +158,10 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                       <p className="font-bold text-slate-900">{bill.description || 'Billed amount'}</p>
                     </td>
                     <td className="py-2.5 px-3 text-center font-mono font-semibold">1</td>
-                    <td className="py-2.5 px-3 text-right font-mono">${totalAmount.toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono">{money(totalAmount)}</td>
                     <td className="py-2.5 px-3 text-center text-slate-500">0%</td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                      ${totalAmount.toFixed(2)}
+                      {money(totalAmount)}
                     </td>
                   </tr>) : ((bill?.items || []).map((it, idx) => (<tr key={idx} className="hover:bg-slate-50/50">
                       <td className="py-2.5 px-3 text-center font-mono text-slate-500">{idx + 1}</td>
@@ -169,10 +170,10 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                         {it.itemSku && <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku}</p>}
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{it.qty}</td>
-                      <td className="py-2.5 px-3 text-right font-mono">${Number(it.rate || 0).toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono">{money(it.rate)}</td>
                       <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{it.tax || 0}%</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                        ${Number(it.amount || (Number(it.qty) || 0) * (Number(it.rate) || 0)).toFixed(2)}
+                        {money(it.amount || (Number(it.qty) || 0) * (Number(it.rate) || 0))}
                       </td>
                     </tr>)))}
               </tbody>
@@ -198,27 +199,27 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
             <div className="w-72 space-y-1.5 font-mono text-xs text-right">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal (Net Excl. Tax):</span>
-                <span>${totalAmount.toFixed(2)}</span>
+                <span>{money(totalAmount)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Tax / VAT (0.0%):</span>
-                <span>$0.00</span>
+                <span>{money(0)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Freight & Handling:</span>
-                <span>$0.00</span>
+                <span>{money(0)}</span>
               </div>
               <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-300">
                 <span>Total Billed Amount:</span>
-                <span>${totalAmount.toFixed(2)}</span>
+                <span>{money(totalAmount)}</span>
               </div>
               <div className="flex justify-between text-xs font-semibold text-emerald-700">
                 <span>Total Disbursed (Paid):</span>
-                <span>-${paidAmount.toFixed(2)}</span>
+                <span>-{money(paidAmount)}</span>
               </div>
               <div className="flex justify-between text-sm font-black text-rose-700 pt-1 border-t-2 border-slate-900 bg-slate-50 p-1.5 rounded">
                 <span>Outstanding Balance Due:</span>
-                <span>${balanceDue.toFixed(2)}</span>
+                <span>{money(balanceDue)}</span>
               </div>
             </div>
           </div>

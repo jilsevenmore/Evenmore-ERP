@@ -4,12 +4,13 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileSpreadsheet, CheckCircle2, DollarSign, X, Eye, Printer, Clock, AlertCircle, FileText, Ban, MapPin } from 'lucide-react';
+import { Plus, FileSpreadsheet, CheckCircle2, IndianRupee, X, Eye, Printer, Clock, AlertCircle, FileText, Ban, MapPin } from 'lucide-react';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintBillModal } from '../../components/common/PrintBillModal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const purchaseBillGuide = {
     title: 'Purchase Bills & Accounts Payable',
     subtitle: 'Supplier invoice intake, 3-way matching audit, inventory replenishment, and disbursements.',
@@ -28,7 +29,7 @@ const purchaseBillGuide = {
     workflow: ['PO Issued', 'Physical Goods Intake', 'Vendor Bill Recorded', '3-Way Match Verified', 'Payment Disbursed'],
 };
 export const PurchaseBillsPage = () => {
-    const { purchaseBills, purchaseOrders, vendors, addPurchaseBill, cancelPurchaseBill, addPaymentOut, getBillOutstanding, getPoBilledStatus, paymentOuts, purchaseReturns, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO } = useERP();
+    const { purchaseBills, purchaseOrders, vendors, bankAccounts = [], addPurchaseBill, cancelPurchaseBill, addPaymentOut, getBillOutstanding, getPoBilledStatus, paymentOuts, purchaseReturns, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBill, setSelectedBill] = useState(null);
     const [showPayModal, setShowPayModal] = useState(null);
@@ -40,7 +41,8 @@ export const PurchaseBillsPage = () => {
     const [lineItems, setLineItems] = useState([]);
     // Payment form state
     const [payAmount, setPayAmount] = useState(0);
-    const [payMode, setPayMode] = useState('Bank Transfer');
+    const [payMode, setPayMode] = useState('Bank Wire');
+    const [payBankAccountId, setPayBankAccountId] = useState('');
     const [payRef, setPayRef] = useState('');
     // Start every new bill blank -- closing the modal without saving must not carry values over.
     const handleOpenAddModal = () => {
@@ -105,6 +107,7 @@ export const PurchaseBillsPage = () => {
         e.preventDefault();
         if (!showPayModal || payAmount <= 0)
             return;
+        const selectedBankId = payBankAccountId || bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id;
         addPaymentOut({
             vendorId: showPayModal.vendorId,
             vendor: showPayModal.vendor,
@@ -112,10 +115,12 @@ export const PurchaseBillsPage = () => {
             billNumber: showPayModal.billNumber,
             amount: payAmount,
             mode: payMode,
-            reference: payRef || `ACH-${Date.now()}`,
+            bankAccountId: payMode === 'Cash' ? undefined : selectedBankId,
+            reference: payRef || `VOU-${Date.now()}`,
         });
         setShowPayModal(null);
         setPayAmount(0);
+        setPayRef('');
     };
     const getBillTimelineSteps = (b) => {
         const outstanding = getBillOutstanding(b.id);
@@ -331,10 +336,11 @@ export const PurchaseBillsPage = () => {
                           onClick={() => {
                             setShowPayModal(b);
                             setPayAmount(outstanding.balanceDue);
+                            setPayBankAccountId(bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id || '');
                           }}
                           className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
                         >
-                          <DollarSign size={11}/> Pay Bill
+                          <IndianRupee size={11}/> Pay Bill
                         </button>
                       </div>
                     ) : (
@@ -359,15 +365,26 @@ export const PurchaseBillsPage = () => {
 
       {/* Purchase Bills KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={DollarSign} />
+        <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={IndianRupee} />
         <StatCard label="AP Payable Due" value={formatCurrency(totalApOutstanding)} icon={Clock} trend={{ positive: totalApOutstanding === 0, text: totalApOutstanding > 0 ? `${unpaidBillsCount} unpaid bills` : 'All bills cleared' }} highlight={totalApOutstanding > 0} />
         <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={CheckCircle2} trend={{ positive: true, text: 'Disbursements verified' }} />
         <StatCard label="Active Bills" value={`${purchaseBills.length} Bills`} icon={FileText} subtext={`${unpaidBillsCount} awaiting payment`} />
       </div>
 
-      <DataTable title="Accounts Payable Bills" columns={columns} data={purchaseBills} keyExtractor={(b) => b.id} searchPlaceholder="Search bill #, PO, or vendor..." searchFilter={(b, term) => String(b.billNumber ?? '').toLowerCase().includes(term) ||
-            (b.poRef || b.linkedPo || '').toLowerCase().includes(term) ||
-            String(b.vendor ?? '').toLowerCase().includes(term)}/>
+      <DataTable
+        title="Accounts Payable Bills"
+        columns={columns}
+        data={purchaseBills}
+        keyExtractor={(b) => b.id}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
+        searchPlaceholder="Search bill #, PO, or vendor..."
+        searchFilter={(b, term) =>
+          String(b.billNumber ?? '').toLowerCase().includes(term) ||
+          (b.poRef || b.linkedPo || '').toLowerCase().includes(term) ||
+          String(b.vendor ?? '').toLowerCase().includes(term)
+        }
+      />
 
       {/* Enter Bill Modal */}
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4">
@@ -524,7 +541,7 @@ export const PurchaseBillsPage = () => {
                   <div>
                     <span className="text-slate-400 block text-[10px]">3. Vendor Invoiced Amount</span>
                     <strong className="text-slate-800 font-mono">
-                      ${(selectedBill.total || selectedBill.amount).toFixed(2)}
+                      {formatCurrency(selectedBill.total || selectedBill.amount)}
                     </strong>
                   </div>
                 </div>
@@ -566,6 +583,7 @@ export const PurchaseBillsPage = () => {
                       <Button onClick={() => {
                         setShowPayModal(selectedBill);
                         setPayAmount(getBillOutstanding(selectedBill.id).balanceDue);
+                        setPayBankAccountId(bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id || '');
                         setSelectedBill(null);
                       }}>
                         Disburse Payment
@@ -586,7 +604,7 @@ export const PurchaseBillsPage = () => {
           <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-600"/>
+                <IndianRupee className="w-5 h-5 text-emerald-600"/>
                 <h3 className="font-bold text-base text-slate-900">Disburse Vendor Payment</h3>
               </div>
               <button onClick={() => setShowPayModal(null)} className="text-slate-400 hover:text-slate-600">
@@ -605,30 +623,67 @@ export const PurchaseBillsPage = () => {
                 </div>
                 <div className="flex justify-between text-amber-700 font-semibold border-t border-slate-200 pt-1">
                   <span>Balance Due:</span>
-                  <span className="font-mono">${getBillOutstanding(showPayModal.id).balanceDue.toFixed(2)}</span>
+                  <span className="font-mono">{formatCurrency(getBillOutstanding(showPayModal.id).balanceDue)}</span>
                 </div>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Disbursement Amount ($) *</label>
-                <input type="number" step="0.01" min="0.01" max={getBillOutstanding(showPayModal.id).balanceDue} value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))} required className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-mono font-bold text-sm"/>
+                <label className="font-semibold text-slate-700 block mb-1">Disbursement Amount (₹) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={getBillOutstanding(showPayModal.id).balanceDue}
+                  value={payAmount ?? ''}
+                  onFocus={handleNumberInputFocus}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') { setPayAmount(''); return; }
+                    const cleaned = sanitizeNumberInput(raw);
+                    if (cleaned !== raw) e.target.value = cleaned;
+                    setPayAmount(cleaned === '' ? '' : Number(cleaned));
+                  }}
+                  placeholder="0.00"
+                  required
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-mono font-bold text-sm"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Payment Mode</label>
                   <select value={payMode} onChange={(e) => setPayMode(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800">
+                    <option value="Bank Wire">Bank Wire / RTGS</option>
                     <option value="ACH">ACH Direct</option>
-                    <option value="Bank Wire">Bank Wire</option>
-                    <option value="Corporate Card">Corporate Card</option>
+                    <option value="UPI">UPI</option>
                     <option value="Cheque">Corporate Cheque</option>
+                    <option value="Corporate Card">Corporate Card</option>
+                    <option value="Cash">Cash</option>
                   </select>
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Disbursement Voucher / Ref</label>
-                  <input type="text" value={payRef} onChange={(e) => setPayRef(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"/>
+                  <input type="text" value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="e.g. UTR / Ref #" className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"/>
                 </div>
               </div>
+
+              {payMode !== 'Cash' && bankAccounts.length > 0 && (
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Disbursing Bank Account *</label>
+                  <select
+                    value={payBankAccountId}
+                    onChange={(e) => setPayBankAccountId(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                    required
+                  >
+                    {bankAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.bankName || acc.name || 'Bank Account'} {acc.accountNumber ? `(${acc.accountNumber})` : ''} {acc.isDefault ? '— Primary' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={() => setShowPayModal(null)} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">

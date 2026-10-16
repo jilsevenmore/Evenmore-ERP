@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
+import { Pagination } from '../../components/ui/Pagination';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ClipboardList, Send, ArrowRight, X, Copy, Printer, DollarSign, Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin, BookOpen, CreditCard, RefreshCw } from 'lucide-react';
+import { Plus, ClipboardList, Send, ArrowRight, X, Copy, Printer, IndianRupee, Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin, BookOpen, CreditCard, RefreshCw, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -12,6 +13,7 @@ import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCa
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintPurchaseOrderModal } from '../../components/common/PrintPurchaseOrderModal';
 import { fetchPoRegister, fetchVendorAdvances, createVendorAdvance, reconcileVendorAdvance } from '../../services/upgradeService';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
     subtitle: 'Supplier procurement contracts driving inventory replenishment and vendor billing.',
@@ -31,7 +33,7 @@ const purchaseOrderGuide = {
 };
 export const PurchaseOrdersPage = () => {
     const navigate = useNavigate();
-    const { purchaseOrders, vendors, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO } = useERP();
+    const { purchaseOrders, vendors, parties = [], addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, addPaymentOut, applyVendorAdvanceToBill, refreshFromBackend, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO } = useERP();
     const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'register'
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -43,7 +45,17 @@ export const PurchaseOrdersPage = () => {
     
     // Commitments & Advances State
     const [registerData, setRegisterData] = useState([]);
+    const [registerAggregates, setRegisterAggregates] = useState(null);
+    const [registerPage, setRegisterPage] = useState(1);
+    const [registerPageSize, setRegisterPageSize] = useState(20);
+    const [registerSearch, setRegisterSearch] = useState('');
+
     const [advances, setAdvances] = useState([]);
+    const [advancesAggregates, setAdvancesAggregates] = useState(null);
+    const [advancesPage, setAdvancesPage] = useState(1);
+    const [advancesPageSize, setAdvancesPageSize] = useState(20);
+    const [advancesSearch, setAdvancesSearch] = useState('');
+
     const [isLoadingRegister, setIsLoadingRegister] = useState(false);
     const [showAdvanceModal, setShowAdvanceModal] = useState(false);
     const [showReconcileModal, setShowReconcileModal] = useState(false);
@@ -111,24 +123,62 @@ export const PurchaseOrdersPage = () => {
     const loadRegisterData = async () => {
         setIsLoadingRegister(true);
         try {
-            const regRes = await fetchPoRegister().catch(() => null);
-            if (regRes?.data) {
-                setRegisterData(Array.isArray(regRes.data) ? regRes.data : []);
-            } else if (Array.isArray(regRes)) {
-                setRegisterData(regRes);
-            }
+            const regRes = await fetchPoRegister({ all: true }).catch(() => null);
+            const regList = Array.isArray(regRes)
+                ? regRes
+                : (regRes?.results || regRes?.data || []);
+            setRegisterData(Array.isArray(regList) ? regList : []);
+            if (regRes?.aggregates) setRegisterAggregates(regRes.aggregates);
+
             const advRes = await fetchVendorAdvances().catch(() => null);
-            if (advRes?.data) {
-                setAdvances(Array.isArray(advRes.data) ? advRes.data : []);
-            } else if (Array.isArray(advRes)) {
-                setAdvances(advRes);
-            }
+            const advList = Array.isArray(advRes)
+                ? advRes
+                : (advRes?.results || advRes?.data || []);
+            setAdvances(Array.isArray(advList) ? advList : []);
+            if (advRes?.aggregates) setAdvancesAggregates(advRes.aggregates);
         } catch (err) {
             console.error('Error loading PO register / advances:', err);
         } finally {
             setIsLoadingRegister(false);
         }
     };
+
+    const filteredRegisterData = useMemo(() => {
+        if (!registerSearch.trim()) return registerData;
+        const q = registerSearch.toLowerCase().trim();
+        return registerData.filter((row) =>
+            String(row.po_number || '').toLowerCase().includes(q) ||
+            String(row.vendor_name || '').toLowerCase().includes(q) ||
+            String(row.status || '').toLowerCase().includes(q)
+        );
+    }, [registerData, registerSearch]);
+
+    const paginatedRegisterData = useMemo(() => {
+        const start = (registerPage - 1) * registerPageSize;
+        return filteredRegisterData.slice(start, start + registerPageSize);
+    }, [filteredRegisterData, registerPage, registerPageSize]);
+
+    const filteredAdvances = useMemo(() => {
+        if (!advancesSearch.trim()) return advances;
+        const q = advancesSearch.toLowerCase().trim();
+        return advances.filter((adv) => {
+            const num = adv.advance_number || adv.advanceNumber || '';
+            const party = adv.party_name || adv.partyName || adv.vendorName || adv.vendor || '';
+            const ref = adv.reference_number || adv.referenceNumber || '';
+            const status = adv.status || '';
+            return (
+                String(num).toLowerCase().includes(q) ||
+                String(party).toLowerCase().includes(q) ||
+                String(ref).toLowerCase().includes(q) ||
+                String(status).toLowerCase().includes(q)
+            );
+        });
+    }, [advances, advancesSearch]);
+
+    const paginatedAdvances = useMemo(() => {
+        const start = (advancesPage - 1) * advancesPageSize;
+        return filteredAdvances.slice(start, start + advancesPageSize);
+    }, [filteredAdvances, advancesPage, advancesPageSize]);
 
     useEffect(() => {
         if (activeTab === 'register') {
@@ -139,15 +189,41 @@ export const PurchaseOrdersPage = () => {
     const handleCreateAdvanceSubmit = async (e) => {
         e.preventDefault();
         try {
+            const advAmount = parseFloat(newAdvance.amount);
+            const targetParty = parties.find(p => p.id === newAdvance.party || p.code === newAdvance.party) || vendors.find(v => v.id === newAdvance.party || v.name === newAdvance.party);
+            const targetPo = purchaseOrders.find(p => p.id === newAdvance.purchase_order || p.poNumber === newAdvance.purchase_order);
+
             await createVendorAdvance({
+                vendorId: newAdvance.party,
                 party: newAdvance.party,
-                amount: parseFloat(newAdvance.amount),
+                amount: advAmount,
+                advanceDate: newAdvance.advance_date,
                 advance_date: newAdvance.advance_date,
+                mode: newAdvance.payment_mode,
                 payment_mode: newAdvance.payment_mode,
-                reference_number: newAdvance.reference_number,
+                referenceNumber: newAdvance.reference_number || undefined,
+                reference_number: newAdvance.reference_number || undefined,
+                purchaseOrderId: newAdvance.purchase_order || undefined,
                 purchase_order: newAdvance.purchase_order || undefined,
-                notes: newAdvance.notes,
+                notes: newAdvance.notes || undefined,
             });
+
+            // Also record in ERPContext disbursement register so PO advance immediately connects to vendor balance
+            if (addPaymentOut && advAmount > 0) {
+                addPaymentOut({
+                    vendorId: targetParty?.id || newAdvance.party,
+                    vendor: targetParty?.name || targetParty?.partyName || '',
+                    poId: targetPo?.id || newAdvance.purchase_order || undefined,
+                    poNumber: targetPo?.poNumber || undefined,
+                    paymentType: 'Advance',
+                    date: newAdvance.advance_date || getCurrentDateFormatted(),
+                    mode: newAdvance.payment_mode || 'Bank Transfer',
+                    amount: advAmount,
+                    reference: newAdvance.reference_number || `ADV-${Date.now()}`,
+                    notes: newAdvance.notes,
+                });
+            }
+
             setShowAdvanceModal(false);
             setNewAdvance({
                 party: '',
@@ -159,8 +235,16 @@ export const PurchaseOrdersPage = () => {
                 notes: '',
             });
             await loadRegisterData();
+            if (refreshFromBackend) refreshFromBackend().catch(() => {});
         } catch (err) {
-            alert('Failed to record vendor advance: ' + (err.message || 'Unknown error'));
+            const fieldErrors = err?.payload?.field_errors;
+            let detailMsg = '';
+            if (fieldErrors && typeof fieldErrors === 'object') {
+                detailMsg = Object.entries(fieldErrors)
+                    .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+                    .join('\n');
+            }
+            alert('Failed to record vendor advance: ' + (detailMsg || err.message || 'Unknown error'));
         }
     };
 
@@ -183,10 +267,14 @@ export const PurchaseOrdersPage = () => {
         if (!selectedAdvance) return;
         try {
             await reconcileVendorAdvance(selectedAdvance.id, reconcileForm.bill_id, reconcileForm.amount);
+            if (applyVendorAdvanceToBill && reconcileForm.bill_id) {
+                applyVendorAdvanceToBill(reconcileForm.bill_id, parseFloat(reconcileForm.amount) || undefined);
+            }
             setShowReconcileModal(false);
             setSelectedAdvance(null);
             setReconcileForm({ bill_id: '', amount: '' });
             await loadRegisterData();
+            if (refreshFromBackend) refreshFromBackend().catch(() => {});
         } catch (err) {
             alert('Failed to reconcile advance: ' + (err.message || 'Unknown error'));
         }
@@ -418,29 +506,41 @@ export const PurchaseOrdersPage = () => {
         <>
           {/* Purchase Orders KPI Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Committed Procurement" value={formatCurrency(totalPoValue)} icon={DollarSign} />
+            <StatCard label="Committed Procurement" value={formatCurrency(totalPoValue)} icon={IndianRupee} />
             <StatCard label="Active Orders In-Flight" value={`${activePoCount} Orders`} icon={Clock} trend={{ positive: true, text: 'Awaiting dock arrival' }} highlight={activePoCount > 0} />
             <StatCard label="Draft Orders" value={`${draftPoCount} Drafts`} icon={Package} subtext="Ready for vendor dispatch" />
             <StatCard label="Fulfilled & Billed" value={`${receivedPoCount} Received`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
           </div>
 
-          <DataTable title="Supplier Purchase Orders" columns={columns} data={purchaseOrders} keyExtractor={(p) => p.id} searchPlaceholder="Search PO # or vendor..." searchFilter={(p, term) => String(p.poNumber ?? '').toLowerCase().includes(term) ||
-                String(p.vendor ?? '').toLowerCase().includes(term)}/>
+          <DataTable
+            title="Supplier Purchase Orders"
+            columns={columns}
+            data={purchaseOrders}
+            keyExtractor={(p) => p.id}
+            pageSize={20}
+            pageSizeOptions={[10, 20, 50, 100]}
+            searchPlaceholder="Search PO # or vendor..."
+            searchFilter={(p, term) =>
+              String(p.poNumber ?? '').toLowerCase().includes(term) ||
+              String(p.vendor ?? '').toLowerCase().includes(term)
+            }
+          />
         </>
       ) : (
         /* Commitments Book & Vendor Advances View */
         <div className="space-y-6">
           {/* Commitments KPIs */}
           {(() => {
-            const totalCommit = registerData.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
-            const totalBilled = registerData.reduce((acc, r) => acc + (Number(r.billed_total) || 0), 0);
-            const totalUnbilled = registerData.reduce((acc, r) => acc + (Number(r.unbilled_commitment) || 0), 0);
-            const totalAdv = advances.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
-            const unallocAdv = advances.reduce((acc, a) => acc + (Number(a.unallocated_amount) || 0), 0);
+            const totalCommit = registerAggregates?.totalCommitted ?? registerData.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
+            const totalBilled = registerAggregates?.billedTotal ?? registerData.reduce((acc, r) => acc + (Number(r.billed_total) || 0), 0);
+            const totalUnbilled = registerAggregates?.unbilledCommitment ?? registerData.reduce((acc, r) => acc + (Number(r.unbilled_commitment) || 0), 0);
+            const totalAdv = advancesAggregates?.totalAmount ?? advances.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
+            const unallocAdv = advancesAggregates?.unallocated ?? advances.reduce((acc, a) => acc + (Number(a.unallocated_amount ?? a.unallocatedAmount ?? a.amount) || 0), 0);
+            const totalOrdersCount = registerAggregates?.orderCount ?? registerData.length;
 
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Gross PO Commitments" value={formatCurrency(totalCommit)} icon={DollarSign} subtext={`${registerData.length} total orders`} />
+                <StatCard label="Gross PO Commitments" value={formatCurrency(totalCommit)} icon={IndianRupee} subtext={`${totalOrdersCount} total orders`} />
                 <StatCard label="Billed / Invoiced to Date" value={formatCurrency(totalBilled)} icon={CheckCircle2} />
                 <StatCard label="Open Unbilled Commitments" value={formatCurrency(totalUnbilled)} icon={Clock} highlight={totalUnbilled > 0} trend={{ positive: false, text: 'Future AP exposure' }} />
                 <StatCard label="Unallocated Advances" value={formatCurrency(unallocAdv)} icon={CreditCard} subtext={`${advances.length} advances recorded`} />
@@ -450,14 +550,29 @@ export const PurchaseOrdersPage = () => {
 
           {/* Section 1: PO Commitments Register */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-slate-800 text-sm">Purchase Commitments Register</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Tracking ordered quantities, warehouse receipts, and unbilled commitment liabilities</p>
+                <p className="text-xs text-slate-500 mt-0.5">Tracking ordered quantities, warehouse receipts, and unbilled commitment liabilities (20 per page)</p>
               </div>
-              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">
-                {registerData.length} records
-              </span>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search commitments..."
+                    value={registerSearch}
+                    onChange={(e) => {
+                      setRegisterSearch(e.target.value);
+                      setRegisterPage(1);
+                    }}
+                    className="pl-8.5 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded whitespace-nowrap">
+                  {filteredRegisterData.length} records
+                </span>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -476,14 +591,14 @@ export const PurchaseOrdersPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {registerData.length === 0 ? (
+                  {filteredRegisterData.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="text-center py-8 text-slate-400">
                         {isLoadingRegister ? 'Loading commitments...' : 'No purchase commitments found.'}
                       </td>
                     </tr>
                   ) : (
-                    registerData.map((row) => (
+                    paginatedRegisterData.map((row) => (
                       <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-2.5 px-4 font-mono font-bold text-primary">{row.po_number}</td>
                         <td className="py-2.5 px-4 font-medium text-slate-800">{row.vendor_name || '—'}</td>
@@ -507,18 +622,49 @@ export const PurchaseOrdersPage = () => {
                 </tbody>
               </table>
             </div>
+
+            {filteredRegisterData.length > 0 && (
+              <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+                <Pagination
+                  total={filteredRegisterData.length}
+                  page={registerPage}
+                  pageSize={registerPageSize}
+                  pageSizeOptions={[10, 20, 50, 100]}
+                  onPageSizeChange={(newSize) => {
+                    setRegisterPageSize(newSize);
+                    setRegisterPage(1);
+                  }}
+                  onChange={setRegisterPage}
+                />
+              </div>
+            )}
           </div>
 
           {/* Section 2: Vendor Advances Book */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-slate-800 text-sm">Vendor Advance Disbursements</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Prepayments made to suppliers prior to invoice presentation, eligible for settlement against final bills</p>
+                <p className="text-xs text-slate-500 mt-0.5">Prepayments made to suppliers prior to invoice presentation, eligible for settlement against final bills (20 per page)</p>
               </div>
-              <Button size="sm" icon={Plus} onClick={handleOpenAdvanceModal}>
-                Record Advance
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search advances..."
+                    value={advancesSearch}
+                    onChange={(e) => {
+                      setAdvancesSearch(e.target.value);
+                      setAdvancesPage(1);
+                    }}
+                    className="pl-8.5 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <Button size="sm" icon={Plus} onClick={handleOpenAdvanceModal}>
+                  Record Advance
+                </Button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -538,50 +684,79 @@ export const PurchaseOrdersPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {advances.length === 0 ? (
+                  {filteredAdvances.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="text-center py-8 text-slate-400">
                         No vendor advances recorded. Click "Record Advance" to log a supplier prepayment.
                       </td>
                     </tr>
                   ) : (
-                    advances.map((adv) => (
-                      <tr key={adv.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-2.5 px-4 font-mono font-bold text-primary">{adv.advance_number || adv.advanceNumber}</td>
-                        <td className="py-2.5 px-4 font-medium text-slate-800">{adv.party_name || adv.partyName || adv.vendor || '—'}</td>
-                        <td className="py-2.5 px-4 text-slate-600">{adv.advance_date ? formatDateDDMMYYYY(adv.advance_date) : '—'}</td>
-                        <td className="py-2.5 px-4 text-slate-600">{adv.payment_mode || adv.paymentMode || '—'}</td>
-                        <td className="py-2.5 px-4 font-mono text-slate-500">{adv.reference_number || adv.referenceNumber || '—'}</td>
-                        <td className="py-2.5 px-4 text-right font-mono font-semibold">{formatCurrency(adv.amount)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono text-emerald-600">{formatCurrency(adv.reconciled_amount || 0)}</td>
-                        <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-600">
-                          {formatCurrency(adv.unallocated_amount !== undefined ? adv.unallocated_amount : adv.amount - (adv.reconciled_amount || 0))}
-                        </td>
-                        <td className="py-2.5 px-4 text-center">
-                          <StatusBadge status={adv.status || 'Active'} />
-                        </td>
-                        <td className="py-2.5 px-4 text-center">
-                          {Number(adv.unallocated_amount ?? adv.amount) > 0 ? (
-                            <button
-                              onClick={() => {
-                                setSelectedAdvance(adv);
-                                setReconcileForm({ bill_id: '', amount: adv.unallocated_amount || adv.amount });
-                                setShowReconcileModal(true);
-                              }}
-                              className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-primary hover:text-white rounded font-medium transition cursor-pointer text-slate-700"
-                            >
-                              Reconcile
-                            </button>
-                          ) : (
-                            <span className="text-[11px] text-slate-400 font-medium">Settled</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                    paginatedAdvances.map((adv) => {
+                      const unalloc = adv.unallocated_amount !== undefined
+                        ? adv.unallocated_amount
+                        : adv.unallocatedAmount !== undefined
+                        ? adv.unallocatedAmount
+                        : (Number(adv.amount || 0) - Number(adv.reconciled_amount || adv.reconciledAmount || 0));
+                      const recAmt = adv.reconciled_amount ?? adv.reconciledAmount ?? 0;
+                      const dateVal = adv.advance_date || adv.advanceDate;
+                      const partyVal = adv.party_name || adv.partyName || adv.vendorName || adv.vendor || '—';
+                      const modeVal = adv.payment_mode || adv.paymentMode || adv.mode || '—';
+                      const refVal = adv.reference_number || adv.referenceNumber || '—';
+
+                      return (
+                        <tr key={adv.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-4 font-mono font-bold text-primary">{adv.advance_number || adv.advanceNumber}</td>
+                          <td className="py-2.5 px-4 font-medium text-slate-800">{partyVal}</td>
+                          <td className="py-2.5 px-4 text-slate-600">{dateVal ? formatDateDDMMYYYY(dateVal) : '—'}</td>
+                          <td className="py-2.5 px-4 text-slate-600">{modeVal}</td>
+                          <td className="py-2.5 px-4 font-mono text-slate-500">{refVal}</td>
+                          <td className="py-2.5 px-4 text-right font-mono font-semibold">{formatCurrency(adv.amount)}</td>
+                          <td className="py-2.5 px-4 text-right font-mono text-emerald-600">{formatCurrency(recAmt)}</td>
+                          <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-600">
+                            {formatCurrency(unalloc)}
+                          </td>
+                          <td className="py-2.5 px-4 text-center">
+                            <StatusBadge status={adv.status || 'Active'} />
+                          </td>
+                          <td className="py-2.5 px-4 text-center">
+                            {Number(unalloc) > 0 ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedAdvance(adv);
+                                  setReconcileForm({ bill_id: '', amount: unalloc });
+                                  setShowReconcileModal(true);
+                                }}
+                                className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-primary hover:text-white rounded font-medium transition cursor-pointer text-slate-700"
+                              >
+                                Reconcile
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 font-medium">Settled</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
+
+            {filteredAdvances.length > 0 && (
+              <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+                <Pagination
+                  total={filteredAdvances.length}
+                  page={advancesPage}
+                  pageSize={advancesPageSize}
+                  pageSizeOptions={[10, 20, 50, 100]}
+                  onPageSizeChange={(newSize) => {
+                    setAdvancesPageSize(newSize);
+                    setAdvancesPage(1);
+                  }}
+                  onChange={setAdvancesPage}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -838,7 +1013,8 @@ export const PurchaseOrdersPage = () => {
                     min="1"
                     placeholder="e.g. 50000"
                     value={newAdvance.amount}
-                    onChange={(e) => setNewAdvance({ ...newAdvance, amount: e.target.value })}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => setNewAdvance({ ...newAdvance, amount: sanitizeNumberInput(e.target.value) })}
                     className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                   />
                 </div>
@@ -965,7 +1141,8 @@ export const PurchaseOrdersPage = () => {
                   min="1"
                   max={selectedAdvance.unallocated_amount ?? selectedAdvance.amount}
                   value={reconcileForm.amount}
-                  onChange={(e) => setReconcileForm({ ...reconcileForm, amount: e.target.value })}
+                  onFocus={handleNumberInputFocus}
+                  onChange={(e) => setReconcileForm({ ...reconcileForm, amount: sanitizeNumberInput(e.target.value) })}
                   className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                 />
               </div>

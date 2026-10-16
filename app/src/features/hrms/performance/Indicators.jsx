@@ -19,6 +19,7 @@ export default function Indicators() {
   const { indicators, addIndicator, updateIndicator, deleteIndicator } = usePerformanceStore();
 
   const [search, setSearch] = useState("");
+  const [empFilter, setEmpFilter] = useState("All");
   const [branch, setBranch] = useState("All");
   const [dept, setDept] = useState("All");
   const [desig, setDesig] = useState("All");
@@ -47,6 +48,7 @@ export default function Indicators() {
   const filtered = useMemo(() => {
     return indicators.filter((r) => {
       if (search && !`${r.name} ${r.department} ${r.designation} ${r.target || ""} ${r.assignedEmployee || ""}`.toLowerCase().includes(search.toLowerCase())) return false;
+      if (empFilter !== "All" && r.assignedEmployee !== empFilter && r.assignedEmployee !== "All in Designation" && r.assignedEmployee !== "All in Role") return false;
       if (branch !== "All" && r.branch !== branch) return false;
       if (dept !== "All" && r.department !== dept) return false;
       if (desig !== "All" && r.designation !== desig) return false;
@@ -57,7 +59,7 @@ export default function Indicators() {
       }
       return true;
     });
-  }, [indicators, search, branch, dept, desig, status, rating]);
+  }, [indicators, search, empFilter, branch, dept, desig, status, rating]);
 
   function validate(f) {
     const e = {};
@@ -221,6 +223,11 @@ export default function Indicators() {
         </div>
       ),
     },
+  ];
+
+  const empOpts = [
+    { value: "All", label: "All Employees" },
+    ...employees.map((e) => ({ value: e.name, label: e.name })),
   ];
 
   const branchOpts = [
@@ -417,6 +424,7 @@ export default function Indicators() {
         search={search}
         onSearch={setSearch}
         selects={[
+          { label: "Employee", value: empFilter, onChange: setEmpFilter, options: empOpts },
           { label: "Branch", value: branch, onChange: setBranch, options: branchOpts },
           { label: "Department", value: dept, onChange: setDept, options: deptOpts },
           { label: "Designation", value: desig, onChange: setDesig, options: desigOpts },
@@ -425,6 +433,7 @@ export default function Indicators() {
         ]}
         onClear={() => {
           setSearch("");
+          setEmpFilter("All");
           setBranch("All");
           setDept("All");
           setDesig("All");

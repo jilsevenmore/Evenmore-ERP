@@ -395,7 +395,7 @@ export function DepartmentsTab({ draft, onChange }) {
               className="w-32 px-3 py-2 rounded-lg border border-[#dce5f4] bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
             />
             <p className="text-[11px] text-slate-400 mt-1">
-              Maximum concurrent open tasks before utilization turns red (>90%).
+              Maximum concurrent open tasks before utilization turns red (&gt;90%).
             </p>
           </div>
         </form>

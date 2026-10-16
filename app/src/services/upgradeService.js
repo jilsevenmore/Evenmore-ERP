@@ -17,6 +17,12 @@ export async function convertEstimateToChallan(estimateId) {
   });
 }
 
+export async function convertEstimateToOrder(estimateId) {
+  return apiClient(`/sales/estimates/${estimateId}/convert-to-order/`, {
+    method: 'POST',
+  });
+}
+
 export async function captureContractSignature(contractId, { role, signature, signatoryName, signatoryEmail }) {
   return apiClient(`/crm/contracts/${contractId}/capture-signature/`, {
     method: 'POST',
@@ -57,12 +63,15 @@ export async function impersonateCustomer(customerId, reason) {
 }
 
 // ── 2. Operations & Supply Chain (§2.2) ───────────────────────────────────
-export async function fetchPoRegister() {
-  return apiClient('/purchase/orders/register/');
+export async function fetchPoRegister(params = {}) {
+  const query = typeof params === 'object' && params !== null ? params : {};
+  return apiClient('/purchase/orders/register/', { query });
 }
 
-export async function fetchVendorAdvances(vendorId) {
-  const query = vendorId ? { vendorId } : {};
+export async function fetchVendorAdvances(vendorIdOrParams) {
+  const query = typeof vendorIdOrParams === 'object' && vendorIdOrParams !== null
+    ? vendorIdOrParams
+    : vendorIdOrParams ? { vendorId: vendorIdOrParams } : {};
   return apiClient('/purchase/advances/', { query });
 }
 
@@ -76,7 +85,7 @@ export async function createVendorAdvance(data) {
 export async function reconcileVendorAdvance(advanceId, purchaseBillId, amount) {
   return apiClient(`/purchase/advances/${advanceId}/reconcile/`, {
     method: 'POST',
-    data: { purchaseBillId, amount },
+    data: { purchaseBillId, bill_id: purchaseBillId, amount },
   });
 }
 
@@ -156,31 +165,31 @@ export async function createScrapLog(data) {
 
 // ── 3. Finance & Accounting (§2.4) ────────────────────────────────────────
 export async function fetchBudgets() {
-  return apiClient('/accounting/budgets/');
+  return apiClient('/accounts/budgets/');
 }
 
 export async function createBudget(data) {
-  return apiClient('/accounting/budgets/', {
+  return apiClient('/accounts/budgets/', {
     method: 'POST',
     data,
   });
 }
 
 export async function updateBudget(id, data) {
-  return apiClient(`/accounting/budgets/${id}/`, {
+  return apiClient(`/accounts/budgets/${id}/`, {
     method: 'PATCH',
     data,
   });
 }
 
 export async function deleteBudget(id) {
-  return apiClient(`/accounting/budgets/${id}/`, {
+  return apiClient(`/accounts/budgets/${id}/`, {
     method: 'DELETE',
   });
 }
 
 export async function fetchBudgetVarianceSummary() {
-  return apiClient('/accounting/budgets/variance-summary/');
+  return apiClient('/accounts/budgets/variance-summary/');
 }
 
 // ── 4. HRMS (§2.5) ────────────────────────────────────────────────────────
@@ -190,7 +199,18 @@ export async function fetchEmployeeTransfers(employeeId) {
 }
 
 export async function createEmployeeTransfer(data) {
-  return apiClient('/hrms/transfers/', { method: 'POST', data });
+  const payload = {
+    employeeId: data.employeeId || data.employee,
+    fromDepartmentId: data.fromDepartmentId || data.from_department,
+    toDepartmentId: data.toDepartmentId || data.to_department,
+    to_department: data.to_department || data.toDepartmentId,
+    fromLocationId: data.fromLocationId || data.from_location,
+    toLocationId: data.toLocationId || data.to_location,
+    effective_date: data.effective_date || data.effectiveDate,
+    reason: data.reason || '',
+    status: data.status || 'Completed',
+  };
+  return apiClient('/hrms/transfers/', { method: 'POST', data: payload });
 }
 
 export async function fetchEmployeePromotions(employeeId) {
@@ -199,7 +219,18 @@ export async function fetchEmployeePromotions(employeeId) {
 }
 
 export async function createEmployeePromotion(data) {
-  return apiClient('/hrms/promotions/', { method: 'POST', data });
+  const payload = {
+    employeeId: data.employeeId || data.employee,
+    fromDesignationId: data.fromDesignationId || data.previous_designation,
+    toDesignationId: data.toDesignationId || data.new_designation,
+    new_designation: data.new_designation || data.toDesignationId,
+    previous_salary: data.previous_salary !== undefined ? data.previous_salary : data.previousSalary,
+    new_salary: data.new_salary !== undefined ? data.new_salary : data.newSalary,
+    effective_date: data.effective_date || data.effectiveDate,
+    justification: data.justification || data.notes || '',
+    status: data.status || 'Effective',
+  };
+  return apiClient('/hrms/promotions/', { method: 'POST', data: payload });
 }
 
 export async function fetchEmployeeWarnings(employeeId) {
@@ -208,7 +239,15 @@ export async function fetchEmployeeWarnings(employeeId) {
 }
 
 export async function createEmployeeWarning(data) {
-  return apiClient('/hrms/warnings/', { method: 'POST', data });
+  const payload = {
+    employeeId: data.employeeId || data.employee,
+    subject: data.subject || data.title,
+    severity: data.severity || data.warning_level || 'First Written',
+    issue_date: data.issue_date || data.warning_date || data.date,
+    description: data.description || data.explanation || '',
+    status: data.status || 'Issued',
+  };
+  return apiClient('/hrms/warnings/', { method: 'POST', data: payload });
 }
 
 export async function fetchEmployeeAwards(employeeId) {
@@ -217,7 +256,35 @@ export async function fetchEmployeeAwards(employeeId) {
 }
 
 export async function createEmployeeAward(data) {
-  return apiClient('/hrms/awards/', { method: 'POST', data });
+  const payload = {
+    employeeId: data.employeeId || data.employee,
+    award_name: data.award_name || data.title,
+    category: data.category || 'Excellence',
+    award_date: data.award_date || data.presentation_date || data.date,
+    gift_amount: data.gift_amount !== undefined ? data.gift_amount : (data.cash_reward || 0),
+    citation: data.citation || '',
+  };
+  return apiClient('/hrms/awards/', { method: 'POST', data: payload });
+}
+
+export async function confirmEmployeeProbation(employeeId, data = {}) {
+  return apiClient(`/hrms/employees/${employeeId}/confirm-probation/`, { method: 'POST', data });
+}
+
+export async function extendEmployeeProbation(employeeId, data = {}) {
+  return apiClient(`/hrms/employees/${employeeId}/extend-probation/`, { method: 'POST', data });
+}
+
+export async function evaluateEmployeeLifecycle() {
+  return apiClient('/hrms/employees/evaluate-lifecycle/', { method: 'POST' });
+}
+
+export async function waiveResignationNotice(resignationId, data = {}) {
+  return apiClient(`/hrms/resignations/${resignationId}/waive-notice/`, { method: 'POST', data });
+}
+
+export async function shortenResignationNotice(resignationId, data = {}) {
+  return apiClient(`/hrms/resignations/${resignationId}/shorten-notice/`, { method: 'POST', data });
 }
 
 export async function fetchTravelRequests(employeeId) {
@@ -229,6 +296,26 @@ export async function createTravelRequest(data) {
   return apiClient('/hrms/travel-requests/', { method: 'POST', data });
 }
 
+export async function updateTravelRequest(id, data) {
+  return apiClient(`/hrms/travel-requests/${id}/`, { method: 'PATCH', data });
+}
+
+export async function deleteTravelRequest(id) {
+  return apiClient(`/hrms/travel-requests/${id}/`, { method: 'DELETE' });
+}
+
+export async function approveTravelRequest(id, remark = "") {
+  return apiClient(`/hrms/travel-requests/${id}/approve/`, { method: 'POST', data: { remark } });
+}
+
+export async function rejectTravelRequest(id, reason = "") {
+  return apiClient(`/hrms/travel-requests/${id}/reject/`, { method: 'POST', data: { remark: reason, reason } });
+}
+
+export async function settleTravelRequest(id, data = {}) {
+  return apiClient(`/hrms/travel-requests/${id}/settle/`, { method: 'POST', data });
+}
+
 export async function fetchAnnouncements() {
   return apiClient('/hrms/announcements/');
 }
@@ -236,6 +323,39 @@ export async function fetchAnnouncements() {
 export async function createAnnouncement(data) {
   return apiClient('/hrms/announcements/', { method: 'POST', data });
 }
+
+export async function updateAnnouncement(id, data) {
+  return apiClient(`/hrms/announcements/${id}/`, { method: 'PATCH', data });
+}
+
+export async function publishAnnouncement(id) {
+  return apiClient(`/hrms/announcements/${id}/publish/`, { method: 'POST' });
+}
+
+export async function archiveAnnouncement(id) {
+  return apiClient(`/hrms/announcements/${id}/archive/`, { method: 'POST' });
+}
+
+export async function deleteAnnouncement(id) {
+  return apiClient(`/hrms/announcements/${id}/`, { method: 'DELETE' });
+}
+
+export async function addComplaintComment(complaintId, text) {
+  return apiClient(`/hrms/complaints/${complaintId}/comment/`, { method: 'POST', data: { text } });
+}
+
+export async function resolveComplaint(complaintId, resolution) {
+  return apiClient(`/hrms/complaints/${complaintId}/resolve/`, { method: 'POST', data: { resolution } });
+}
+
+export async function sendOfferLetter(offerId) {
+  return apiClient(`/hrms/offers/${offerId}/send_offer/`, { method: 'POST' });
+}
+
+export async function acceptOfferLetter(offerId) {
+  return apiClient(`/hrms/offers/${offerId}/accept_offer/`, { method: 'POST' });
+}
+
 
 export async function calculateLeaveDaysPreview(fromDate, toDate, leaveTypeId) {
   return apiClient('/hrms/leave/calculate-days/', {
@@ -327,16 +447,22 @@ export async function logTimesheetHours({ projectId, taskId, taskName, hours, ho
   });
 }
 
-export async function startLiveTimer({ projectId, taskId, description, isBillable }) {
+export async function startLiveTimer({ projectId, taskId, description, isBillable, hourlyRate }) {
   return apiClient('/pms/timesheet-entries/start-timer/', {
     method: 'POST',
-    data: { projectId, taskId, description, isBillable },
+    data: { projectId, taskId, description, isBillable, hourlyRate },
   });
 }
 
 export async function stopLiveTimer(entryId) {
   return apiClient(`/pms/timesheet-entries/${entryId}/stop-timer/`, {
     method: 'POST',
+  });
+}
+
+export async function deleteTimesheetEntry(id) {
+  return apiClient(`/pms/timesheet-entries/${id}/`, {
+    method: 'DELETE',
   });
 }
 

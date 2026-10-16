@@ -152,7 +152,7 @@ const FinancialReportsPage = lazy(() => import('../features/accounts/FinancialRe
 const BudgetsPage = lazy(() => import('../features/accounts/BudgetsPage'));
 
 // ── ERP — Reports & Settings (Lazy Loaded) ────────────────────
-const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
+// const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const WebhooksPage = lazy(() => import('../features/settings/WebhooksPage'));
 
@@ -345,9 +345,10 @@ const router = createBrowserRouter([
       { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
 
       // ── Sales ─────────────────────────────────────────────
-      { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },
+      { path: 'sales', element: <Navigate to="/sales/estimates" replace /> },
       { path: 'sales/estimates', element: <Page component={EstimatesPage} /> },
-      { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
+      // { path: 'sales/quotations', element: <Page component={QuotationsPage} /> }, // Hidden: Quotation removed per workflow update
+      { path: 'sales/quotations', element: <Navigate to="/sales/orders" replace /> },
       { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
       { path: 'sales/proforma', element: <Page component={ProformaInvoicesPage} /> },
       { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },
@@ -419,7 +420,7 @@ const router = createBrowserRouter([
       // ── Accounts ──────────────────────────────────────────
       { path: 'accounts', element: <Navigate to="/accounts/cash-bank" replace /> },
       { path: 'accounts/cash-bank', element: <Page component={CashBankPage} /> },
-      { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
+      // { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
       { path: 'accounts/budgets', element: <Page component={BudgetsPage} /> },
       { path: 'accounts/reports', element: <Page component={FinancialReportsPage} /> },
 
@@ -453,6 +454,7 @@ const router = createBrowserRouter([
       // { path: 'hrms/recruitment/career', element: <Page component={Career} /> }, // Hidden: Career Portal out of scope
       { path: 'hrms/recruitment/questions', element: <Page component={CustomQuestions} /> },
       { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> },
+      { path: 'hrms/recruitment/pipeline', element: <Navigate to="/hrms/recruitment/candidates" replace /> },
       { path: 'hrms/performance', element: <Page component={PerformanceDashboard} /> },
       { path: 'hrms/performance/indicators', element: <Page component={Indicators} /> },
       { path: 'hrms/performance/kpi-data', element: <Page component={KpiData} /> },
@@ -461,10 +463,10 @@ const router = createBrowserRouter([
       // { path: 'hrms/performance/goal-tracking', element: <Page component={GoalTracking} /> }, // Hidden: Goal Tracking feature commented out
       // { path: 'hrms/performance/goal-funnel', element: <Page component={GoalFunnel} /> }, // Hidden: Goal Funnel feature commented out
       { path: 'hrms/training', element: <Page component={TrainingDashboard} /> },
-      { path: 'hrms/training/list', element: <Page component={() => <TrainingDashboard initialTab="list" />} /> },
-      { path: 'hrms/training/training-funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
-      { path: 'hrms/training/trainers', element: <Page component={() => <TrainingDashboard initialTab="trainers" />} /> },
-      { path: 'hrms/training/funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
+      { path: 'hrms/training/list', element: <Page component={TrainingList} /> },
+      { path: 'hrms/training/training-funnel', element: <Page component={TrainingFunnel} /> },
+      { path: 'hrms/training/trainers', element: <Page component={Trainers} /> },
+      { path: 'hrms/training/funnel', element: <Page component={TrainingFunnel} /> },
       { path: 'hrms/meetings', element: <Page component={MeetingsPage} /> },
       // Moved to the Organization section; old links still land there.
       { path: 'hrms/org-chart', element: <Navigate to="/organization/org-chart" replace /> },
@@ -507,7 +509,7 @@ const router = createBrowserRouter([
       { path: 'hrms/hr-admin/travel', element: <Page component={HRAdminPage} defaultTab="travel" /> },
 
       // ── Reports ───────────────────────────────────────────
-      { path: 'reports', element: <Page component={ReportsPage} /> },
+      // { path: 'reports', element: <Page component={ReportsPage} /> },
 
       // ── Administration & Settings ─────────────────────────
       { path: 'administration', element: <Navigate to="/administration/settings" replace /> },

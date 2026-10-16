@@ -106,12 +106,13 @@ const usePayrollStoreBase = create((set, get) => ({
       sessionCan(PAYROLL_MANAGERS) ? pullTracked("salaryStructures") : null,
       sessionCan("view_staff") ? pullWorkingDays() : null,
     ]);
+    const config = settings?.data ?? settings?.value ?? settings;
     set((s) => ({
       employees: employees || s.employees,
       structures: structures || s.structures,
-      defaultWorkingDays: settings?.defaultWorkingDays ?? s.defaultWorkingDays,
-      departmentWorkingDays: settings?.departmentWorkingDays ?? s.departmentWorkingDays,
-      departmentWorkingHours: settings?.departmentWorkingHours ?? s.departmentWorkingHours,
+      defaultWorkingDays: config?.defaultWorkingDays ?? s.defaultWorkingDays,
+      departmentWorkingDays: config?.departmentWorkingDays ?? s.departmentWorkingDays,
+      departmentWorkingHours: config?.departmentWorkingHours ?? s.departmentWorkingHours,
     }));
     return employees;
   },
@@ -364,16 +365,19 @@ const usePayrollStoreBase = create((set, get) => ({
    * endpoints; the working-day configuration is a tenant setting.
    */
   persist: () => {
-    // Only payroll managers change payroll; for anyone else the server would
-    // refuse every one of these writes.
-    if (!sessionCan(PAYROLL_MANAGERS)) return;
-    writeThrough("payroll", get().employees);
-    writeThrough("salaryStructures", get().structures);
-    pushWorkingDays({
-      defaultWorkingDays: get().defaultWorkingDays,
-      departmentWorkingDays: get().departmentWorkingDays,
-      departmentWorkingHours: get().departmentWorkingHours,
-    }).catch((err) => console.warn("[HRMS] working days not saved:", err?.message || err));
+    // Only payroll managers change payroll & structures
+    if (sessionCan(PAYROLL_MANAGERS)) {
+      writeThrough("payroll", get().employees);
+      writeThrough("salaryStructures", get().structures);
+    }
+    // HR managers with edit_staff or payroll managers can persist working schedule
+    if (sessionCan(PAYROLL_MANAGERS) || sessionCan("edit_staff")) {
+      pushWorkingDays({
+        defaultWorkingDays: get().defaultWorkingDays,
+        departmentWorkingDays: get().departmentWorkingDays,
+        departmentWorkingHours: get().departmentWorkingHours,
+      }).catch((err) => console.warn("[HRMS] working days not saved:", err?.message || err));
+    }
   },
 
   /** Discard anything local and re-read payroll from the server. */

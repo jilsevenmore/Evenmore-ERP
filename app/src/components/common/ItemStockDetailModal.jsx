@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowDownLeft, ArrowUpRight, AlertTriangle, Layers, Sliders, ShieldCheck, Award, QrCode, Eye } from 'lucide-react';
+import { X, ArrowDownLeft, ArrowUpRight, AlertTriangle, Layers, Sliders, ShieldCheck, Award, QrCode, Eye, Package } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { formatDisplayDate, formatWarrantyPeriod, getWarrantyStatusStyle } from '../../utils/warrantyUtils';
 import { WarrantyCardModal } from './WarrantyCardModal';
@@ -110,28 +110,46 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
     return (<div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${item.name} stock detail`}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-2 lg:gap-0 bg-slate-50">
-          <div className="min-w-0 lg:min-w-auto">
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-3">
-              <h3 className="text-lg font-bold text-slate-900">{item.name}</h3>
-              <span className="font-mono text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                {item.sku}
-              </span>
-              <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
-                {item.category}
-              </span>
-              {item.trackingMode === 'Batch' && item.batchNumber && (
-                <span className="text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">
-                  Batch: {item.batchNumber}
-                </span>
-              )}
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4 bg-slate-50">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-14 h-14 rounded-xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+              {(item.imageUrl || item.image) ? (
+                <img
+                  src={item.imageUrl || item.image}
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <div className={`w-full h-full flex items-center justify-center text-slate-400 ${(item.imageUrl || item.image) ? 'hidden' : ''}`}>
+                <Package className="w-7 h-7 text-slate-400" />
+              </div>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Primary Location: {item.location} • UOM: {item.uom} • Reorder Threshold: {item.reorderLevel} {pluralizeUom(item.uom)}
-              {item.expiryDate ? ` • Expiry: ${item.expiryDate}` : ''}
-            </p>
+            <div className="min-w-0">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-3">
+                <h3 className="text-lg font-bold text-slate-900 truncate">{item.name}</h3>
+                <span className="font-mono text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                  {item.sku}
+                </span>
+                <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                  {item.category}
+                </span>
+                {item.trackingMode === 'Batch' && item.batchNumber && (
+                  <span className="text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">
+                    Batch: {item.batchNumber}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Primary Location: {item.location} • UOM: {item.uom} • Reorder Threshold: {item.reorderLevel} {pluralizeUom(item.uom)}
+                {item.expiryDate ? ` • Expiry: ${item.expiryDate}` : ''}
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" aria-label="Close stock detail">
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer shrink-0" aria-label="Close stock detail">
             <X className="w-5 h-5"/>
           </button>
         </div>

@@ -7,6 +7,7 @@ import {
   validateDelayEntry,
   DELAY_REASON_CATEGORIES,
 } from '../../../../stores/pmsStore';
+import { toISODate } from '../../../../utils/dateUtils';
 
 /**
  * LogDelayModal — log a delay, revise its recovery plan, or resolve it.
@@ -20,12 +21,9 @@ const fieldClass =
   'w-full text-xs rounded-lg border border-[#dce5f4] bg-white px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400';
 const labelClass = 'block text-[11px] font-semibold text-slate-600 mb-1.5';
 
-function toDateInput(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 10);
+function toDateInput(val) {
+  if (!val) return '';
+  return toISODate(val) || '';
 }
 
 export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
@@ -47,11 +45,12 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
 
   useEffect(() => {
     if (!isOpen || !row) return;
-    setCategory(row.category ?? 'Other');
-    setReason(row.reason ?? '');
-    setResponsibleUser(row.responsibleUser ?? '');
+    const toStr = (v) => (typeof v === 'object' && v !== null ? v.name || v.label || '' : v ?? '');
+    setCategory(toStr(row.category) || 'Other');
+    setReason(toStr(row.reason) || '');
+    setResponsibleUser(toStr(row.responsibleUser) || '');
     setRecoveryDate(toDateInput(row.expectedRecoveryDate));
-    setNotes(row.resolutionNotes ?? '');
+    setNotes(toStr(row.resolutionNotes) || '');
     setErrors({});
   }, [isOpen, row]);
 
@@ -65,6 +64,10 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
     const actor = project.projectManager;
 
     try {
+      const cleanRecoveryDate = recoveryDate ? (toISODate(recoveryDate) || recoveryDate) : null;
+      const matchedEmp = employees.find((emp) => emp.name === responsibleUser || emp.id === responsibleUser);
+      const responsibleUserId = matchedEmp?.id || undefined;
+
       if (isResolve) {
         resolveDelay(project.id, row.stageId, notes.trim(), actor);
       } else if (isPlan) {
@@ -74,7 +77,9 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
           {
             category,
             responsibleUser,
-            expectedRecoveryDate: recoveryDate ? new Date(recoveryDate).toISOString() : null,
+            responsibleUserId,
+            expectedRecoveryDate: cleanRecoveryDate,
+            recoveryPlan: notes.trim(),
             resolutionNotes: notes.trim(),
           },
           actor
@@ -85,7 +90,9 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
           reason: reason.trim(),
           responsibleDepartment: row.department,
           responsibleUser,
-          expectedRecoveryDate: recoveryDate ? new Date(recoveryDate).toISOString() : null,
+          responsibleUserId,
+          expectedRecoveryDate: cleanRecoveryDate,
+          recoveryPlan: notes.trim(),
           resolutionNotes: notes.trim(),
         };
         const found = validateDelayEntry(draft);
@@ -131,8 +138,8 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
         <div className="rounded-lg border border-[#dce5f4] bg-[#f6f9ff] p-3">
           <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              ['Customer', row.customerName],
-              ['Department', row.department],
+              ['Customer', typeof row.customerName === 'object' && row.customerName !== null ? row.customerName.name : row.customerName],
+              ['Department', typeof row.department === 'object' && row.department !== null ? row.department.name : row.department],
               ['Overdue by', row.delayMs > 0 ? row.delayLabel : 'Not yet overdue'],
               ['Completion', `${row.completionPct}%`],
             ].map(([k, v], i) => (
@@ -141,9 +148,9 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
                 <dd
                   className="text-[11px] font-bold truncate"
                   style={{ color: i === 2 && row.delayMs > 0 ? '#9f1239' : '#334155' }}
-                  title={String(v)}
+                  title={String(v ?? '')}
                 >
-                  {v}
+                  {v != null ? String(v) : '—'}
                 </dd>
               </div>
             ))}
@@ -158,7 +165,8 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
             </p>
             {row.reason && (
               <p className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                <strong>{row.category ?? 'Logged'}:</strong> {row.reason}
+                <strong>{typeof row.category === 'object' && row.category !== null ? row.category.name : (row.category ?? 'Logged')}:</strong>{' '}
+                {typeof row.reason === 'object' && row.reason !== null ? row.reason.name : row.reason}
               </p>
             )}
           </>

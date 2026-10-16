@@ -28,7 +28,10 @@ import {
   History,
   Info,
   HelpCircle,
+  FileText,
+  Printer,
 } from "lucide-react";
+import PerformanceReportModal from "./PerformanceReportModal";
 
 export default function Appraisal() {
   const showToast = useAppStore((s) => s.showToast);
@@ -62,6 +65,11 @@ export default function Appraisal() {
   const [deptFilter, setDeptFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [stageFilter, setStageFilter] = useState("All");
+  const [empFilter, setEmpFilter] = useState("All");
+
+  // Performance Report State
+  const [perfReportOpen, setPerfReportOpen] = useState(false);
+  const [selectedPerfAppraisal, setSelectedPerfAppraisal] = useState(null);
 
   // Modals & Drawers
   const [addOpen, setAddOpen] = useState(false);
@@ -134,9 +142,18 @@ export default function Appraisal() {
       if (deptFilter !== "All" && r.department !== deptFilter) return false;
       if (statusFilter !== "All" && r.status !== statusFilter) return false;
       if (stageFilter !== "All" && r.stage !== stageFilter) return false;
+      if (empFilter !== "All" && r.employee !== empFilter) return false;
       return true;
     });
-  }, [appraisals, tab, role, employeeViewName, managerViewName, activeCycleName, search, cycleFilter, deptFilter, statusFilter, stageFilter]);
+  }, [appraisals, tab, role, employeeViewName, managerViewName, activeCycleName, search, cycleFilter, deptFilter, statusFilter, stageFilter, empFilter]);
+
+  const empOpts = useMemo(() => [
+    { value: "All", label: "All Employees" },
+    ...[...new Set([...employees.map((e) => e.name), ...appraisals.map((a) => a.employee)])]
+      .filter(Boolean)
+      .sort()
+      .map((name) => ({ value: name, label: name })),
+  ], [employees, appraisals]);
 
   // Sync to Employee Profile
   function handleSyncToProfile(r) {
@@ -415,6 +432,18 @@ export default function Appraisal() {
               </button>
             )}
 
+            {/* Performance Report */}
+            <button
+              onClick={() => {
+                setSelectedPerfAppraisal(r);
+                setPerfReportOpen(true);
+              }}
+              className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-[11px] font-medium border border-blue-200 transition flex items-center gap-1"
+              title="Generate Employee Performance Report"
+            >
+              <FileText size={11} /> Report
+            </button>
+
             {/* View Details Drawer */}
             <button
               onClick={() => setViewRow(r)}
@@ -516,6 +545,17 @@ export default function Appraisal() {
             </button>
           </div>
 
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSelectedPerfAppraisal(null);
+              setPerfReportOpen(true);
+            }}
+          >
+            <FileText size={14} className="text-blue-600 mr-1.5" />
+            Performance Report
+          </Button>
+
           {/* Add Appraisal Button (Available to HR/Admin) */}
           {role === "HR" && (
             <Button
@@ -591,6 +631,12 @@ export default function Appraisal() {
         onSearch={setSearch}
         selects={[
           {
+            label: "Employee",
+            value: empFilter,
+            onChange: setEmpFilter,
+            options: empOpts,
+          },
+          {
             label: "Cycle",
             value: cycleFilter,
             onChange: setCycleFilter,
@@ -647,6 +693,7 @@ export default function Appraisal() {
         ]}
         onClear={() => {
           setSearch("");
+          setEmpFilter("All");
           setCycleFilter("All");
           setDeptFilter("All");
           setStatusFilter("All");
@@ -1122,11 +1169,23 @@ export default function Appraisal() {
         subtitle={`${viewRow?.designation} • ${viewRow?.department} (${viewRow?.cycle})`}
         footer={
           <div className="flex items-center justify-between w-full">
-            {role === "HR" && viewRow?.status === "Completed" && (
-              <Button onClick={() => handleSyncToProfile(viewRow)}>
-                Sync to Profile
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedPerfAppraisal(viewRow);
+                  setPerfReportOpen(true);
+                }}
+              >
+                <FileText size={14} className="text-blue-600 mr-1.5" />
+                Performance Report
               </Button>
-            )}
+              {role === "HR" && viewRow?.status === "Completed" && (
+                <Button onClick={() => handleSyncToProfile(viewRow)}>
+                  Sync to Profile
+                </Button>
+              )}
+            </div>
             <Button variant="secondary" onClick={() => setViewRow(null)}>
               Close
             </Button>
@@ -1348,6 +1407,13 @@ export default function Appraisal() {
           Are you sure you want to delete the appraisal for <b>{deleteRow?.employee}</b> ({deleteRow?.cycle})? This action cannot be undone.
         </p>
       </Modal>
+
+      {/* Performance & Appraisal Report Modal */}
+      <PerformanceReportModal
+        isOpen={perfReportOpen}
+        onClose={() => setPerfReportOpen(false)}
+        appraisal={selectedPerfAppraisal}
+      />
     </div>
   );
 }

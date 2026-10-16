@@ -32,7 +32,10 @@ import {
   Eye,
   Check,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
+import { uploadFileToBackend } from '../../services/fileUploadService';
 
 export const AddEditItemPage = () => {
   const { id } = useParams();
@@ -143,11 +146,14 @@ export const AddEditItemPage = () => {
 
   // Product Image Upload
   const [imagePreview, setImagePreview] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imageFileId, setImageFileId] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const [costPrice, setCostPrice] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
-  const [availableQty, setAvailableQty] = useState('0');
+  const [availableQty, setAvailableQty] = useState('');
   const [reorderLevel, setReorderLevel] = useState('');
   const [location, setLocation] = useState(locations[0]?.name || '');
   const [description, setDescription] = useState('');
@@ -275,6 +281,8 @@ export const AddEditItemPage = () => {
       setSacCode(existingItem.sacCode || '');
       setSerialNumbersText((existingItem.serialNumbers || []).join('\n'));
       setImagePreview(existingItem.image || existingItem.imageUrl || '');
+      setImageFileId(existingItem.imageFileId || '');
+      setImageFile(null);
       setCostPrice(String(existingItem.costPrice ?? existingItem.unitCost ?? ''));
       setSellingPrice(String(existingItem.sellingPrice ?? ''));
       setAvailableQty(String(existingItem.availableQty ?? existingItem.stock ?? '0'));
@@ -438,6 +446,7 @@ export const AddEditItemPage = () => {
       alert('Please select an image file (PNG, JPG, JPEG, WEBP, or SVG).');
       return;
     }
+    setImageFile(file);
     const reader = new FileReader();
     reader.onload = (e) => {
       setImagePreview(e.target.result);
@@ -455,6 +464,8 @@ export const AddEditItemPage = () => {
 
   const handleRemoveImage = () => {
     setImagePreview('');
+    setImageFile(null);
+    setImageFileId('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -503,7 +514,7 @@ export const AddEditItemPage = () => {
     setNewFieldOptions('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const isService = itemKind === 'Service';
     const parsedCost = parseFloat(costPrice) || 0;
@@ -521,6 +532,30 @@ export const AddEditItemPage = () => {
       computedStatus = 'Low Stock';
     } else {
       computedStatus = 'Optimal';
+    }
+
+    let finalFileId = imageFileId || undefined;
+    let finalImagePreview = imagePreview;
+
+    if (imageFile) {
+      try {
+        setIsUploadingImage(true);
+        const uploadedId = await uploadFileToBackend(imageFile, imageFile.name, 'product_image');
+        if (uploadedId) {
+          finalFileId = uploadedId;
+          setImageFileId(uploadedId);
+        }
+      } catch (err) {
+        console.error('Failed to upload product image to backend:', err);
+        alert(`Failed to upload product image: ${err.message || 'Storage error'}`);
+        setIsUploadingImage(false);
+        return;
+      } finally {
+        setIsUploadingImage(false);
+      }
+    } else if (!imagePreview) {
+      finalFileId = null;
+      finalImagePreview = '';
     }
 
     const payload = {
@@ -590,8 +625,9 @@ export const AddEditItemPage = () => {
       reorderLevel: parsedReorder,
       location,
       status: computedStatus,
-      image: imagePreview,
-      imageUrl: imagePreview,
+      image: finalImagePreview,
+      imageUrl: finalImagePreview,
+      imageFileId: finalFileId,
       customFieldValues,
     };
 
@@ -1678,7 +1714,13 @@ export const AddEditItemPage = () => {
                     type="number"
                     step="0.01"
                     value={costPrice}
-                    onChange={(e) => setCostPrice(e.target.value)}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const cleaned = sanitizeNumberInput(raw);
+                      if (cleaned !== raw) e.target.value = cleaned;
+                      setCostPrice(cleaned);
+                    }}
                     className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
                     placeholder="45.00"
                   />
@@ -1691,7 +1733,13 @@ export const AddEditItemPage = () => {
                     type="number"
                     step="0.01"
                     value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value)}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const cleaned = sanitizeNumberInput(raw);
+                      if (cleaned !== raw) e.target.value = cleaned;
+                      setSellingPrice(cleaned);
+                    }}
                     className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
                     placeholder="129.99"
                   />
@@ -2039,9 +2087,15 @@ export const AddEditItemPage = () => {
                         <input
                           type="number"
                           value={availableQty}
-                          onChange={(e) => setAvailableQty(e.target.value)}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            setAvailableQty(cleaned);
+                          }}
                           className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                          placeholder="50"
+                          placeholder="0"
                         />
                       </div>
                       <div>
@@ -2051,7 +2105,13 @@ export const AddEditItemPage = () => {
                         <input
                           type="number"
                           value={reorderLevel}
-                          onChange={(e) => setReorderLevel(e.target.value)}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            setReorderLevel(cleaned);
+                          }}
                           className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
                           placeholder="15"
                         />
@@ -2067,9 +2127,15 @@ export const AddEditItemPage = () => {
                       <input
                         type="number"
                         value={availableQty}
-                        onChange={(e) => setAvailableQty(e.target.value)}
+                        onFocus={handleNumberInputFocus}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const cleaned = sanitizeNumberInput(raw);
+                          if (cleaned !== raw) e.target.value = cleaned;
+                          setAvailableQty(cleaned);
+                        }}
                         className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                        placeholder="50"
+                        placeholder="0"
                       />
                     </div>
                     <div>
@@ -2079,7 +2145,13 @@ export const AddEditItemPage = () => {
                       <input
                         type="number"
                         value={reorderLevel}
-                        onChange={(e) => setReorderLevel(e.target.value)}
+                        onFocus={handleNumberInputFocus}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const cleaned = sanitizeNumberInput(raw);
+                          if (cleaned !== raw) e.target.value = cleaned;
+                          setReorderLevel(cleaned);
+                        }}
                         className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
                         placeholder="15"
                       />
@@ -2518,8 +2590,10 @@ export const AddEditItemPage = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" icon={Save}>
-              {isEditMode ? `Update ${itemKind} SKU` : `Save & Register ${itemKind}`}
+            <Button type="submit" icon={isUploadingImage ? Loader2 : Save} disabled={isUploadingImage}>
+              {isUploadingImage
+                ? 'Uploading Image...'
+                : (isEditMode ? `Update ${itemKind} SKU` : `Save & Register ${itemKind}`)}
             </Button>
           </div>
         </form>

@@ -52,7 +52,12 @@ export default function InterviewDetails() {
         <p className="text-[13px] text-muted mt-1 mb-5">
           The requested interview schedule could not be located or may have been removed.
         </p>
-        <Button variant="secondary" onClick={() => navigate("/hrms/recruitment/interviews")}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/hrms/recruitment/interviews")}
+          className="mt-4"
+        >
           Back to Interviews
         </Button>
       </div>
@@ -449,10 +454,12 @@ export default function InterviewDetails() {
         title="Interview Evaluation"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setFeedbackModalOpen(false)}>
+            <Button variant="outline" size="sm" onClick={() => setFeedbackModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEvaluation}>Save Evaluation & Complete</Button>
+            <Button variant="primary" size="sm" onClick={handleSaveEvaluation}>
+              Save Evaluation & Complete
+            </Button>
           </>
         }
       >

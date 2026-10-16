@@ -46,7 +46,36 @@ function dataUrlToBlob(dataUrl) {
   while (n--) {
     u8arr[n] = bstr.charCodeAt(n);
   }
-  return new Blob([u8arr], { type: mime });
+}
+
+const AVATAR_COLORS = [
+  "bg-blue-100 text-blue-700 border-blue-200",
+  "bg-indigo-100 text-indigo-700 border-indigo-200",
+  "bg-purple-100 text-purple-700 border-purple-200",
+  "bg-emerald-100 text-emerald-700 border-emerald-200",
+  "bg-amber-100 text-amber-700 border-amber-200",
+  "bg-rose-100 text-rose-700 border-rose-200",
+  "bg-teal-100 text-teal-700 border-teal-200",
+  "bg-cyan-100 text-cyan-700 border-cyan-200",
+];
+
+function getInitials(name = "") {
+  if (!name || name === "All Staff") return "AS";
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return parts[0].slice(0, 2).toUpperCase();
+}
+
+function getAvatarColor(name = "") {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
 }
 
 // Builds a compliant PDF 1.4 Binary Blob
@@ -150,23 +179,46 @@ function downloadPdfDocument(doc) {
   URL.revokeObjectURL(url);
 }
 
-// Inferred category from filename
+export const DOCUMENT_CATEGORIES = [
+  "Identity",
+  "Contract",
+  "Financial",
+  "Compliance",
+  "Legal",
+  "Educational",
+  "General",
+];
+
+export function getAuthoritativeCategory(docOrCat) {
+  const cat = typeof docOrCat === "string" ? docOrCat : (docOrCat?.category || "");
+  const lower = String(cat).trim().toLowerCase();
+  if (lower === "identity") return "Identity";
+  if (lower === "contract") return "Contract";
+  if (lower === "financial") return "Financial";
+  if (lower === "compliance" || lower === "security") return "Compliance";
+  if (lower === "legal") return "Legal";
+  if (lower === "educational" || lower === "education") return "Educational";
+  if (lower === "general" || lower === "policy") return "General";
+  return "General";
+}
+
+// Inferred category from filename (maps to canonical 7 categories)
 function inferCategoryFromFilename(filename) {
-  const lower = filename.toLowerCase();
+  const lower = String(filename || "").toLowerCase();
   if (lower.includes("offer") || lower.includes("contract") || lower.includes("agreement") || lower.includes("appointment")) {
     return "Contract";
   }
   if (lower.includes("passport") || lower.includes("aadhaar") || lower.includes("id") || lower.includes("license") || lower.includes("pan") || lower.includes("kyc")) {
     return "Identity";
   }
-  if (lower.includes("policy") || lower.includes("handbook") || lower.includes("guideline") || lower.includes("manual")) {
-    return "Policy";
-  }
   if (lower.includes("tax") || lower.includes("form16") || lower.includes("salary") || lower.includes("cheque") || lower.includes("bank") || lower.includes("w2") || lower.includes("w4")) {
     return "Financial";
   }
-  if (lower.includes("visa") || lower.includes("permit") || lower.includes("compliance") || lower.includes("nda") || lower.includes("confidential")) {
+  if (lower.includes("visa") || lower.includes("permit") || lower.includes("compliance") || lower.includes("nda") || lower.includes("confidential") || lower.includes("security")) {
     return "Compliance";
+  }
+  if (lower.includes("law") || lower.includes("court") || lower.includes("legal") || lower.includes("affidavit") || lower.includes("notary")) {
+    return "Legal";
   }
   if (lower.includes("degree") || lower.includes("certificate") || lower.includes("transcript") || lower.includes("diploma")) {
     return "Educational";
@@ -235,11 +287,46 @@ export function DocumentsPage() {
     }
   }, [previewDoc]);
 
+  // Ensure document store is hydrated on mount
+  useEffect(() => {
+    useDocumentStore.getState().hydrate();
+  }, []);
+
+  // Derive status dynamically if expiry date is present
+  function resolveDocStatus(doc) {
+    if (!doc) return "Valid";
+    if (doc.status === "Pending Verification") return "Pending Verification";
+    if (!doc.expiry || doc.expiry === "Permanent" || doc.expiry === "—" || doc.expiry === "-") {
+      return doc.status || "Valid";
+    }
+    const expDate = new Date(doc.expiry);
+    if (isNaN(expDate.getTime())) return doc.status || "Valid";
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return "Expired";
+    if (diffDays <= 30) return "Expiring Soon";
+    return doc.status || "Valid";
+  }
+
   // KPI Statistics calculations
   const total = documents.length;
-  const valid = documents.filter((d) => d.status === "Valid").length;
-  const expiringSoon = documents.filter((d) => d.status === "Expiring Soon").length;
-  const expired = documents.filter((d) => d.status === "Expired").length;
+  const valid = documents.filter((d) => resolveDocStatus(d) === "Valid").length;
+  const expiringSoon = documents.filter((d) => resolveDocStatus(d) === "Expiring Soon").length;
+  const expired = documents.filter((d) => ["Expired", "Action Required"].includes(resolveDocStatus(d))).length;
+
+  // Live category count calculations across scopes
+  const allCategoryCounts = useMemo(() => {
+    const counts = { All: documents.length };
+    DOCUMENT_CATEGORIES.forEach((c) => {
+      counts[c] = 0;
+    });
+    documents.forEach((d) => {
+      const cat = getAuthoritativeCategory(d);
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [documents]);
 
   // Filtered documents for "All Documents"
   const filteredAllDocs = useMemo(() => {
@@ -248,17 +335,22 @@ export function DocumentsPage() {
       const matchesSearch =
         String(d.title ?? '').toLowerCase().includes(q) ||
         String(d.employee ?? '').toLowerCase().includes(q) ||
+        String(d.employeeCode ?? '').toLowerCase().includes(q) ||
+        String(d.employeeId ?? '').toLowerCase().includes(q) ||
+        String(d.fileName ?? '').toLowerCase().includes(q) ||
         String(d.id ?? '').toLowerCase().includes(q) ||
         (d.tags && d.tags.some((t) => t.toLowerCase().includes(q)));
 
-      const matchesCat = categoryFilter === "All" || d.category === categoryFilter;
-      const matchesStatus = statusFilter === "All" || d.status === statusFilter;
+      const authCat = getAuthoritativeCategory(d);
+      const matchesCat = categoryFilter === "All" || authCat === categoryFilter;
+      const docStatus = resolveDocStatus(d);
+      const matchesStatus = statusFilter === "All" || docStatus === statusFilter;
       const matchesScope =
         scopeFilter === "All"
           ? true
           : scopeFilter === "Company"
-          ? d.employee === "All Staff"
-          : d.employee !== "All Staff";
+          ? (d.employee === "All Staff" || d.employeeId === "ALL")
+          : (d.employee !== "All Staff" && d.employeeId !== "ALL");
 
       return matchesSearch && matchesCat && matchesStatus && matchesScope;
     });
@@ -275,30 +367,91 @@ export function DocumentsPage() {
         email: "",
         joining: "—",
         status: "—",
-        avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(selectedEmpName)}`,
       }
     );
   }, [employees, selectedEmpName]);
 
+  const getEmployeeDocCount = (emp) => {
+    const nameLower = String(emp.name || "").toLowerCase().trim();
+    const empId = emp.id;
+    const empCode = emp.employee_code || emp.employeeId;
+    return documents.filter((d) => {
+      if (d.employee && String(d.employee).toLowerCase().trim() === nameLower) return true;
+      if (empId && d.employeeId && String(d.employeeId) === String(empId)) return true;
+      if (empCode && ((d.employeeCode && String(d.employeeCode) === String(empCode)) || (d.employeeId && String(d.employeeId) === String(empCode)))) return true;
+      return false;
+    }).length;
+  };
+
   const employeeDocs = useMemo(() => {
-    return documents.filter((d) => d.employee === selectedEmpName);
-  }, [documents, selectedEmpName]);
+    if (!selectedEmpName) return [];
+    const selEmp = currentSelectedEmployee;
+    const nameLower = String(selectedEmpName).toLowerCase().trim();
+    const selId = selEmp?.id;
+    const selCode = selEmp?.employee_code || selEmp?.employeeId;
+
+    return documents.filter((d) => {
+      if (d.employee && String(d.employee).toLowerCase().trim() === nameLower) return true;
+      if (selId && d.employeeId && String(d.employeeId) === String(selId)) return true;
+      if (selCode && ((d.employeeCode && String(d.employeeCode) === String(selCode)) || (d.employeeId && String(d.employeeId) === String(selCode)))) return true;
+      return false;
+    });
+  }, [documents, selectedEmpName, currentSelectedEmployee]);
+
+  const empCategoryCounts = useMemo(() => {
+    const counts = { All: employeeDocs.length };
+    DOCUMENT_CATEGORIES.forEach((c) => {
+      counts[c] = 0;
+    });
+    employeeDocs.forEach((d) => {
+      const cat = getAuthoritativeCategory(d);
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [employeeDocs]);
 
   const filteredEmployeeDocs = useMemo(() => {
     if (empCategoryFilter === "All") return employeeDocs;
-    return employeeDocs.filter((d) => d.category === empCategoryFilter);
+    return employeeDocs.filter((d) => getAuthoritativeCategory(d) === empCategoryFilter);
   }, [employeeDocs, empCategoryFilter]);
 
   // Documents for "My Documents"
   const myDocs = useMemo(() => {
-    return documents.filter(
-      (d) => d.employee?.toLowerCase() === myDocUser.toLowerCase()
+    const targetUser = myDocUser || currentUser?.name || "";
+    if (!targetUser) return [];
+    const targetEmp = employees.find((e) =>
+      e.name?.toLowerCase() === targetUser.toLowerCase() ||
+      e.id === targetUser
     );
-  }, [documents, myDocUser]);
+    const targetEmpId = targetEmp?.id || currentUser?.employee_id || currentUser?.id;
+    const targetEmpCode = targetEmp?.employee_code || targetEmp?.employeeId;
+    const targetNameLower = targetUser.toLowerCase().trim();
+
+    return documents.filter((d) => {
+      if (d.employee === "All Staff" || d.employeeId === "ALL") return false;
+
+      if (d.employee && String(d.employee).toLowerCase().trim() === targetNameLower) return true;
+      if (targetEmpId && d.employeeId && String(d.employeeId) === String(targetEmpId)) return true;
+      if (targetEmpCode && ((d.employeeCode && String(d.employeeCode) === String(targetEmpCode)) || (d.employeeId && String(d.employeeId) === String(targetEmpCode)))) return true;
+      return false;
+    });
+  }, [documents, myDocUser, currentUser, employees]);
+
+  const myCategoryCounts = useMemo(() => {
+    const counts = { All: myDocs.length };
+    DOCUMENT_CATEGORIES.forEach((c) => {
+      counts[c] = 0;
+    });
+    myDocs.forEach((d) => {
+      const cat = getAuthoritativeCategory(d);
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [myDocs]);
 
   const filteredMyDocs = useMemo(() => {
     if (myDocCategoryFilter === "All") return myDocs;
-    return myDocs.filter((d) => d.category === myDocCategoryFilter);
+    return myDocs.filter((d) => getAuthoritativeCategory(d) === myDocCategoryFilter);
   }, [myDocs, myDocCategoryFilter]);
 
   // =========================================================================
@@ -328,17 +481,19 @@ export function DocumentsPage() {
         const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
         const inferredCat = inferCategoryFromFilename(file.name);
 
+        const targetEmp = employees.find((x) => x.name === targetScope || x.id === targetScope);
+        const resolvedEmpId = targetScope === "All Staff" ? "ALL" : (targetEmp?.id || null);
+
         const newDoc = addDocument({
           title: formattedTitle || file.name,
           category: inferredCat,
-          employee: targetScope,
-          employeeId:
-            targetScope === "All Staff"
-              ? "ALL"
-              : employees.find((x) => x.name === targetScope)?.id || "EMP-VAR",
-          version: "v1.0",
-          expiry: "—",
+          employee: targetEmp?.name || targetScope,
+          employeeId: resolvedEmpId,
+          version: 1,
+          expiry: null,
           status: "Valid",
+          fileName: file.name,
+          uploadDate: new Date().toISOString().slice(0, 10),
           fileType: (file.name.split(".").pop() || "").toUpperCase(),
           fileSize: `${sizeInMb} MB`,
           uploadedBy: currentUser?.name,
@@ -655,17 +810,14 @@ export function DocumentsPage() {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer"
+                className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 font-medium focus:outline-none focus:border-navy cursor-pointer"
               >
-                <option value="All">All Categories</option>
-                <option value="Policy">Policy</option>
-                <option value="Contract">Contract</option>
-                <option value="Identity">Identity</option>
-                <option value="Compliance">Compliance</option>
-                <option value="Security">Security</option>
-                <option value="Educational">Educational</option>
-                <option value="Financial">Financial</option>
-                <option value="Legal">Legal</option>
+                <option value="All">All Categories ({allCategoryCounts.All})</option>
+                {DOCUMENT_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat} ({allCategoryCounts[cat] || 0})
+                  </option>
+                ))}
               </select>
 
               <select
@@ -700,6 +852,51 @@ export function DocumentsPage() {
                 <UploadCloud size={14} />
                 <span>Select PDF from Device</span>
               </button>
+            </div>
+          </div>
+
+          {/* Category Filter Pills Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white border border-bdr rounded-2xl p-3 shadow-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCategoryFilter("All")}
+                className={`px-3 py-1.5 text-[12px] font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                  categoryFilter === "All"
+                    ? "bg-navy text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <span>All</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono ${
+                  categoryFilter === "All" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}>
+                  {allCategoryCounts.All}
+                </span>
+              </button>
+              {DOCUMENT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`px-3 py-1.5 text-[12px] font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                    categoryFilter === cat
+                      ? "bg-navy text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <span>{cat}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono ${
+                    categoryFilter === cat ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                  }`}>
+                    {allCategoryCounts[cat] || 0}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="text-[12px] text-muted pr-1">
+              Showing <b className="text-slate-800">{filteredAllDocs.length}</b> of {documents.length} PDF documents
             </div>
           </div>
 
@@ -744,7 +941,15 @@ export function DocumentsPage() {
                                 {d.title}
                               </button>
                               <div className="text-[11.5px] text-muted flex items-center gap-2 mt-0.5">
-                                <span>Updated: {d.updatedOn}</span>
+                                <span>Uploaded: {d.uploadDate || d.updatedOn}</span>
+                                {d.fileName && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono text-slate-500 max-w-[200px] truncate" title={d.fileName}>
+                                      {d.fileName}
+                                    </span>
+                                  </>
+                                )}
                                 {d.tags && d.tags.length > 0 && (
                                   <>
                                     <span>•</span>
@@ -765,29 +970,36 @@ export function DocumentsPage() {
                         <td className="py-3.5 px-5">
                           <span
                             className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${getCategoryColor(
-                              d.category
+                              getAuthoritativeCategory(d)
                             )}`}
                           >
-                            {d.category}
+                            {getAuthoritativeCategory(d)}
                           </span>
                         </td>
 
                         <td className="py-3.5 px-5">
-                          {d.employee === "All Staff" ? (
+                          {d.employee === "All Staff" || d.employeeId === "ALL" ? (
                             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11.5px] font-medium">
                               <Building size={12} />
                               All Staff
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                                <img
-                                  src={`https://i.pravatar.cc/100?u=${encodeURIComponent(d.employee)}`}
-                                  alt=""
-                                  className="w-full h-full object-cover"
-                                />
+                              <div
+                                className={`w-6 h-6 rounded-full border text-[10px] font-bold flex items-center justify-center shrink-0 ${getAvatarColor(
+                                  d.employee
+                                )}`}
+                              >
+                                {getInitials(d.employee)}
                               </div>
-                              <span className="font-medium text-slate-800">{d.employee}</span>
+                              <div>
+                                <span className="font-medium text-slate-800">{d.employee}</span>
+                                {(d.employeeCode || (d.employeeId && d.employeeId !== "ALL")) && (
+                                  <div className="text-[10px] text-muted font-mono">
+                                    {d.employeeCode || d.employeeId}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </td>
@@ -801,14 +1013,14 @@ export function DocumentsPage() {
                         </td>
 
                         <td className="py-3.5 px-5 text-slate-700">
-                          {d.expiry === "—" ? (
+                          {d.expiry === "—" || !d.expiry ? (
                             <span className="text-slate-400">Permanent</span>
                           ) : (
                             <span
                               className={
-                                d.status === "Expiring Soon"
+                                resolveDocStatus(d) === "Expiring Soon"
                                   ? "text-amber-700 font-semibold"
-                                  : d.status === "Expired"
+                                  : resolveDocStatus(d) === "Expired"
                                   ? "text-rose-700 font-semibold"
                                   : "text-slate-700"
                               }
@@ -818,7 +1030,7 @@ export function DocumentsPage() {
                           )}
                         </td>
 
-                        <td className="py-3.5 px-5">{getStatusBadge(d.status)}</td>
+                        <td className="py-3.5 px-5">{getStatusBadge(resolveDocStatus(d))}</td>
 
                         <td className="py-3.5 px-5 text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -875,7 +1087,7 @@ export function DocumentsPage() {
       {activeTab === "employee" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Employee Directory Selector */}
-          <div className="lg:col-span-4 bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+          <div className="lg:col-span-5 xl:col-span-4 bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col gap-3">
             <div className="flex items-center justify-between pb-2 border-b border-bdr/60">
               <h3 className="font-bold text-[15px] text-slate-900 flex items-center gap-1.5">
                 <Users size={16} className="text-navy" />
@@ -907,7 +1119,7 @@ export function DocumentsPage() {
                     String(e.designation ?? '').toLowerCase().includes(empSearch.toLowerCase())
                 )
                 .map((emp) => {
-                  const empDocCount = documents.filter((d) => d.employee === emp.name).length;
+                  const empDocCount = getEmployeeDocCount(emp);
                   const isSelected = selectedEmpName === emp.name;
 
                   return (
@@ -922,17 +1134,15 @@ export function DocumentsPage() {
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <img
-                          src={
-                            emp.avatar ||
-                            emp.img ||
-                            `https://i.pravatar.cc/100?u=${encodeURIComponent(emp.name)}`
-                          }
-                          alt={emp.name}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-slate-900 truncate">
+                        <div
+                          className={`w-9 h-9 rounded-full border text-[12px] font-bold flex items-center justify-center shrink-0 shadow-xs ${getAvatarColor(
+                            emp.name
+                          )}`}
+                        >
+                          {getInitials(emp.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-semibold text-slate-900 truncate" title={emp.name}>
                             {emp.name}
                           </div>
                           <div className="text-[11px] text-muted truncate">
@@ -965,19 +1175,17 @@ export function DocumentsPage() {
           </div>
 
           {/* Right Selected Employee Dossier */}
-          <div className="lg:col-span-8 flex flex-col gap-4">
+          <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
             {/* Employee Profile Header Banner */}
             <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-wrap justify-between items-center gap-4">
               <div className="flex items-center gap-4">
-                <img
-                  src={
-                    currentSelectedEmployee.avatar ||
-                    currentSelectedEmployee.img ||
-                    `https://i.pravatar.cc/100?u=${encodeURIComponent(currentSelectedEmployee.name)}`
-                  }
-                  alt={currentSelectedEmployee.name}
-                  className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-xs"
-                />
+                <div
+                  className={`w-14 h-14 rounded-2xl border text-[18px] font-bold flex items-center justify-center shadow-xs shrink-0 ${getAvatarColor(
+                    currentSelectedEmployee.name
+                  )}`}
+                >
+                  {getInitials(currentSelectedEmployee.name)}
+                </div>
                 <div>
                   <div className="flex items-center gap-2.5">
                     <h2 className="text-[18px] font-bold text-slate-900 leading-tight">
@@ -1011,26 +1219,39 @@ export function DocumentsPage() {
             {/* Dossier Category Filter Pills */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-bdr rounded-2xl p-3 shadow-xs">
               <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  "All",
-                  "Identity",
-                  "Contract",
-                  "Educational",
-                  "Financial",
-                  "Compliance",
-                  "Legal",
-                ].map((cat) => (
+                <button
+                  type="button"
+                  onClick={() => setEmpCategoryFilter("All")}
+                  className={`px-3 py-1.5 text-[12px] font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                    empCategoryFilter === "All"
+                      ? "bg-navy text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <span>All</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono ${
+                    empCategoryFilter === "All" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                  }`}>
+                    {empCategoryCounts.All}
+                  </span>
+                </button>
+                {DOCUMENT_CATEGORIES.map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setEmpCategoryFilter(cat)}
-                    className={`px-3 py-1.5 text-[12px] font-semibold rounded-xl transition cursor-pointer ${
+                    className={`px-3 py-1.5 text-[12px] font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
                       empCategoryFilter === cat
                         ? "bg-navy text-white shadow-xs"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    {cat}
+                    <span>{cat}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono ${
+                      empCategoryFilter === cat ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                    }`}>
+                      {empCategoryCounts[cat] || 0}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -1081,18 +1302,26 @@ export function DocumentsPage() {
                             </button>
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${getCategoryColor(
-                                doc.category
+                                getAuthoritativeCategory(doc)
                               )}`}
                             >
-                              {doc.category}
+                              {getAuthoritativeCategory(doc)}
                             </span>
-                            {getStatusBadge(doc.status)}
+                            {getStatusBadge(resolveDocStatus(doc))}
                           </div>
                           <div className="text-[12px] text-slate-600 mt-1 line-clamp-1">
                             {doc.description || "Official personnel PDF record."}
                           </div>
                           <div className="text-[11.5px] text-muted flex flex-wrap items-center gap-2.5 mt-1.5">
                             <span>ID: <b className="font-mono text-slate-700">{doc.id}</b></span>
+                            <span>•</span>
+                            <span>Uploaded: <b className="text-slate-700">{doc.uploadDate || doc.updatedOn}</b></span>
+                            {doc.fileName && (
+                              <>
+                                <span>•</span>
+                                <span className="font-mono text-slate-500 max-w-[180px] truncate" title={doc.fileName}>{doc.fileName}</span>
+                              </>
+                            )}
                             <span>•</span>
                             <span>Format: <b className="text-rose-700">PDF</b></span>
                             <span>•</span>
@@ -1102,9 +1331,9 @@ export function DocumentsPage() {
                               Expiry:{" "}
                               <b
                                 className={
-                                  doc.status === "Expiring Soon"
+                                  resolveDocStatus(doc) === "Expiring Soon"
                                     ? "text-amber-700"
-                                    : doc.status === "Expired"
+                                    : resolveDocStatus(doc) === "Expired"
                                     ? "text-rose-700"
                                     : "text-slate-700"
                                 }
@@ -1118,7 +1347,7 @@ export function DocumentsPage() {
 
                       {/* Action buttons */}
                       <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
-                        {doc.status !== "Valid" && (
+                        {resolveDocStatus(doc) !== "Valid" && (
                           <button
                             type="button"
                             onClick={() => handleQuickVerify(doc)}
@@ -1261,22 +1490,41 @@ export function DocumentsPage() {
           {/* Category Filter Pills */}
           <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {["All", "Identity", "Contract", "Financial", "Compliance", "Legal", "Educational"].map(
-                (cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setMyDocCategoryFilter(cat)}
-                    className={`px-3 py-1.5 text-[12.5px] font-semibold rounded-xl transition cursor-pointer ${
-                      myDocCategoryFilter === cat
-                        ? "bg-navy text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                )
-              )}
+              <button
+                type="button"
+                onClick={() => setMyDocCategoryFilter("All")}
+                className={`px-3 py-1.5 text-[12.5px] font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                  myDocCategoryFilter === "All"
+                    ? "bg-navy text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <span>All</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono ${
+                  myDocCategoryFilter === "All" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}>
+                  {myCategoryCounts.All}
+                </span>
+              </button>
+              {DOCUMENT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setMyDocCategoryFilter(cat)}
+                  className={`px-3 py-1.5 text-[12.5px] font-semibold rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                    myDocCategoryFilter === cat
+                      ? "bg-navy text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <span>{cat}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono ${
+                    myDocCategoryFilter === cat ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                  }`}>
+                    {myCategoryCounts[cat] || 0}
+                  </span>
+                </button>
+              ))}
             </div>
 
             <span className="text-[12px] text-muted">
@@ -1312,12 +1560,12 @@ export function DocumentsPage() {
                     <div className="flex items-start justify-between gap-2 mb-2.5">
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getCategoryColor(
-                          doc.category
+                          getAuthoritativeCategory(doc)
                         )}`}
                       >
-                        {doc.category}
+                        {getAuthoritativeCategory(doc)}
                       </span>
-                      {getStatusBadge(doc.status)}
+                      {getStatusBadge(resolveDocStatus(doc))}
                     </div>
 
                     <h3 className="font-bold text-[15px] text-slate-900 leading-snug">
@@ -1329,15 +1577,23 @@ export function DocumentsPage() {
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-bdr/60">
+                    <div className="flex items-center justify-between text-[11px] text-muted mb-2">
+                      <span>Uploaded: <b className="text-slate-700">{doc.uploadDate || doc.updatedOn}</b></span>
+                      {doc.fileName && (
+                        <span className="font-mono text-slate-500 truncate max-w-[130px]" title={doc.fileName}>
+                          {doc.fileName}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between text-[11.5px] text-muted mb-3">
                       <span>Format: <b className="text-rose-700">{doc.fileType || "—"}</b> ({doc.fileSize || "—"})</span>
                       <span>
                         Expiry:{" "}
                         <b
                           className={
-                            doc.status === "Expiring Soon"
+                            resolveDocStatus(doc) === "Expiring Soon"
                               ? "text-amber-700"
-                              : doc.status === "Expired"
+                              : resolveDocStatus(doc) === "Expired"
                               ? "text-rose-700"
                               : "text-slate-700"
                           }
@@ -1523,18 +1779,15 @@ export function DocumentsPage() {
                   Category
                 </label>
                 <select
-                  value={editDoc.category}
+                  value={getAuthoritativeCategory(editDoc.category)}
                   onChange={(e) => setEditDoc({ ...editDoc, category: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-bdr text-[12.5px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
+                  className="w-full px-3 py-2 rounded-xl border border-bdr text-[12.5px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer font-medium"
                 >
-                  <option value="Policy">Policy</option>
-                  <option value="Contract">Contract</option>
-                  <option value="Identity">Identity</option>
-                  <option value="Compliance">Compliance</option>
-                  <option value="Security">Security</option>
-                  <option value="Educational">Educational</option>
-                  <option value="Financial">Financial</option>
-                  <option value="Legal">Legal</option>
+                  {DOCUMENT_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
                 </select>
               </div>
 

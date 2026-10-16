@@ -59,7 +59,7 @@ export function isTokenValid(token) {
  */
 export function getStoredToken() {
   try {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(EVENMORE_AUTH_TOKEN_KEY);
+    const token = localStorage.getItem(EVENMORE_AUTH_TOKEN_KEY);
     if (!token) return null;
 
     if (!isTokenValid(token)) {
@@ -79,7 +79,6 @@ export function getStoredToken() {
 export function saveStoredAuth(token, { refreshToken = null, expiresInMs = null, remember = true } = {}) {
   try {
     if (!token) return;
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
     localStorage.setItem(EVENMORE_AUTH_TOKEN_KEY, token);
 
     if (refreshToken) {

@@ -64,7 +64,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         { label: 'Purchase Bills & AP', path: '/purchase/bills', icon: FileSpreadsheet, category: 'Navigation' },
         { label: 'Parties Directory', path: '/parties', icon: Building2, category: 'Navigation' },
         { label: 'HRMS Employees', path: '/hrms/employees', icon: Users, category: 'Navigation' },
-        { label: 'ERP Reports & Analytics', path: '/reports', icon: BarChart3, category: 'Navigation' },
+        // { label: 'ERP Reports & Analytics', path: '/reports', icon: BarChart3, category: 'Navigation' },
     ].filter((n) => {
         if (n.path === '/dashboard') {
             return canUseDashboard(currentUser, grantedPermissions);

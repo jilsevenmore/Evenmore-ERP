@@ -21,9 +21,25 @@ import {
 } from "lucide-react";
 import UserInitials from "../../../components/common/UserInitials";
 
+const RECRUITMENT_HUB_GUIDE = {
+  title: "Recruitment & Talent Hub",
+  subtitle: "Manage talent acquisition pipelines, candidate scoring, and team onboarding.",
+  purpose: "The central nexus connecting job requisitions, candidate sourcing, evaluation rounds, and onboarding conversion.",
+  workflow: [
+    "Requisition Specification",
+    "Applicant Intake & Sourcing",
+    "Screening & Technical Rounds",
+    "Compensation & Offer Rollout",
+    "Onboarding & Employee Induction",
+  ],
+  keyTerms: [
+    { term: "Talent Hub", definition: "Unified navigation center for all specialized recruitment subsystems." },
+    { term: "Pipeline Conversion", definition: "Stage progression from raw applicant intake through to inducted employee." },
+  ],
+};
+
 export default function Recruitment() {
   const navigate = useNavigate();
-  const [guideOpen, setGuideOpen] = useState(false);
 
   const candidates = useRecruitmentStore((s) => s.candidates);
   const jobs = useRecruitmentStore((s) => s.jobs);
@@ -183,26 +199,17 @@ export default function Recruitment() {
         title="Recruitment & Talent Hub"
         subtitle="Manage talent acquisition pipelines, candidate scoring, and team onboarding."
         breadcrumb={[{ label: "HRMS", path: "/hrms" }, { label: "Recruitment" }]}
+        guide={RECRUITMENT_HUB_GUIDE}
         actions={
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-muted hover:text-text hover:bg-soft text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <HelpCircle size={14} />
-              <span>Guide</span>
-            </button>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => navigate("/hrms/recruitment/candidates", { state: { openAdd: true } })}
-              className="shadow-xs whitespace-nowrap font-medium"
-            >
-              Add Candidate
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => navigate("/hrms/recruitment/candidates", { state: { openAdd: true } })}
+            className="shadow-xs whitespace-nowrap font-medium"
+          >
+            Add Candidate
+          </Button>
         }
       />
 
@@ -274,51 +281,6 @@ export default function Recruitment() {
           />
         </div>
       </div>
-
-      {/* Guide Modal */}
-      {guideOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
-          onClick={() => setGuideOpen(false)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto text-[13px] text-slate-600 dark:text-slate-300 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600">
-                  <HelpCircle size={18} />
-                </div>
-                <h3 className="text-[16px] font-bold text-slate-900 dark:text-white">
-                  Recruitment Hub Guide
-                </h3>
-              </div>
-              <button
-                onClick={() => setGuideOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  End-to-End Talent Acquisition
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  From requisition creation, public career portal listings, and resume parsing to multi-round interview scoring, offer letter rollouts, and new hire induction.
-                </p>
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end">
-              <Button size="sm" onClick={() => setGuideOpen(false)}>
-                Got it
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

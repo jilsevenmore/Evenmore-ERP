@@ -206,7 +206,7 @@ export const GeneralLedgerPage = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-text-secondary mb-1">Amount ($)</label>
+                  <label className="block font-semibold text-text-secondary mb-1">Amount (₹)</label>
                   <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-border rounded-xl p-2 bg-card text-text font-mono text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition" placeholder="2500"/>
                 </div>
                 <div>

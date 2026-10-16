@@ -1,11 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Download, ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, MoreHorizontal, X, Check, Clock, Plus, ShieldCheck } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
-import { pullPunchTimeline, submitPunchCorrection, pullTracked } from "../../../services/hrmsSync";
+import { pullPunchTimeline, submitPunchCorrection, pullTracked, hrmsSync } from "../../../services/hrmsSync";
+import { api } from "../../../services/api";
 import { toISODate } from "../../../utils/dateUtils";
 import { UserInitials } from "../../../components/common/UserInitials";
 
@@ -91,6 +92,18 @@ export default function AttendanceOverview() {
   const [corrTime, setCorrTime] = useState("18:00");
   const [corrReason, setCorrReason] = useState("");
   const [submittingCorr, setSubmittingCorr] = useState(false);
+
+  // Pull fresh attendance records whenever dateVal changes or on mount
+  useEffect(() => {
+    let cancelled = false;
+    hrmsSync.pull("attendance", { date: dateVal }).then((rows) => {
+      if (cancelled) return;
+      if (Array.isArray(rows) && rows.length > 0) {
+        useAttendanceStore.getState().saveDailyAttendance(dateVal, rows);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [dateVal]);
 
   // Normalize attendance records for table display
   const combinedAttendance = useMemo(() => {
@@ -191,10 +204,6 @@ export default function AttendanceOverview() {
     const leaveCount = combinedAttendance.filter((r) => r.status === "On Leave").length;
     const wfhCount = combinedAttendance.filter((r) => r.status === "WFH").length;
     const percent = Math.round((presentCount / total) * 100);
-    const overtimeTotalHours = combinedAttendance.reduce(
-      (sum, r) => sum + (r.overtimeHrs || 0),
-      0
-    );
 
     return [
       { label: "PRESENT", val: String(presentCount), sub: `${percent}% of staff`, dotColor: "#22c55e" },
@@ -202,12 +211,6 @@ export default function AttendanceOverview() {
       { label: "LATE", val: String(lateCount), sub: "Grace 10 min", dotColor: "#f59e0b" },
       { label: "ON LEAVE", val: String(leaveCount), sub: "Approved leave", dotColor: "#3b82f6" },
       { label: "WFH", val: String(wfhCount), sub: "Remote active", dotColor: null },
-      {
-        label: "OVERTIME",
-        val: `${Math.round(overtimeTotalHours * 10) / 10}h`,
-        sub: "Today",
-        dotColor: "#22c55e",
-      },
     ];
   }, [combinedAttendance]);
 
@@ -252,15 +255,36 @@ export default function AttendanceOverview() {
     setRegReason("");
   };
 
-  const handleQuickStatus = (row) => {
+  const handleQuickStatus = async (row) => {
     const cycle = ["Present", "Late", "Half Day", "WFH", "On Leave", "Absent"];
     const currIdx = cycle.indexOf(row.status);
     const nextStatus = cycle[(currIdx + 1) % cycle.length];
-    updateStoreRecord(row.id, {
+    const patch = {
       status: nextStatus,
       checkIn: nextStatus === "Absent" || nextStatus === "On Leave" ? "—" : row.checkIn === "—" ? "09:00" : row.checkIn,
       checkOut: nextStatus === "Absent" || nextStatus === "On Leave" ? "—" : row.checkOut === "—" ? "18:00" : row.checkOut,
-    });
+    };
+    updateStoreRecord(row.id, patch);
+
+    try {
+      const targetEmp = row.employeeId || row.empId || row.id;
+      const targetDate = toISODate(row.rawDate || row.date) || dateVal;
+      await api.post("/hrms/attendance/bulk/", {
+        date: targetDate,
+        records: [
+          {
+            employeeId: targetEmp,
+            checkIn: patch.checkIn && patch.checkIn !== "—" ? patch.checkIn : null,
+            checkOut: patch.checkOut && patch.checkOut !== "—" ? patch.checkOut : null,
+            status: patch.status,
+          },
+        ],
+      });
+      await useAttendanceStore.getState().refreshAttendance();
+    } catch (err) {
+      console.warn("Failed to persist quick status:", err);
+    }
+
     setToast(`${row.name}'s status updated to ${nextStatus}.`);
   };
 
@@ -328,7 +352,7 @@ export default function AttendanceOverview() {
             <h1 className="att-title">Attendance Management</h1>
             <PageInfoButton guide={hrmsGuides.attendanceOverview} />
           </div>
-          <p className="att-sub">Daily tracking, attendance status, regularization, shifts and overtime.</p>
+          <p className="att-sub">Daily tracking, attendance status, regularization, and shifts.</p>
         </div>
         <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button type="button" onClick={handleExport} className="att-export-btn">
@@ -499,7 +523,6 @@ export default function AttendanceOverview() {
                 <th>WORKING HOURS</th>
                 <th>LATE</th>
                 <th>EARLY OUT</th>
-                <th>OVERTIME</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
               </tr>
@@ -548,13 +571,6 @@ export default function AttendanceOverview() {
                       >
                         {row.earlyMins} min early
                       </span>
-                    ) : (
-                      <span style={{ color: "#94a3b8" }}>—</span>
-                    )}
-                  </td>
-                  <td>
-                    {row.overtimeHrs > 0 ? (
-                      <span className="att-ot-pill">+{row.overtimeHrs}h</span>
                     ) : (
                       <span style={{ color: "#94a3b8" }}>—</span>
                     )}
@@ -862,7 +878,7 @@ export default function AttendanceOverview() {
         .att-reg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--primary); color: #fff; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(31,107,255,0.25); }
         .att-reg-btn:hover { background: var(--primary-dark); }
 
-        .att-stats-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+        .att-stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
         .att-stat-card { background: #fff; border: 1px solid #e8edf3; border-radius: 14px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(16,24,40,0.03); }
         .att-stat-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #6b7280; text-transform: uppercase; }
         .att-stat-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }

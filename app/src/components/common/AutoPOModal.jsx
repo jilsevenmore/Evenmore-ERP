@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { getCurrentDateFormatted } from '../../utils/dateUtils';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 export const AutoPOModal = ({
   isOpen,
   onClose,
@@ -12,7 +13,7 @@ export const AutoPOModal = ({
   sourceRef,
   sourceDocNumber,
 }) => {
-  const { vendors = [], items: masterItems = [], addPurchaseOrder, showToast } = useERP() || {};
+  const { vendors = [], items: masterItems = [], addPurchaseOrder, showToast, formatCurrency } = useERP() || {};
   const activeItem = shortageItem || item;
   const initialQty = requiredDeficitQty || defaultDeficitQty || 5;
   const activeSource = sourceRef || sourceDocNumber || 'Sales Order Shortage';
@@ -191,20 +192,41 @@ export const AutoPOModal = ({
                 type="number"
                 min="1"
                 required
-                value={orderQty}
-                onChange={(e) => setOrderQty(Math.max(1, Number(e.target.value)))}
+                value={orderQty ?? ''}
+                onFocus={handleNumberInputFocus}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') { setOrderQty(''); return; }
+                  const cleaned = sanitizeNumberInput(raw);
+                  if (cleaned !== raw) e.target.value = cleaned;
+                  setOrderQty(cleaned === '' ? '' : Math.max(1, Number(cleaned)));
+                }}
+                onBlur={() => {
+                  if (!orderQty || Number(orderQty) < 1) setOrderQty(1);
+                }}
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white font-mono font-bold text-sm text-slate-900"
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Unit Cost Price ($)</label>
+              <label className="block font-semibold text-slate-700 mb-1">Unit Cost Price (₹)</label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 required
-                value={unitCost}
-                onChange={(e) => setUnitCost(Math.max(0, Number(e.target.value)))}
+                placeholder="0.00"
+                value={unitCost ?? ''}
+                onFocus={handleNumberInputFocus}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') { setUnitCost(''); return; }
+                  const cleaned = sanitizeNumberInput(raw);
+                  if (cleaned !== raw) e.target.value = cleaned;
+                  setUnitCost(cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                }}
+                onBlur={() => {
+                  if (unitCost === '') setUnitCost(0);
+                }}
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white font-mono text-slate-900"
               />
             </div>
@@ -225,7 +247,7 @@ export const AutoPOModal = ({
             <div className="font-mono text-xs text-slate-600">
               Total PO:{' '}
               <strong className="text-slate-900 font-bold">
-                ${totalPOAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {formatCurrency ? formatCurrency(totalPOAmount) : `₹${totalPOAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
               </strong>
             </div>
             <div className="flex items-center gap-2">

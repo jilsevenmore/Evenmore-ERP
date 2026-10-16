@@ -4,8 +4,8 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban, Layers, SlidersHorizontal, Eye, AlertCircle, ExternalLink } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban, Layers, SlidersHorizontal, Eye, AlertCircle, ExternalLink, Globe, MessageSquare } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
@@ -16,6 +16,7 @@ import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderMod
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 import { usePmsStore } from '../../stores/pmsStore';
 import { CreateProjectModal } from '../pms/projects/components/CreateProjectModal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const salesOrderGuide = {
     title: 'Sales Orders',
     subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
@@ -34,12 +35,42 @@ const salesOrderGuide = {
     ],
     workflow: ['Quotation Approved', 'Sales Order Confirmed', 'Proforma Issued (Optional)', 'Delivery Challan Dispatched', 'Sales Invoice Issued', 'Payment Receipt Settled'],
 };
+// Client portal reorder: where an order was raised. Read only from the
+// server's `orderSource` -- never inferred from notes, party or reference.
+const PORTAL_SOURCE = 'Client Portal';
+const isPortalOrder = (o) => o?.orderSource === PORTAL_SOURCE;
+const SOURCE_FILTERS = [
+    { id: 'all', label: 'All Orders' },
+    { id: 'direct', label: 'Direct / In-House' },
+    { id: 'portal', label: 'Client Portal Orders' },
+];
+const matchesSource = (o, source) => (
+    source === 'portal' ? isPortalOrder(o) : source === 'direct' ? !isPortalOrder(o) : true
+);
+const PortalOrderBadge = ({ className = '' }) => (
+  <span
+    className={`inline-flex w-fit items-center gap-1 rounded border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 whitespace-nowrap ${className}`}
+    title="Placed by the customer from the client portal"
+  >
+    <Globe size={10}/> Portal Order
+  </span>
+);
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
     const { salesOrders, customers, addSalesOrder, updateSalesOrderAllocation, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, addPaymentIn, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
     const pmsProjects = usePmsStore((s) => s.projects || []);
     const [pmsModalOrder, setPmsModalOrder] = useState(null);
     const [stageFilter, setStageFilter] = useState('All');
+    // ?source=portal|direct, so a link can open the portal queue directly.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const sourceParam = searchParams.get('source');
+    const sourceFilter = SOURCE_FILTERS.some((f) => f.id === sourceParam) ? sourceParam : 'all';
+    const setSourceFilter = (id) => {
+        const next = new URLSearchParams(searchParams);
+        if (id === 'all') next.delete('source');
+        else next.set('source', id);
+        setSearchParams(next, { replace: true });
+    };
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -89,19 +120,37 @@ export const SalesOrdersPage = () => {
     }, [lineItems, showAddModal]);
 
     const handleInvoiceAmountChange = (val) => {
-        const numVal = Number(val) || 0;
+        if (val === '') {
+            setFormalInvoiceAmountInput('');
+            if (autoBalanceSplit) {
+                setCashAmountInput(totalSalesValueInput);
+            }
+            return;
+        }
+        const cleaned = sanitizeNumberInput(val);
+        const numVal = cleaned === '' ? '' : Math.max(0, Number(cleaned));
         setFormalInvoiceAmountInput(numVal);
         if (autoBalanceSplit) {
-            const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+            const numericVal = Number(numVal) || 0;
+            const rem = Math.max(0, Math.round((totalSalesValueInput - numericVal) * 100) / 100);
             setCashAmountInput(rem);
         }
     };
 
     const handleCashAmountChange = (val) => {
-        const numVal = Number(val) || 0;
+        if (val === '') {
+            setCashAmountInput('');
+            if (autoBalanceSplit) {
+                setFormalInvoiceAmountInput(totalSalesValueInput);
+            }
+            return;
+        }
+        const cleaned = sanitizeNumberInput(val);
+        const numVal = cleaned === '' ? '' : Math.max(0, Number(cleaned));
         setCashAmountInput(numVal);
         if (autoBalanceSplit) {
-            const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+            const numericVal = Number(numVal) || 0;
+            const rem = Math.max(0, Math.round((totalSalesValueInput - numericVal) * 100) / 100);
             setFormalInvoiceAmountInput(rem);
         }
     };
@@ -228,9 +277,19 @@ export const SalesOrdersPage = () => {
         });
         handleCloseCreateModal();
     };
-    const advanceStage = (orderId, currentStage) => {
+    const advanceStage = async (orderId, currentStage, options = {}) => {
         if (currentStage === 'Draft') {
-            updateSalesOrderStage(orderId, 'Confirmed');
+            const res = await updateSalesOrderStage(orderId, 'Confirmed', options);
+            if (res && !res.success && res.error) {
+                const errCode = res.error?.code || res.error?.data?.code;
+                if (errCode === 'CREDIT_LIMIT_EXCEEDED') {
+                    const msg = res.error?.message || res.error?.data?.message || 'Customer credit limit exceeded.';
+                    const ok = window.confirm(`${msg}\n\nDo you want to override the credit limit and confirm this order?`);
+                    if (ok) {
+                        await updateSalesOrderStage(orderId, 'Confirmed', { overrideCreditLimit: true });
+                    }
+                }
+            }
         }
         else if (currentStage === 'Confirmed' || currentStage === 'Partially Dispatched') {
             convertSalesOrderToChallan(orderId);
@@ -241,11 +300,22 @@ export const SalesOrdersPage = () => {
             navigate('/sales/invoices');
         }
     };
-    const filteredOrders = salesOrders.filter((o) => {
-        if (stageFilter === 'All')
-            return true;
-        return o.stage === stageFilter;
-    });
+    // Replaced (client portal reorder): the stage tabs now combine with the
+    // order-source filter; DataTable's search, sort and paging run on the result.
+    // const filteredOrders = salesOrders.filter((o) => {
+    //     if (stageFilter === 'All')
+    //         return true;
+    //     return o.stage === stageFilter;
+    // });
+    const stageOrders = salesOrders.filter((o) => stageFilter === 'All' || o.stage === stageFilter);
+    const filteredOrders = stageOrders.filter((o) => matchesSource(o, sourceFilter));
+    const sourceCounts = {
+        all: stageOrders.length,
+        direct: stageOrders.filter((o) => !isPortalOrder(o)).length,
+        portal: stageOrders.filter(isPortalOrder).length,
+    };
+    // Portal orders arrive as Drafts and wait for staff to confirm them.
+    const portalAwaitingReview = salesOrders.filter((o) => isPortalOrder(o) && o.stage === 'Draft').length;
     const handleGenerateProforma = (order) => {
         const cust = customers.find((c) => c.id === order.customerId || c.name === order.customer) || customers[0];
         const nextId = (proformaInvoices.length + 101);
@@ -336,7 +406,9 @@ export const SalesOrdersPage = () => {
         return [
             {
                 label: 'Quotation',
-                docNumber: order.quotationNumber || 'Direct Order',
+                // Replaced (client portal reorder): a portal order is not a direct one.
+                // docNumber: order.quotationNumber || 'Direct Order',
+                docNumber: order.quotationNumber || (isPortalOrder(order) ? 'Client Portal' : 'Direct Order'),
                 status: isQuoteLinked ? 'completed' : 'completed',
             },
             {
@@ -431,6 +503,7 @@ export const SalesOrdersPage = () => {
                     <button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
                       <ShoppingCart size={13} className="text-muted"/> {o.orderNumber}
                     </button>
+                    {isPortalOrder(o) && <PortalOrderBadge/>}
                     {linkedPms && (
                       <button
                         type="button"
@@ -556,15 +629,21 @@ export const SalesOrdersPage = () => {
                 Confirm Order
               </button>)}
             {o.stage === 'Confirmed' && (<>
-                {!pmsProjects.some((p) => p.crmOrderId === o.orderNumber) && (
-                  <button
-                    onClick={() => setPmsModalOrder(o.orderNumber)}
-                    className="px-2 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
-                    title="Convert this Confirmed Sales Order into a PMS Production Project"
-                  >
-                    <Layers size={12}/> PMS Project
-                  </button>
-                )}
+                <button
+                  onClick={() => setPmsModalOrder(o.orderNumber)}
+                  className={`px-2 py-1 rounded-md text-xs font-semibold cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap ${
+                    pmsProjects.some((p) => p.crmOrderId === o.orderNumber)
+                      ? 'bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100'
+                      : 'bg-violet-600 text-white hover:bg-violet-700'
+                  }`}
+                  title={
+                    pmsProjects.some((p) => p.crmOrderId === o.orderNumber)
+                      ? "View or configure planned duration for linked PMS Project"
+                      : "Convert this Confirmed Sales Order into a PMS Production Project"
+                  }
+                >
+                  <Layers size={12}/> PMS Project
+                </button>
                 <button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
                   <Truck size={12}/> Issue Challan
                 </button>
@@ -616,6 +695,34 @@ export const SalesOrdersPage = () => {
                 : 'text-slate-500 hover:text-slate-800'}`}>
             {stg}
           </button>))}
+      </div>
+
+      {/* Order source filter (client portal reorder) */}
+      <div className="flex flex-wrap items-center gap-2 text-xs" role="group" aria-label="Filter by order source">
+        <span className="font-semibold text-slate-500">Source:</span>
+        {SOURCE_FILTERS.map((f) => {
+            const active = sourceFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSourceFilter(f.id)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-semibold transition-colors cursor-pointer ${active
+                    ? 'border-[#1F2E4A] bg-white text-[#1F2E4A] shadow-sm'
+                    : 'border-slate-200 bg-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}
+              >
+                {f.id === 'portal' && <Globe size={12}/>}
+                {f.label}
+                <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600">{sourceCounts[f.id]}</span>
+                {f.id === 'portal' && portalAwaitingReview > 0 && (
+                  <span className="rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-800" title="Portal orders still in Draft, waiting for staff to confirm">
+                    {portalAwaitingReview} to review
+                  </span>
+                )}
+              </button>
+            );
+        })}
       </div>
 
       <DataTable title="Sales Order Register" data={filteredOrders} columns={columns} keyExtractor={(o) => o.id} searchPlaceholder="Search order number or customer..."/>
@@ -845,8 +952,17 @@ export const SalesOrdersPage = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formalInvoiceAmountInput}
-                          onChange={(e) => handleInvoiceAmountChange(e.target.value)}
+                          value={formalInvoiceAmountInput ?? ''}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            handleInvoiceAmountChange(cleaned);
+                          }}
+                          onBlur={() => {
+                            if (formalInvoiceAmountInput === '') setFormalInvoiceAmountInput(0);
+                          }}
                           className="w-full p-2 border border-blue-300 rounded-lg bg-blue-50/30 text-blue-950 font-mono font-bold text-sm focus:ring-2 focus:ring-blue-500"
                           placeholder="0.00"
                         />
@@ -917,8 +1033,17 @@ export const SalesOrdersPage = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={cashAmountInput}
-                          onChange={(e) => handleCashAmountChange(e.target.value)}
+                          value={cashAmountInput ?? ''}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            handleCashAmountChange(cleaned);
+                          }}
+                          onBlur={() => {
+                            if (cashAmountInput === '') setCashAmountInput(0);
+                          }}
                           className="w-full p-2 border border-amber-300 rounded-lg bg-amber-50/30 text-amber-950 font-mono font-bold text-sm focus:ring-2 focus:ring-amber-500"
                           placeholder="0.00"
                         />
@@ -986,6 +1111,7 @@ export const SalesOrdersPage = () => {
                   {selectedOrder.customer}
                 </span>
                 <StatusBadge status={selectedOrder.stage || 'Draft'}/>
+                {isPortalOrder(selectedOrder) && <PortalOrderBadge className="text-[11px]"/>}
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 <button
@@ -1003,6 +1129,35 @@ export const SalesOrdersPage = () => {
             </div>
 
             <div className="space-y-6 mt-4 overflow-y-auto pr-1 flex-1">
+              {/* Order source (client portal reorder) */}
+              {isPortalOrder(selectedOrder) ? (
+                <div className="rounded-xl border border-teal-200 bg-teal-50/60 p-3 sm:p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="inline-flex items-center gap-1.5 font-bold text-teal-800">
+                      <Globe size={14}/> Order source: Client Portal
+                    </span>
+                    <span className="text-slate-600">Placed by the customer from the client portal.</span>
+                    {selectedOrder.stage === 'Draft' && (
+                      <span className="font-semibold text-amber-700">Review the lines and confirm the order to start fulfilment.</span>
+                    )}
+                  </div>
+                  {selectedOrder.portalClientNotes ? (
+                    <div className="rounded-lg border border-teal-100 bg-white p-2.5">
+                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <MessageSquare size={11}/> Customer remarks
+                      </span>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-slate-800">{selectedOrder.portalClientNotes}</p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500">The customer left no remarks.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  Order source: <strong className="text-slate-700">Direct / In-House</strong>
+                </p>
+              )}
+
               {/* Lifecycle Stepper */}
               <DocumentTimeline steps={getOrderTimelineSteps(selectedOrder)}/>
 
@@ -1476,11 +1631,24 @@ export const SalesOrdersPage = () => {
                       step="0.01"
                       min="0"
                       max={allocModalTotal}
-                      value={allocModalFormal}
+                      value={allocModalFormal ?? ''}
+                      onFocus={handleNumberInputFocus}
                       onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          setAllocModalFormal('');
+                          setAllocModalCash(allocModalTotal);
+                          return;
+                        }
+                        const cleaned = sanitizeNumberInput(raw);
+                        if (cleaned !== raw) e.target.value = cleaned;
+                        const val = cleaned === '' ? '' : Number(cleaned);
                         setAllocModalFormal(val);
-                        setAllocModalCash(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                        const numericVal = Number(val) || 0;
+                        setAllocModalCash(Math.max(0, Math.round((allocModalTotal - numericVal) * 100) / 100));
+                      }}
+                      onBlur={() => {
+                        if (allocModalFormal === '') setAllocModalFormal(0);
                       }}
                       className="w-full p-2 border border-blue-300 rounded-lg bg-white font-mono font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 text-sm"
                     />
@@ -1496,11 +1664,24 @@ export const SalesOrdersPage = () => {
                       step="0.01"
                       min="0"
                       max={allocModalTotal}
-                      value={allocModalCash}
+                      value={allocModalCash ?? ''}
+                      onFocus={handleNumberInputFocus}
                       onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          setAllocModalCash('');
+                          setAllocModalFormal(allocModalTotal);
+                          return;
+                        }
+                        const cleaned = sanitizeNumberInput(raw);
+                        if (cleaned !== raw) e.target.value = cleaned;
+                        const val = cleaned === '' ? '' : Number(cleaned);
                         setAllocModalCash(val);
-                        setAllocModalFormal(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                        const numericVal = Number(val) || 0;
+                        setAllocModalFormal(Math.max(0, Math.round((allocModalTotal - numericVal) * 100) / 100));
+                      }}
+                      onBlur={() => {
+                        if (allocModalCash === '') setAllocModalCash(0);
                       }}
                       className="w-full p-2 border border-amber-300 rounded-lg bg-white font-mono font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 text-sm"
                     />

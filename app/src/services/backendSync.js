@@ -141,6 +141,7 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [], partial = 
     billing_address: doc.billing_address || doc.billingAddress || undefined,
     shipping_address: doc.shipping_address || doc.shippingAddress || undefined,
     place_of_supply: stripStateCode(doc.place_of_supply || doc.placeOfSupply) || undefined,
+    status: doc.status || undefined,
     date: isoOut(doc.date) || (partial ? undefined : isoOut('Today')),
     dueDate: isoOut(doc.dueDate),
     expectedDate: isoOut(doc.expectedDate || doc.deliveryDate),
@@ -493,12 +494,18 @@ export const RESOURCES = {
       legB: item.legB ? num(item.legB) : undefined,
       webThickness: item.webThickness ? num(item.webThickness) : undefined,
       flangeThickness: item.flangeThickness ? num(item.flangeThickness) : undefined,
+      imageFileId: item.imageFileId || undefined,
+      image: item.image !== undefined ? (item.image || null) : undefined,
+      imageUrl: item.imageUrl !== undefined ? (item.imageUrl || null) : undefined,
       customFieldValues: item.customFieldValues || undefined,
     }),
     // `availableQty` / `status` come off the movement ledger, so the row the
     // server returns is the only correct one.
     fromApi: (row) => ({
       ...row,
+      image: row.image || row.imageUrl || '',
+      imageUrl: row.imageUrl || row.image || '',
+      imageFileId: row.imageFileId || '',
       itemTypeId: row.itemTypeId || row.item_type_id || '',
       itemType: row.itemType || row.item_type || '',
       gradeId: row.gradeId || row.grade_id || '',
@@ -595,6 +602,7 @@ export const RESOURCES = {
         totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
         formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
         cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
+        overrideCreditLimit: doc.overrideCreditLimit !== undefined ? Boolean(doc.overrideCreditLimit) : undefined,
       }),
       fromApi: (row) => ({
         ...base.fromApi(row),
@@ -858,6 +866,8 @@ export const RESOURCES = {
       customer: row.customerName,
       reference: row.referenceNumber,
       paymentMode: row.paymentMode || 'Cash',
+      invoiceId: row.invoiceId || row.invoice || undefined,
+      invoiceNumber: row.invoiceNumber || row.invoice_number || undefined,
       _synced: true,
     }),
   },

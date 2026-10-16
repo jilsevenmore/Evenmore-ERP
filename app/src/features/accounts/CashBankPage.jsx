@@ -45,8 +45,9 @@ export const CashBankPage = () => {
         accountNumber: '',
         accountName: 'Operating Account',
         accountType: 'Current Operating',
-        balance: 0,
+        balance: '',
     });
+    const [accountNumError, setAccountNumError] = useState('');
     const totalLiquidity = bankAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
     const columns = [
         {
@@ -96,10 +97,35 @@ export const CashBankPage = () => {
         </span>)),
         },
     ];
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setAccountNumError('');
+        setNewAcc({
+            bankName: '',
+            accountNumber: '',
+            accountName: 'Operating Account',
+            accountType: 'Current Operating',
+            balance: '',
+        });
+    };
+    const handleAccountNumberChange = (e) => {
+        const val = e.target.value;
+        if (val && !/^\d*$/.test(val)) {
+            setAccountNumError('Account number must contain only digits.');
+        } else {
+            setAccountNumError('');
+        }
+        const digitsOnly = val.replace(/\D/g, '');
+        setNewAcc((prev) => ({ ...prev, accountNumber: digitsOnly }));
+    };
     const handleCreate = (e) => {
         e.preventDefault();
         if (!newAcc.bankName)
             return;
+        if (newAcc.accountNumber && !/^\d+$/.test(newAcc.accountNumber)) {
+            setAccountNumError('Account number must contain only digits.');
+            return;
+        }
         addBankAccount({
             bankName: newAcc.bankName,
             accountName: newAcc.accountName || newAcc.bankName,
@@ -107,10 +133,10 @@ export const CashBankPage = () => {
             accountType: newAcc.accountType || 'Current Operating',
             // [PHASE-4] Sweven INR default (was hardcoded 'USD')
             currency: 'INR',
-            balance: Number(newAcc.balance) || 0,
+            balance: newAcc.balance === '' ? 0 : (Number(newAcc.balance) || 0),
             lastReconciled: getCurrentDateFormatted(),
         });
-        setIsModalOpen(false);
+        handleCloseModal();
     };
     return (<div className="space-y-6">
       <PageHeader title="Cash & Bank Accounts" subtitle="Real-time liquidity monitoring, treasury accounts, and automated statement reconciliation." guide={cashBankGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>
@@ -222,7 +248,7 @@ export const CashBankPage = () => {
           <div className="bg-card rounded-2xl border border-border max-w-md w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <h3 className="font-bold text-base text-text">Link New Bank Account</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 rounded-xl text-muted hover:text-text cursor-pointer transition">
+              <button onClick={handleCloseModal} className="p-1 rounded-xl text-muted hover:text-text cursor-pointer transition">
                 <X size={18}/>
               </button>
             </div>
@@ -232,8 +258,21 @@ export const CashBankPage = () => {
                 <input type="text" required placeholder="e.g. Bank of America Commercial" value={newAcc.bankName} onChange={(e) => setNewAcc({ ...newAcc, bankName: e.target.value })} className="w-full p-2 border border-border rounded-xl bg-card text-text focus:ring-2 focus:ring-primary/20 focus:border-primary transition"/>
               </div>
               <div>
-                <label className="font-semibold text-text-secondary block mb-1">Account Number Mask</label>
-                <input type="text" placeholder="e.g. •••• 9921" value={newAcc.accountNumber} onChange={(e) => setNewAcc({ ...newAcc, accountNumber: e.target.value })} className="w-full p-2 border border-border rounded-xl bg-card text-text focus:ring-2 focus:ring-primary/20 focus:border-primary transition"/>
+                <label className="font-semibold text-text-secondary block mb-1">Account Number</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="e.g. 50200084920194"
+                  value={newAcc.accountNumber}
+                  onChange={handleAccountNumberChange}
+                  className={`w-full p-2 border rounded-xl bg-card text-text font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition ${
+                    accountNumError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
+                  }`}
+                />
+                {accountNumError && (
+                  <p className="text-xs text-rose-500 mt-1 font-medium">{accountNumError}</p>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -245,12 +284,19 @@ export const CashBankPage = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-text-secondary block mb-1">Opening Balance ($)</label>
-                  <input type="number" value={newAcc.balance} onChange={(e) => setNewAcc({ ...newAcc, balance: Number(e.target.value) })} className="w-full p-2 border border-border rounded-xl bg-card text-text font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition"/>
+                  <label className="font-semibold text-text-secondary block mb-1">Opening Balance (₹)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="0"
+                    value={newAcc.balance}
+                    onChange={(e) => setNewAcc({ ...newAcc, balance: e.target.value })}
+                    className="w-full p-2 border border-border rounded-xl bg-card text-text font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                  />
                 </div>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-border">
-                <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>
+                <Button variant="outline" type="button" onClick={handleCloseModal}>
                   Cancel
                 </Button>
                 <Button type="submit">Link Account</Button>

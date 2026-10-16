@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
-import { ChevronRight, X } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { ChevronRight, ChevronLeft, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { pullIndividualAttendance, HRMS_RESOURCES, isServerId } from "../../../services/hrmsSync";
+import { api } from "../../../services/api";
 import Modal from "../../../components/ui/Modal";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
@@ -47,6 +48,9 @@ const statusStyles = {
   WFH: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
   "On Leave": { background: "#eff6ff", color: "#2563eb", border: "#bfdbfe" },
   "Half Day": { background: "#f3e8ff", color: "#7e22ce", border: "#d8b4fe" },
+  "Week Off": { background: "#f1f5f9", color: "#64748b", border: "#e2e8f0" },
+  "Holiday": { background: "#fdf4ff", color: "#c026d3", border: "#f5d0fe" },
+  "Not Marked": { background: "#f8fafc", color: "#94a3b8", border: "#e2e8f0" },
 };
 
 export default function IndividualAttendance() {
@@ -76,6 +80,7 @@ export default function IndividualAttendance() {
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
   const [viewMode, setViewMode] = useState("Table");
+  const [tableAllMonthsTab, setTableAllMonthsTab] = useState("Summary"); // "Summary" | "Records"
 
   const [localEdits, setLocalEdits] = useState({});
   const [editItem, setEditItem] = useState(null);
@@ -101,28 +106,43 @@ export default function IndividualAttendance() {
   // from it. Read the picked employee's month straight from the API and merge
   // it with the store (the store copy wins -- it carries today's punches).
   const [monthRecords, setMonthRecords] = useState(null);
-  useEffect(() => {
-    if (!isServerId(currentEmp.id)) return undefined;
-    let cancelled = false;
-    const monthIdx = MONTHS.indexOf(selectedMonth);
+
+  const fetchMonthRecords = useCallback(() => {
+    if (!isServerId(currentEmp.id)) return;
     const yearNum = Number(selectedYear);
     const pad = (n) => String(n).padStart(2, "0");
-    const lastDay = new Date(yearNum, monthIdx + 1, 0).getDate();
+
+    let date_from = `${yearNum}-01-01`;
+    let date_to = `${yearNum}-12-31`;
+
+    if (selectedMonth !== "All") {
+      const monthIdx = MONTHS.indexOf(selectedMonth);
+      if (monthIdx >= 0) {
+        const lastDay = new Date(yearNum, monthIdx + 1, 0).getDate();
+        date_from = `${yearNum}-${pad(monthIdx + 1)}-01`;
+        date_to = `${yearNum}-${pad(monthIdx + 1)}-${pad(lastDay)}`;
+      }
+    }
+
     pullIndividualAttendance(currentEmp.id, {
-      date_from: `${yearNum}-${pad(monthIdx + 1)}-01`,
-      date_to: `${yearNum}-${pad(monthIdx + 1)}-${pad(lastDay)}`,
+      date_from,
+      date_to,
     }).then((body) => {
-      if (cancelled) return;
       const rows = Array.isArray(body) ? body : body?.results;
       setMonthRecords(Array.isArray(rows) ? rows.map(HRMS_RESOURCES.attendance.fromApi) : null);
+    }).catch((err) => {
+      console.warn("[IndividualAttendance] Failed to fetch month attendance:", err);
     });
-    return () => { cancelled = true; };
   }, [currentEmp.id, selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchMonthRecords();
+  }, [fetchMonthRecords]);
 
   const sourceRecords = useMemo(() => {
     if (!monthRecords) return storeRecords || [];
-    const byId = new Map(monthRecords.map((r) => [r.id, r]));
-    (storeRecords || []).forEach((r) => byId.set(r.id, r));
+    const byId = new Map((storeRecords || []).map((r) => [r.id, r]));
+    monthRecords.forEach((r) => byId.set(r.id, r));
     return [...byId.values()];
   }, [monthRecords, storeRecords]);
 
@@ -130,6 +150,8 @@ export default function IndividualAttendance() {
     if (!currentEmp.id) return [];
     const monthIdx = MONTHS.indexOf(selectedMonth);
     const yearNum = Number(selectedYear);
+    const pad = (n) => String(n).padStart(2, "0");
+
     return sourceRecords
       .filter((r) => {
         const matchesEmp =
@@ -138,46 +160,446 @@ export default function IndividualAttendance() {
           String(r.id ?? "") === String(currentEmp.id) ||
           (currentEmp.name && (r.employee === currentEmp.name || r.name === currentEmp.name));
         if (!matchesEmp) return false;
-        const d = parseRecordDate(r.date);
-        return d && d.getMonth() === monthIdx && d.getFullYear() === yearNum;
+        const d = parseRecordDate(r.date || r.rawDate);
+        if (!d || d.getFullYear() !== yearNum) return false;
+        if (selectedMonth !== "All" && d.getMonth() !== monthIdx) return false;
+        return true;
       })
       .map((r) => {
-        const d = parseRecordDate(r.date);
+        const d = parseRecordDate(r.date || r.rawDate);
+        const isoDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
         const key = `${r.id ?? ""}|${r.date}`;
-        const mins = workedMinutes(r);
+        const editOverride = localEdits[isoDate] || localEdits[key];
+        const merged = editOverride ? { ...r, ...editOverride } : r;
+        const mins = workedMinutes(merged);
         const base = {
           key,
           recordId: r.id,
+          employeeId: currentEmp.id,
           sortTime: d.getTime(),
+          dayNum: d.getDate(),
+          monthIdx: d.getMonth(),
+          monthName: MONTHS[d.getMonth()],
+          isoDate,
+          rawDate: r.rawDate || r.date,
           date: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
           day: DAY_NAMES[d.getDay()],
-          checkIn: toHHMM(r.checkIn),
-          checkOut: toHHMM(r.checkOut),
-          workHours: r.workHours || (mins ? `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}` : "—"),
-          shift: r.shift || "General",
-          status: r.status || "Present",
-          remarks: r.remarks || r.notes || "",
+          checkIn: toHHMM(merged.checkIn),
+          checkOut: toHHMM(merged.checkOut),
+          workHours: merged.workHours || (mins ? `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}` : "—"),
+          shift: merged.shift || "General",
+          status: merged.status || "Present",
+          remarks: merged.remarks || merged.notes || "",
         };
-        return localEdits[key] ? { ...base, ...localEdits[key] } : base;
+        return base;
       })
       .sort((a, b) => a.sortTime - b.sortTime);
   }, [sourceRecords, currentEmp, selectedMonth, selectedYear, localEdits]);
 
+  const monthWiseSummary = useMemo(() => {
+    const yearNum = Number(selectedYear);
+    const pad = (n) => String(n).padStart(2, "0");
+    return MONTHS.map((monthName, idx) => {
+      const monthRecordsList = (sourceRecords || []).filter((r) => {
+        const matchesEmp =
+          String(r.employeeId ?? "") === String(currentEmp.id) ||
+          (currentEmp.empId && String(r.id ?? "") === String(currentEmp.empId)) ||
+          String(r.id ?? "") === String(currentEmp.id) ||
+          (currentEmp.name && (r.employee === currentEmp.name || r.name === currentEmp.name));
+        if (!matchesEmp) return false;
+        const d = parseRecordDate(r.date || r.rawDate);
+        return d && d.getFullYear() === yearNum && d.getMonth() === idx;
+      }).map((r) => {
+        const d = parseRecordDate(r.date || r.rawDate);
+        const iso = d ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : "";
+        return localEdits[iso] ? { ...r, ...localEdits[iso] } : r;
+      });
+
+      // Incorporate local edits for this month not yet in sourceRecords
+      const totalDays = new Date(yearNum, idx + 1, 0).getDate();
+      for (let day = 1; day <= totalDays; day++) {
+        const iso = `${yearNum}-${pad(idx + 1)}-${pad(day)}`;
+        if (localEdits[iso]) {
+          const already = monthRecordsList.some((r) => {
+            const d = parseRecordDate(r.date || r.rawDate);
+            return d && d.getDate() === day;
+          });
+          if (!already) {
+            monthRecordsList.push({ ...localEdits[iso], date: iso, rawDate: iso });
+          }
+        }
+      }
+
+      const present = monthRecordsList.filter((r) => r.status === "Present").length;
+      const absent = monthRecordsList.filter((r) => r.status === "Absent").length;
+      const late = monthRecordsList.filter((r) => r.status === "Late").length;
+      const halfDay = monthRecordsList.filter((r) => r.status === "Half Day").length;
+      const leave = monthRecordsList.filter((r) => r.status === "On Leave").length;
+      const wfh = monthRecordsList.filter((r) => r.status === "WFH").length;
+      const totalMarked = present + absent + late + halfDay + leave + wfh;
+      const attendanceRate = totalMarked > 0 ? Math.round(((present + late + wfh + halfDay * 0.5) / totalMarked) * 100) : 0;
+
+      return {
+        month: monthName,
+        monthIdx: idx,
+        year: yearNum,
+        totalDays,
+        present,
+        absent,
+        late,
+        halfDay,
+        leave,
+        wfh,
+        totalMarked,
+        attendanceRate: totalMarked > 0 ? `${attendanceRate}%` : "—",
+      };
+    });
+  }, [sourceRecords, currentEmp, selectedYear, localEdits]);
+
+  const recordsByDay = useMemo(() => {
+    const map = {};
+    records.forEach((r) => {
+      map[r.dayNum] = r;
+    });
+
+    // Also inject any localEdits for this month/year even if no server row existed yet
+    const pad = (n) => String(n).padStart(2, "0");
+    const curMonthIdx = new Date().getMonth();
+    const monthIdx = selectedMonth === "All" ? curMonthIdx : MONTHS.indexOf(selectedMonth);
+    const yearNum = Number(selectedYear);
+    if (monthIdx >= 0 && yearNum) {
+      const totalDays = new Date(yearNum, monthIdx + 1, 0).getDate();
+      for (let day = 1; day <= totalDays; day++) {
+        const iso = `${yearNum}-${pad(monthIdx + 1)}-${pad(day)}`;
+        const edit = localEdits[iso];
+        if (edit) {
+          const prev = map[day] || {};
+          const d = new Date(yearNum, monthIdx, day);
+          map[day] = {
+            ...prev,
+            dayNum: day,
+            isoDate: iso,
+            rawDate: iso,
+            date: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+            day: DAY_NAMES[d.getDay()],
+            checkIn: edit.status === "Absent" ? "—" : (edit.checkIn || prev.checkIn || "09:30"),
+            checkOut: edit.status === "Absent" ? "—" : (edit.checkOut || prev.checkOut || "18:30"),
+            workHours: edit.status === "Absent" ? "—" : (edit.workHours || prev.workHours || "09:00"),
+            shift: edit.shift || prev.shift || "General",
+            status: edit.status || prev.status || "Present",
+            remarks: edit.remarks !== undefined ? edit.remarks : (prev.remarks || ""),
+          };
+        }
+      }
+    }
+    return map;
+  }, [records, localEdits, selectedMonth, selectedYear]);
+
+  const monthDailyRows = useMemo(() => {
+    if (selectedMonth === "All") {
+      return records;
+    }
+
+    const monthIdx = MONTHS.indexOf(selectedMonth);
+    const yearNum = Number(selectedYear);
+    if (monthIdx < 0 || !yearNum) return [];
+
+    const totalDays = new Date(yearNum, monthIdx + 1, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getMonth() === monthIdx && today.getFullYear() === yearNum;
+    const todayDate = today.getDate();
+
+    const rows = [];
+    for (let day = 1; day <= totalDays; day++) {
+      const dateObj = new Date(yearNum, monthIdx, day);
+      const dayOfWeek = dateObj.getDay();
+      const isSunday = dayOfWeek === 0;
+      const isToday = isCurrentMonth && day === todayDate;
+      const isPast = isCurrentMonth
+        ? day < todayDate
+        : new Date(yearNum, monthIdx, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+      const pad = (n) => String(n).padStart(2, "0");
+      const isoDate = `${yearNum}-${pad(monthIdx + 1)}-${pad(day)}`;
+      const formattedDate = dateObj.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+
+      const record = recordsByDay[day];
+
+      let status = "Not Marked";
+      let checkIn = "—";
+      let checkOut = "—";
+      let workHours = "—";
+      let shift = "General";
+      let remarks = "";
+
+      if (record) {
+        status = record.status || "Present";
+        checkIn = record.checkIn;
+        checkOut = record.checkOut;
+        workHours = record.workHours;
+        shift = record.shift || "General";
+        remarks = record.remarks;
+      } else if (isSunday) {
+        status = "Week Off";
+      } else if (isPast) {
+        status = "Absent";
+      } else if (isToday) {
+        status = "Not Marked";
+      }
+
+      rows.push({
+        key: `row-${day}`,
+        recordId: record?.recordId,
+        dayNum: day,
+        dateObj,
+        isoDate,
+        date: formattedDate,
+        day: DAY_NAMES[dayOfWeek],
+        isToday,
+        isSunday,
+        isPast,
+        record,
+        checkIn,
+        checkOut,
+        workHours,
+        shift,
+        status,
+        remarks,
+      });
+    }
+
+    return rows;
+  }, [selectedMonth, selectedYear, records, recordsByDay]);
+
+  const calendarDays = useMemo(() => {
+    const curMonthIdx = new Date().getMonth();
+    const monthIdx = selectedMonth === "All" ? curMonthIdx : MONTHS.indexOf(selectedMonth);
+    const yearNum = Number(selectedYear);
+    if (monthIdx < 0 || !yearNum) return [];
+
+    const totalDays = new Date(yearNum, monthIdx + 1, 0).getDate();
+    // Monday as index 0 (0=Mon, 1=Tue, ..., 6=Sun)
+    const firstDayOfWeek = (new Date(yearNum, monthIdx, 1).getDay() + 6) % 7;
+
+    const today = new Date();
+    const isCurrentMonth = today.getMonth() === monthIdx && today.getFullYear() === yearNum;
+    const todayDate = today.getDate();
+
+    const days = [];
+
+    // Preceding padding cells from previous month
+    const prevMonthTotalDays = new Date(yearNum, monthIdx, 0).getDate();
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      const prevDayNum = prevMonthTotalDays - firstDayOfWeek + 1 + i;
+      days.push({
+        key: `prev-${prevDayNum}`,
+        dayNum: prevDayNum,
+        isOtherMonth: true,
+      });
+    }
+
+    // All days in the current month
+    for (let day = 1; day <= totalDays; day++) {
+      const dateObj = new Date(yearNum, monthIdx, day);
+      const dayOfWeek = dateObj.getDay(); // 0 is Sun, 6 is Sat
+      const isSunday = dayOfWeek === 0;
+      const isToday = isCurrentMonth && day === todayDate;
+      const isPast = isCurrentMonth
+        ? day < todayDate
+        : new Date(yearNum, monthIdx, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+      const pad = (n) => String(n).padStart(2, "0");
+      const isoDate = `${yearNum}-${pad(monthIdx + 1)}-${pad(day)}`;
+      const formattedDate = dateObj.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+
+      const record = recordsByDay[day];
+
+      let status = "";
+      let checkIn = "";
+      let checkOut = "";
+      let workHours = "";
+      let remarks = "";
+
+      if (record) {
+        status = record.status || "Present";
+        checkIn = record.checkIn;
+        checkOut = record.checkOut;
+        workHours = record.workHours;
+        remarks = record.remarks;
+      } else if (isSunday) {
+        status = "Week Off";
+      } else if (isPast) {
+        status = "Absent";
+      } else if (isToday) {
+        status = "Not Marked";
+      }
+
+      days.push({
+        key: `curr-${day}`,
+        dayNum: day,
+        dateObj,
+        isoDate,
+        formattedDate,
+        dayName: DAY_NAMES[dayOfWeek],
+        isOtherMonth: false,
+        isToday,
+        isSunday,
+        isPast,
+        record,
+        status,
+        checkIn,
+        checkOut,
+        workHours,
+        remarks,
+      });
+    }
+
+    // Trailing padding cells to complete 7 columns
+    const totalFilled = days.length;
+    const remaining = (7 - (totalFilled % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({
+        key: `next-${i}`,
+        dayNum: i,
+        isOtherMonth: true,
+      });
+    }
+
+    return days;
+  }, [selectedMonth, selectedYear, recordsByDay]);
+
   const stats = useMemo(() => {
-    const overtimeMins = records.reduce((sum, r) => sum + Math.max(0, workedMinutes(r) - 8 * 60), 0);
     return {
       present: records.filter((r) => r.status === "Present").length,
       absent: records.filter((r) => r.status === "Absent").length,
       late: records.filter((r) => r.status === "Late").length,
+      halfDay: records.filter((r) => r.status === "Half Day").length,
       leave: records.filter((r) => r.status === "On Leave").length,
       wfh: records.filter((r) => r.status === "WFH").length,
-      overtime: `${Math.round(overtimeMins / 60)}h`,
     };
   }, [records]);
 
-  const handleEditSave = () => {
+  const handlePrevMonth = () => {
+    const currentIdx = MONTHS.indexOf(selectedMonth);
+    if (currentIdx === 0) {
+      setSelectedMonth(MONTHS[11]);
+      setSelectedYear((y) => String(Number(y) - 1));
+    } else {
+      setSelectedMonth(MONTHS[currentIdx - 1]);
+    }
+  };
+
+  const handleNextMonth = () => {
+    const currentIdx = MONTHS.indexOf(selectedMonth);
+    if (currentIdx === 11) {
+      setSelectedMonth(MONTHS[0]);
+      setSelectedYear((y) => String(Number(y) + 1));
+    } else {
+      setSelectedMonth(MONTHS[currentIdx + 1]);
+    }
+  };
+
+  const handleCellClick = (cell) => {
+    if (cell.isOtherMonth) return;
+    if (cell.record) {
+      setEditItem({
+        ...cell.record,
+        isoDate: cell.isoDate,
+        date: cell.formattedDate || cell.record.date,
+        dayNum: cell.dayNum,
+      });
+    } else {
+      setEditItem({
+        key: `new|${currentEmp.id}|${cell.isoDate}`,
+        recordId: undefined,
+        employeeId: currentEmp.id,
+        dayNum: cell.dayNum,
+        date: cell.formattedDate,
+        isoDate: cell.isoDate,
+        checkIn: cell.status === "Absent" || cell.status === "Week Off" ? "" : "09:30",
+        checkOut: cell.status === "Absent" || cell.status === "Week Off" ? "" : "18:30",
+        workHours: cell.status === "Absent" || cell.status === "Week Off" ? "—" : "09:00",
+        shift: "General",
+        status: cell.status && cell.status !== "Not Marked" && cell.status !== "Week Off" ? cell.status : "Present",
+        remarks: "",
+        isNew: true,
+      });
+    }
+  };
+
+  const handleEditSave = async () => {
     if (!editItem) return;
-    setLocalEdits((prev) => ({ ...prev, [editItem.key]: { ...editItem } }));
+
+    const pad = (n) => String(n).padStart(2, "0");
+    let isoDate = editItem.isoDate;
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+      const parsedD = parseRecordDate(editItem.date || editItem.rawDate);
+      if (parsedD) {
+        isoDate = `${parsedD.getFullYear()}-${pad(parsedD.getMonth() + 1)}-${pad(parsedD.getDate())}`;
+      }
+    }
+    if (!isoDate) {
+      const curMonthIdx = MONTHS.indexOf(selectedMonth);
+      const mIdx = curMonthIdx >= 0 ? curMonthIdx : new Date().getMonth();
+      const dNum = editItem.dayNum || 1;
+      isoDate = `${selectedYear}-${pad(mIdx + 1)}-${pad(dNum)}`;
+    }
+
+    const updatedItem = {
+      ...editItem,
+      isoDate,
+      status: editItem.status,
+      checkIn: editItem.status === "Absent" ? "—" : (editItem.checkIn || "09:30"),
+      checkOut: editItem.status === "Absent" ? "—" : (editItem.checkOut || "18:30"),
+      remarks: editItem.remarks || "",
+    };
+
+    setLocalEdits((prev) => ({
+      ...prev,
+      [isoDate]: updatedItem,
+      ...(editItem.key ? { [editItem.key]: updatedItem } : {}),
+    }));
+
+    // Optimistically update monthRecords
+    setMonthRecords((prev) => {
+      const list = prev ? [...prev] : [];
+      const idx = list.findIndex(
+        (r) =>
+          (r.id && editItem.recordId && r.id === editItem.recordId) ||
+          r.rawDate === isoDate ||
+          r.date === isoDate ||
+          r.date === editItem.date
+      );
+      const newRow = {
+        ...(idx >= 0 ? list[idx] : {}),
+        id: editItem.recordId || list[idx]?.id || `att-${currentEmp.id}-${isoDate}`,
+        employeeId: currentEmp.id,
+        employeeName: currentEmp.name,
+        name: currentEmp.name,
+        rawDate: isoDate,
+        date: editItem.date || isoDate,
+        checkIn: editItem.status === "Absent" ? null : (editItem.checkIn && editItem.checkIn !== "—" ? editItem.checkIn : null),
+        checkOut: editItem.status === "Absent" ? null : (editItem.checkOut && editItem.checkOut !== "—" ? editItem.checkOut : null),
+        status: editItem.status,
+        remarks: editItem.remarks || "",
+        notes: editItem.remarks || "",
+      };
+      if (idx >= 0) {
+        list[idx] = newRow;
+      } else {
+        list.push(newRow);
+      }
+      return list;
+    });
+
     if (updateStoreRecord && editItem.recordId !== undefined) {
       updateStoreRecord(editItem.recordId, {
         checkIn: editItem.checkIn,
@@ -185,7 +607,27 @@ export default function IndividualAttendance() {
         status: editItem.status,
       });
     }
-    setToast(`Attendance record for ${editItem.date} updated.`);
+
+    try {
+      await api.post("/hrms/attendance/bulk/", {
+        date: isoDate,
+        records: [
+          {
+            employeeId: currentEmp.id,
+            checkIn: editItem.status === "Absent" ? null : (editItem.checkIn && editItem.checkIn !== "—" ? editItem.checkIn : null),
+            checkOut: editItem.status === "Absent" ? null : (editItem.checkOut && editItem.checkOut !== "—" ? editItem.checkOut : null),
+            status: editItem.status,
+            remark: editItem.remarks || null,
+          },
+        ],
+      });
+      await useAttendanceStore.getState().refreshAttendance();
+      fetchMonthRecords();
+    } catch (err) {
+      console.warn("[IndividualAttendance] Failed to save attendance to server:", err);
+    }
+
+    setToast(`Attendance record for ${editItem.date || isoDate} updated.`);
     setEditItem(null);
   };
 
@@ -230,12 +672,26 @@ export default function IndividualAttendance() {
             onChange={(e) => setSelectedMonth(e.target.value)}
             className="ind-select"
           >
+            <option value="All">All Months (Year {selectedYear})</option>
             {MONTHS.map((m) => (
               <option key={m} value={m}>
-                {m}
+                {m} {m === MONTHS[now.getMonth()] && selectedYear === String(now.getFullYear()) ? "(Current)" : ""}
               </option>
             ))}
           </select>
+
+          <button
+            type="button"
+            onClick={() => {
+              const curNow = new Date();
+              setSelectedMonth(MONTHS[curNow.getMonth()]);
+              setSelectedYear(String(curNow.getFullYear()));
+            }}
+            className="ind-btn-current-month"
+            title="Switch to Current Month"
+          >
+            Current Month
+          </button>
 
           <select
             value={selectedYear}
@@ -312,6 +768,10 @@ export default function IndividualAttendance() {
           <span className="ind-stat-val">{stats.late}</span>
         </div>
         <div className="ind-stat-card">
+          <span className="ind-stat-label">HALF DAYS</span>
+          <span className="ind-stat-val">{stats.halfDay}</span>
+        </div>
+        <div className="ind-stat-card">
           <span className="ind-stat-label">LEAVE DAYS</span>
           <span className="ind-stat-val">{stats.leave}</span>
         </div>
@@ -319,90 +779,392 @@ export default function IndividualAttendance() {
           <span className="ind-stat-label">WFH DAYS</span>
           <span className="ind-stat-val">{stats.wfh}</span>
         </div>
-        <div className="ind-stat-card">
-          <span className="ind-stat-label">OVERTIME HOURS</span>
-          <span className="ind-stat-val">{stats.overtime}</span>
-        </div>
       </div>
 
       {/* Table or Calendar View */}
       {viewMode === "Table" ? (
-        <div className="ind-card ind-main-card">
-          <div style={{ overflowX: "auto" }}>
-            <table className="ind-table">
-              <thead>
-                <tr>
-                  <th>DATE</th>
-                  <th>DAY</th>
-                  <th>CHECK IN</th>
-                  <th>CHECK OUT</th>
-                  <th>WORK HOURS</th>
-                  <th>SHIFT</th>
-                  <th>STATUS</th>
-                  <th>REMARKS</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.length === 0 && (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
-                      No attendance records for {selectedMonth} {selectedYear}.
-                    </td>
-                  </tr>
-                )}
-                {records.map((r) => (
-                  <tr key={r.key}>
-                    <td className="ind-date">{r.date}</td>
-                    <td style={{ color: "#374151" }}>{r.day}</td>
-                    <td className="ind-time">{r.checkIn}</td>
-                    <td className="ind-time">{r.checkOut}</td>
-                    <td className="ind-time">{r.workHours}</td>
-                    <td style={{ color: "#374151" }}>{r.shift}</td>
-                    <td>
-                      <span className="ind-status" style={{ ...statusStyles[r.status] }}>
-                        {r.status}
-                      </span>
-                    </td>
-                    <td style={{ color: "#6b7280" }}>{r.remarks || "—"}</td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => setEditItem({ ...r })}
-                        className="ind-btn-edit"
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        selectedMonth === "All" ? (
+          <div className="ind-card ind-main-card">
+            {/* Toolbar for All Months */}
+            <div className="ind-table-toolbar">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>
+                  All Months Attendance Summary — Year {selectedYear}
+                </h3>
+              </div>
+              <div className="ind-tabs">
+                <button
+                  type="button"
+                  onClick={() => setTableAllMonthsTab("Summary")}
+                  className={tableAllMonthsTab === "Summary" ? "ind-tab active" : "ind-tab"}
+                >
+                  Month-Wise List
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableAllMonthsTab("Records")}
+                  className={tableAllMonthsTab === "Records" ? "ind-tab active" : "ind-tab"}
+                >
+                  All Punch Records ({records.length})
+                </button>
+              </div>
+            </div>
+
+            {tableAllMonthsTab === "Summary" ? (
+              <div style={{ overflowX: "auto" }}>
+                <table className="ind-table">
+                  <thead>
+                    <tr>
+                      <th>MONTH</th>
+                      <th>TOTAL DAYS</th>
+                      <th>PRESENT</th>
+                      <th>ABSENT</th>
+                      <th>LATE</th>
+                      <th>HALF DAY</th>
+                      <th>LEAVE</th>
+                      <th>WFH</th>
+                      <th>ATTENDANCE %</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthWiseSummary.map((m) => {
+                      const isCurrentM = m.month === MONTHS[now.getMonth()] && String(m.year) === String(now.getFullYear());
+                      return (
+                        <tr key={m.month}>
+                          <td className="ind-date">
+                            <span style={{ fontWeight: 700, color: "#111827" }}>{m.month}</span>
+                            {isCurrentM && (
+                              <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, background: "#dbeafe", color: "#2563eb", padding: "2px 7px", borderRadius: 999 }}>
+                                Current
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ color: "#475569" }}>{m.totalDays} days</td>
+                          <td>
+                            <span className="ind-status" style={{ ...statusStyles.Present }}>
+                              {m.present}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="ind-status" style={{ ...statusStyles.Absent }}>
+                              {m.absent}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="ind-status" style={{ ...statusStyles.Late }}>
+                              {m.late}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="ind-status" style={{ ...statusStyles["Half Day"] }}>
+                              {m.halfDay}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="ind-status" style={{ ...statusStyles["On Leave"] }}>
+                              {m.leave}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="ind-status" style={{ ...statusStyles.WFH }}>
+                              {m.wfh}
+                            </span>
+                          </td>
+                          <td>
+                            <strong style={{ color: m.totalMarked > 0 ? "#111827" : "#94a3b8" }}>
+                              {m.attendanceRate}
+                            </strong>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMonth(m.month)}
+                              className="ind-btn-edit"
+                              style={{ color: "#2563eb", borderColor: "#bfdbfe", background: "#eff6ff" }}
+                            >
+                              View Month →
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="ind-table">
+                  <thead>
+                    <tr>
+                      <th>DATE</th>
+                      <th>DAY</th>
+                      <th>CHECK IN</th>
+                      <th>CHECK OUT</th>
+                      <th>WORK HOURS</th>
+                      <th>SHIFT</th>
+                      <th>STATUS</th>
+                      <th>REMARKS</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                          No attendance records found for {selectedYear}.
+                        </td>
+                      </tr>
+                    ) : (
+                      records.map((r) => (
+                        <tr key={r.key}>
+                          <td className="ind-date">{r.date}</td>
+                          <td style={{ color: "#374151" }}>{r.day}</td>
+                          <td className="ind-time">{r.checkIn}</td>
+                          <td className="ind-time">{r.checkOut}</td>
+                          <td className="ind-time">{r.workHours}</td>
+                          <td style={{ color: "#374151" }}>{r.shift}</td>
+                          <td>
+                            <span className="ind-status" style={{ ...statusStyles[r.status] }}>
+                              {r.status}
+                            </span>
+                          </td>
+                          <td style={{ color: "#6b7280" }}>{r.remarks || "—"}</td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => setEditItem({ ...r, isoDate: r.isoDate, dayNum: r.dayNum })}
+                              className="ind-btn-edit"
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
+        ) : (
+          <div className="ind-card ind-main-card">
+            <div className="ind-table-toolbar">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>
+                  Daily Attendance List — {selectedMonth} {selectedYear}
+                </h3>
+                {selectedMonth === MONTHS[now.getMonth()] && selectedYear === String(now.getFullYear()) && (
+                  <span style={{ fontSize: 11, fontWeight: 700, background: "#dbeafe", color: "#2563eb", padding: "2px 8px", borderRadius: 999 }}>
+                    Current Month
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMonth("All")}
+                className="ind-btn-edit"
+                style={{ fontSize: 12 }}
+              >
+                ← View All Months
+              </button>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table className="ind-table">
+                <thead>
+                  <tr>
+                    <th>DATE</th>
+                    <th>DAY</th>
+                    <th>CHECK IN</th>
+                    <th>CHECK OUT</th>
+                    <th>WORK HOURS</th>
+                    <th>SHIFT</th>
+                    <th>STATUS</th>
+                    <th>REMARKS</th>
+                    <th>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthDailyRows.map((r) => {
+                    const rowStyle = statusStyles[r.status] || { background: "#f8fafc", color: "#64748b", border: "#e2e8f0" };
+                    return (
+                      <tr key={r.key} style={r.isToday ? { background: "#f8fbff" } : {}}>
+                        <td className="ind-date">
+                          <span style={{ color: r.isSunday ? "#ef4444" : "#111827" }}>{r.date}</span>
+                          {r.isToday && (
+                            <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, background: "#dbeafe", color: "#2563eb", padding: "1px 6px", borderRadius: 999 }}>
+                              Today
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ color: r.isSunday ? "#ef4444" : "#374151", fontWeight: r.isSunday ? 600 : 400 }}>{r.day}</td>
+                        <td className="ind-time">{r.checkIn}</td>
+                        <td className="ind-time">{r.checkOut}</td>
+                        <td className="ind-time">{r.workHours}</td>
+                        <td style={{ color: "#374151" }}>{r.shift}</td>
+                        <td>
+                          <span className="ind-status" style={{ ...rowStyle }}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td style={{ color: "#6b7280" }}>{r.remarks || "—"}</td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (r.record) {
+                                setEditItem({
+                                  ...r.record,
+                                  isoDate: r.isoDate,
+                                  date: r.date,
+                                  dayNum: r.dayNum,
+                                });
+                              } else {
+                                setEditItem({
+                                  key: `new|${currentEmp.id}|${r.isoDate}`,
+                                  recordId: undefined,
+                                  employeeId: currentEmp.id,
+                                  dayNum: r.dayNum,
+                                  date: r.date,
+                                  isoDate: r.isoDate,
+                                  checkIn: r.status === "Absent" || r.status === "Week Off" ? "" : "09:30",
+                                  checkOut: r.status === "Absent" || r.status === "Week Off" ? "" : "18:30",
+                                  workHours: r.status === "Absent" || r.status === "Week Off" ? "—" : "09:00",
+                                  shift: "General",
+                                  status: r.status && r.status !== "Not Marked" && r.status !== "Week Off" ? r.status : "Present",
+                                  remarks: "",
+                                  isNew: true,
+                                });
+                              }
+                            }}
+                            className="ind-btn-edit"
+                          >
+                            {r.record ? "Edit" : "Mark"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       ) : (
-        <div className="ind-card" style={{ padding: "20px" }}>
+        <div className="ind-card ind-cal-card">
+          <div className="ind-cal-toolbar">
+            <div className="ind-cal-month-nav">
+              <button
+                type="button"
+                className="ind-cal-nav-btn"
+                onClick={handlePrevMonth}
+                title="Previous Month"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <h2 className="ind-cal-month-title">
+                {selectedMonth === "All" ? `${MONTHS[now.getMonth()]} ${selectedYear} (Current)` : `${selectedMonth} ${selectedYear}`}
+              </h2>
+              <button
+                type="button"
+                className="ind-cal-nav-btn"
+                onClick={handleNextMonth}
+                title="Next Month"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <div className="ind-cal-legend">
+              <span className="ind-cal-legend-item">
+                <span className="ind-cal-legend-dot" style={{ background: "#15803d" }} />
+                Present
+              </span>
+              <span className="ind-cal-legend-item">
+                <span className="ind-cal-legend-dot" style={{ background: "#b45309" }} />
+                Late
+              </span>
+              <span className="ind-cal-legend-item">
+                <span className="ind-cal-legend-dot" style={{ background: "#7e22ce" }} />
+                Half Day
+              </span>
+              <span className="ind-cal-legend-item">
+                <span className="ind-cal-legend-dot" style={{ background: "#dc2626" }} />
+                Absent
+              </span>
+              <span className="ind-cal-legend-item">
+                <span className="ind-cal-legend-dot" style={{ background: "#2563eb" }} />
+                On Leave
+              </span>
+              <span className="ind-cal-legend-item">
+                <span className="ind-cal-legend-dot" style={{ background: "#475569" }} />
+                WFH
+              </span>
+              <span className="ind-cal-legend-item">
+                <span className="ind-cal-legend-dot" style={{ background: "#94a3b8" }} />
+                Week Off
+              </span>
+            </div>
+          </div>
+
           <div className="ind-cal-grid">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <div key={d} className="ind-cal-header">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, idx) => (
+              <div key={d} className={`ind-cal-day-header ${idx === 6 ? "weekend" : ""}`}>
                 {d}
               </div>
             ))}
-            {records.length === 0 && (
-              <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "#6b7280", padding: "24px" }}>
-                No attendance records for {selectedMonth} {selectedYear}.
-              </div>
-            )}
-            {records.map((r, i) => (
-              <div key={r.key} className="ind-cal-cell" onClick={() => setEditItem({ ...r })}>
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#475569" }}>
-                  {i + 1}
-                </span>
-                <span className="ind-status" style={{ ...statusStyles[r.status], marginTop: 4 }}>
-                  {r.status}
-                </span>
-              </div>
-            ))}
+            {calendarDays.map((cell) => {
+              if (cell.isOtherMonth) {
+                return (
+                  <div key={cell.key} className="ind-cal-cell other-month">
+                    <div className="ind-cal-cell-top">
+                      <span className="ind-cal-day-num" style={{ color: "#94a3b8" }}>{cell.dayNum}</span>
+                    </div>
+                  </div>
+                );
+              }
+              const currentStyle = statusStyles[cell.status] || { background: "#f8fafc", color: "#64748b", border: "#e2e8f0" };
+              return (
+                <div
+                  key={cell.key}
+                  className={`ind-cal-cell ${cell.isToday ? "today" : ""} ${cell.isSunday ? "sunday" : ""}`}
+                  onClick={() => handleCellClick(cell)}
+                  title={cell.status ? `${cell.formattedDate}: ${cell.status} (Click to edit)` : `${cell.formattedDate}: Click to mark attendance`}
+                >
+                  <div className="ind-cal-cell-top">
+                    <span className="ind-cal-day-num" style={{ color: cell.isSunday ? "#ef4444" : "#1e293b" }}>
+                      {cell.dayNum}
+                    </span>
+                    {cell.isToday && <span className="ind-cal-today-badge">Today</span>}
+                  </div>
+
+                  {cell.status ? (
+                    <div>
+                      <span className="ind-cal-badge" style={{ ...currentStyle }}>
+                        {cell.status}
+                      </span>
+                      {cell.checkIn && cell.checkIn !== "—" && (
+                        <div className="ind-cal-timing">
+                          <span>{cell.checkIn}{cell.checkOut && cell.checkOut !== "—" ? ` - ${cell.checkOut}` : ""}</span>
+                          {cell.workHours && cell.workHours !== "—" && (
+                            <span className="ind-cal-hours">{cell.workHours}</span>
+                          )}
+                        </div>
+                      )}
+                      {cell.remarks && (
+                        <div className="ind-cal-remarks" title={cell.remarks}>
+                          {cell.remarks}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "11px", color: "#cbd5e1", marginTop: "auto" }}>
+                      —
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -430,16 +1192,18 @@ export default function IndividualAttendance() {
                 <label className="form-label">Check In Time</label>
                 <input
                   className="form-input"
-                  value={editItem.checkIn}
+                  value={editItem.checkIn || ""}
                   onChange={(e) => setEditItem({ ...editItem, checkIn: e.target.value })}
+                  placeholder="09:30"
                 />
               </div>
               <div className="form-group">
                 <label className="form-label">Check Out Time</label>
                 <input
                   className="form-input"
-                  value={editItem.checkOut}
+                  value={editItem.checkOut || ""}
                   onChange={(e) => setEditItem({ ...editItem, checkOut: e.target.value })}
+                  placeholder="18:30"
                 />
               </div>
             </div>
@@ -449,23 +1213,31 @@ export default function IndividualAttendance() {
                 <select
                   className="form-select"
                   value={editItem.status}
-                  onChange={(e) => setEditItem({ ...editItem, status: e.target.value })}
+                  onChange={(e) => {
+                    const nextStatus = e.target.value;
+                    setEditItem({
+                      ...editItem,
+                      status: nextStatus,
+                      checkIn: nextStatus === "Absent" ? "" : (editItem.checkIn || "09:30"),
+                      checkOut: nextStatus === "Absent" ? "" : (editItem.checkOut || "18:30"),
+                    });
+                  }}
                 >
                   <option>Present</option>
                   <option>Late</option>
                   <option>Absent</option>
+                  <option>Half Day</option>
                   <option>WFH</option>
                   <option>On Leave</option>
-                  <option>Half Day</option>
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Remarks</label>
                 <input
                   className="form-input"
-                  value={editItem.remarks}
+                  value={editItem.remarks || ""}
                   onChange={(e) => setEditItem({ ...editItem, remarks: e.target.value })}
-                  placeholder="e.g. Grace 10 min"
+                  placeholder="e.g. Grace 10 min / Sick leave"
                 />
               </div>
             </div>
@@ -544,10 +1316,40 @@ export default function IndividualAttendance() {
         .ind-btn-edit:hover { background: var(--card-hover); color: var(--text); }
         .ind-btn-view-emp:active, .ind-btn-edit:active { transform: scale(0.99); }
 
-        .ind-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-        .ind-cal-header { text-align: center; font-size: 12px; font-weight: 700; color: #6b7280; padding: 8px 0; }
-        .ind-cal-cell { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; min-height: 70px; cursor: pointer; transition: background 0.15s ease; display: flex; flex-direction: column; justify-content: space-between; }
-        .ind-cal-cell:hover { background: #f8fafc; }
+        .ind-table-toolbar { padding: 14px 20px; border-bottom: 1px solid #eef2f6; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        .ind-btn-current-month { display: inline-flex; align-items: center; justify-content: center; height: 33px; padding: 0 13px; border-radius: 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+        .ind-btn-current-month:hover { background: #dbeafe; }
+
+        .ind-cal-card { padding: 22px; }
+        .ind-cal-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #eef2f6; }
+        .ind-cal-month-nav { display: flex; align-items: center; gap: 12px; }
+        .ind-cal-month-title { font-size: 19px; font-weight: 700; color: #0f172a; margin: 0; }
+        .ind-cal-nav-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; border: 1px solid #e2e8f0; background: #ffffff; color: #475569; cursor: pointer; transition: all 0.15s; }
+        .ind-cal-nav-btn:hover { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
+        .ind-cal-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .ind-cal-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #475569; }
+        .ind-cal-legend-dot { width: 8px; height: 8px; border-radius: 999px; }
+
+        .ind-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+        .ind-cal-day-header { text-align: center; font-size: 12px; font-weight: 700; color: #64748b; padding: 10px 0; text-transform: uppercase; letter-spacing: 0.04em; background: #f8fafc; border-radius: 8px; }
+        .ind-cal-day-header.weekend { color: #ef4444; }
+
+        .ind-cal-cell { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; min-height: 105px; cursor: pointer; transition: all 0.15s ease; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+        .ind-cal-cell:hover { border-color: #93c5fd; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08); transform: translateY(-1px); }
+        .ind-cal-cell.today { border: 2px solid #3b82f6; background: #f8fbff; }
+        .ind-cal-cell.other-month { background: #fafbfc; border-color: #f1f5f9; opacity: 0.4; cursor: default; }
+        .ind-cal-cell.other-month:hover { border-color: #f1f5f9; box-shadow: none; transform: none; }
+        .ind-cal-cell.sunday { background: #fdfefe; }
+
+        .ind-cal-cell-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        .ind-cal-day-num { font-size: 13.5px; font-weight: 700; color: #1e293b; }
+        .ind-cal-today-badge { font-size: 10px; font-weight: 700; color: #2563eb; background: #dbeafe; border-radius: 999px; padding: 1px 7px; text-transform: uppercase; letter-spacing: 0.03em; }
+
+        .ind-cal-badge { display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border-radius: 6px; padding: 2.5px 8px; border: 1px solid; white-space: nowrap; width: fit-content; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+        .ind-cal-timing { margin-top: 6px; font-size: 11px; color: #64748b; font-weight: 500; display: flex; flex-direction: column; gap: 2px; }
+        .ind-cal-hours { font-size: 10.5px; font-weight: 600; color: #475569; }
+        .ind-cal-remarks { font-size: 10.5px; color: #94a3b8; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; margin-top: 2px; }
 
         @media (max-width: 1200px) {
           .ind-stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -568,7 +1370,10 @@ export default function IndividualAttendance() {
           .ind-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
           .ind-tab { flex-shrink: 0; white-space: nowrap; }
           .ind-cal-grid { gap: 4px; }
-          .ind-cal-cell { min-height: 52px; padding: 4px; }
+          .ind-cal-cell { min-height: 65px; padding: 6px; border-radius: 8px; }
+          .ind-cal-day-num { font-size: 11.5px; }
+          .ind-cal-badge { font-size: 9.5px; padding: 1px 5px; }
+          .ind-cal-timing { display: none; }
         }
       `}</style>
     </div>

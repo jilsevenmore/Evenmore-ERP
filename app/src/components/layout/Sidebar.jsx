@@ -171,7 +171,7 @@ const NAV = [
     icon: BarChart3,
     children: [
       { label: 'Estimates', icon: FileText, to: '/sales/estimates' },
-      { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
+      // { label: 'Quotations', icon: FileText, to: '/sales/quotations' }, // Hidden: Quotation removed per workflow update
       { label: 'Sales Orders', icon: ShoppingCart, to: '/sales/orders' },
       { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
@@ -194,7 +194,7 @@ const NAV = [
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
       { label: 'Payment Out', icon: ArrowDownLeft, to: '/purchase/payments' },
       { label: 'Expenses', icon: Landmark, to: '/purchase/expenses' },
-      { label: 'Supplier Portal', icon: ExternalLink, to: '/vendor/portal' },
+      // { label: 'Supplier Portal', icon: ExternalLink, to: '/vendor/portal' },
     ],
   },
 
@@ -231,7 +231,7 @@ const NAV = [
     icon: Landmark,
     children: [
       { label: 'Cash / Bank', icon: Landmark, to: '/accounts/cash-bank' },
-      { label: 'General Ledger', icon: FileText, to: '/accounts/general-ledger' },
+      // { label: 'General Ledger', icon: FileText, to: '/accounts/general-ledger' },
       { label: 'Budgets & Burn', icon: Sliders, to: '/accounts/budgets' },
       { label: 'Financial Reports', icon: PieChart, to: '/accounts/reports' },
     ],
@@ -313,11 +313,11 @@ const NAV = [
     ],
   },
 
-  {
-    label: 'Reports',
-    icon: BarChart3,
-    to: '/reports',
-  },
+  // {
+  //   label: 'Reports',
+  //   icon: BarChart3,
+  //   to: '/reports',
+  // },
 
   {
     label: 'Administration',

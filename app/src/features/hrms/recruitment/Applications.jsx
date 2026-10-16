@@ -22,6 +22,23 @@ import {
 } from "lucide-react";
 import UserInitials from "../../../components/common/UserInitials";
 
+const APPLICATIONS_GUIDE = {
+  title: "Job Applications Intake",
+  subtitle: "Track incoming applicant records, qualification stages, and candidate progress.",
+  purpose: "Monitor candidate submissions, advance candidate pipeline stages directly, and access complete applicant dossiers.",
+  workflow: [
+    "Application Submission",
+    "Stage Triage & Review",
+    "Candidate Dossier Inspection",
+    "Advance to Interview or Offer",
+    "Hired Directory Induction",
+  ],
+  keyTerms: [
+    { term: "Application Source", definition: "Channel through which candidate submitted (Career Portal, Direct, Referral)." },
+    { term: "Quick Progression", definition: "Update candidate pipeline stage directly from the application table." },
+  ],
+};
+
 export default function Applications() {
   const applications = useRecruitmentStore((s) => s.applications) || [];
   const candidates = useRecruitmentStore((s) => s.candidates) || [];
@@ -31,28 +48,49 @@ export default function Applications() {
 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("All");
-  const [guideOpen, setGuideOpen] = useState(false);
 
-  // If applications collection has records, use it; otherwise fall back to candidate application records
+  // All candidates in the pipeline are represented as applications, combined with any standalone application records
   const allApplicationRecords = useMemo(() => {
-    if (applications.length > 0) {
-      return applications.map((app) => {
-        const matchedCandidate = candidates.find((c) => c.id === app.candidateId || c.email === app.email);
-        return {
-          id: app.id || matchedCandidate?.id,
-          candidateId: app.candidateId || matchedCandidate?.id,
-          name: app.candidateName || matchedCandidate?.name || app.name || "Candidate",
-          email: app.email || matchedCandidate?.email || "",
-          avatar: app.avatar || matchedCandidate?.avatar,
-          position: app.jobTitle || app.position || matchedCandidate?.position || "—",
-          appliedDate: app.appliedDate || matchedCandidate?.appliedDate || "—",
-          source: app.source || matchedCandidate?.source || "Portal",
-          stage: app.stage || matchedCandidate?.stage || "Applied",
-          recruiter: app.recruiter || matchedCandidate?.recruiter || "—",
-        };
-      });
-    }
-    return candidates;
+    const list = candidates.map((cand) => {
+      const matchedApp = applications.find(
+        (a) => a.candidateId === cand.id || (a.email && cand.email && a.email.toLowerCase() === cand.email.toLowerCase())
+      );
+      return {
+        id: cand.id,
+        candidateId: cand.id,
+        name: cand.name,
+        email: cand.email || "",
+        avatar: cand.avatar,
+        position: cand.position || matchedApp?.jobTitle || "Staff",
+        appliedDate: cand.appliedDate || matchedApp?.appliedDate || "—",
+        source: cand.source || matchedApp?.source || "Career Portal",
+        stage: cand.stage || "Applied",
+        recruiter: cand.recruiter || matchedApp?.recruiter || "—",
+      };
+    });
+
+    // Also include any standalone applications not yet converted to pipeline candidates
+    applications.forEach((app) => {
+      const alreadyIncluded = list.some(
+        (c) => c.candidateId === app.candidateId || (c.email && app.email && c.email.toLowerCase() === app.email.toLowerCase())
+      );
+      if (!alreadyIncluded) {
+        list.push({
+          id: app.id,
+          candidateId: app.candidateId || app.id,
+          name: app.candidateName || app.name || "Candidate",
+          email: app.email || "",
+          avatar: app.avatar,
+          position: app.jobTitle || app.position || "—",
+          appliedDate: app.appliedDate || "—",
+          source: app.source || "Portal",
+          stage: app.stage || "Applied",
+          recruiter: app.recruiter || "—",
+        });
+      }
+    });
+
+    return list;
   }, [applications, candidates]);
 
   const filtered = useMemo(() => {
@@ -133,10 +171,15 @@ export default function Applications() {
         <select
           value={r.stage}
           onChange={(e) => {
-            changeStage(r.id, e.target.value);
-            showToast(`Moved ${r.name} to ${e.target.value}`);
+            const nextStage = e.target.value;
+            changeStage(r.id, nextStage);
+            if (nextStage === "Hired") {
+              showToast(`${r.name} hired and added to Employee Directory!`);
+            } else {
+              showToast(`Moved ${r.name} to ${nextStage}`);
+            }
           }}
-          className={`h-9 px-2 text-xs font-semibold rounded-xl border outline-none cursor-pointer transition ${
+          className={`h-7 px-2 text-xs font-semibold rounded-lg border outline-none cursor-pointer transition ${
             r.stage === "Hired"
               ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
               : r.stage === "Offer"
@@ -168,14 +211,18 @@ export default function Applications() {
     {
       key: "actions",
       header: "Actions",
+      align: "right",
       render: (r) => (
-        <button
-          onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)}
-          className="inline-flex items-center gap-1 h-8 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-navy dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition"
-        >
-          <Eye size={12} />
-          <span>Profile</span>
-        </button>
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)}
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-navy dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
+          >
+            <Eye size={13} />
+            <span>Profile</span>
+          </button>
+        </div>
       ),
     },
   ];
@@ -191,26 +238,17 @@ export default function Applications() {
           { label: "Recruitment", path: "/hrms/recruitment" },
           { label: "Applications" },
         ]}
+        guide={APPLICATIONS_GUIDE}
         actions={
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl border border-border bg-card text-muted hover:text-text hover:bg-soft text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap"
-            >
-              <HelpCircle size={14} />
-              <span>Guide</span>
-            </button>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => navigate("/hrms/recruitment/candidates", { state: { openRegister: true } })}
-              className="shadow-xs whitespace-nowrap font-medium"
-            >
-              Add Candidate
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => navigate("/hrms/recruitment/candidates", { state: { openRegister: true } })}
+            className="shadow-xs whitespace-nowrap font-medium"
+          >
+            Add Candidate
+          </Button>
         }
       />
 
@@ -304,59 +342,6 @@ export default function Applications() {
         emptyTitle="No applications found"
         emptyDesc="Applications will appear here once candidates apply or are imported."
       />
-
-      {/* Guide Modal */}
-      {guideOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
-          onClick={() => setGuideOpen(false)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto text-[13px] text-slate-600 dark:text-slate-300 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600">
-                  <HelpCircle size={18} />
-                </div>
-                <h3 className="text-[16px] font-bold text-slate-900 dark:text-white">
-                  Job Applications Guide
-                </h3>
-              </div>
-              <button
-                onClick={() => setGuideOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  1. Quick Stage Progression
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Change pipeline stages right from the table dropdown. Candidates will automatically reflect in the Kanban pipeline and Onboarding.
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  2. Candidate Profile & Resume
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Click 'Profile' on any row to open the complete candidate dossier, preview uploaded resumes, and view past interview scorecards.
-                </p>
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end">
-              <Button size="sm" onClick={() => setGuideOpen(false)}>
-                Got it
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

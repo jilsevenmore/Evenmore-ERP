@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { lazyStore } from "../services/lazyModules";
-import { writeThrough, pullTracked } from "../services/hrmsSync";
+import { writeThrough, pullTracked, hrmsSync } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_documents_v2";
 
@@ -37,10 +37,37 @@ const useDocumentStoreBase = create((set, get) => ({
     };
     const updated = [newDoc, ...current];
     try {
-      writeThrough("documents", updated);
+      writeThrough("documents", updated).then((synced) => {
+        if (Array.isArray(synced) && synced.length > 0) {
+          set({ documents: synced });
+        }
+      });
     } catch {}
     set({ documents: updated });
     return newDoc;
+  },
+
+  uploadDocument: async (docData) => {
+    const payload = {
+      title: docData.title,
+      category: docData.category || "General",
+      expiry: docData.expiry || null,
+      description: docData.description || undefined,
+      fileName: docData.fileName,
+      fileData: docData.fileData,
+      fileType: docData.fileType || "PDF",
+      tags: docData.tags || [docData.category || "General"],
+      employeeId: docData.employeeId,
+      status: "Valid",
+      version: 1,
+    };
+    try {
+      const created = await hrmsSync.create("documents", payload);
+      await get().hydrate();
+      return created;
+    } catch (err) {
+      return get().addDocument(docData);
+    }
   },
 
   updateDocument: (id, updates) => {
@@ -49,7 +76,9 @@ const useDocumentStoreBase = create((set, get) => ({
       d.id === id ? { ...d, ...updates, updatedOn: new Date().toISOString().slice(0, 10) } : d
     );
     try {
-      writeThrough("documents", updated);
+      writeThrough("documents", updated).then((synced) => {
+        if (Array.isArray(synced)) set({ documents: synced });
+      });
     } catch {}
     set({ documents: updated });
   },
@@ -58,7 +87,9 @@ const useDocumentStoreBase = create((set, get) => ({
     const current = get().documents;
     const updated = current.filter((d) => d.id !== id);
     try {
-      writeThrough("documents", updated);
+      writeThrough("documents", updated).then((synced) => {
+        if (Array.isArray(synced)) set({ documents: synced });
+      });
     } catch {}
     set({ documents: updated });
   },
@@ -69,7 +100,9 @@ const useDocumentStoreBase = create((set, get) => ({
       d.id === id ? { ...d, status: "Valid", verifiedAt: new Date().toISOString().slice(0, 10) } : d
     );
     try {
-      writeThrough("documents", updated);
+      writeThrough("documents", updated).then((synced) => {
+        if (Array.isArray(synced)) set({ documents: synced });
+      });
     } catch {}
     set({ documents: updated });
   },

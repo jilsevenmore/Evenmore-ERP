@@ -42,6 +42,7 @@ import { FormSection } from '../../components/common/FormSection';
 import { PrintProformaInvoiceModal } from '../../components/common/PrintProformaInvoiceModal';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 const proformaGuide = {
   title: 'Proforma Invoices',
@@ -207,19 +208,37 @@ export const ProformaInvoicesPage = () => {
   }, [grandTotal, showCreateModal]);
 
   const handleInvoiceAmountChange = (val) => {
-    const numVal = Number(val) || 0;
+    if (val === '') {
+      setFormalInvoiceAmountInput('');
+      if (autoBalanceSplit) {
+        setCashAmountInput(totalSalesValueInput);
+      }
+      return;
+    }
+    const cleaned = sanitizeNumberInput(val);
+    const numVal = cleaned === '' ? '' : Math.max(0, Number(cleaned));
     setFormalInvoiceAmountInput(numVal);
     if (autoBalanceSplit) {
-      const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+      const numericVal = Number(numVal) || 0;
+      const rem = Math.max(0, Math.round((totalSalesValueInput - numericVal) * 100) / 100);
       setCashAmountInput(rem);
     }
   };
 
   const handleCashAmountChange = (val) => {
-    const numVal = Number(val) || 0;
+    if (val === '') {
+      setCashAmountInput('');
+      if (autoBalanceSplit) {
+        setFormalInvoiceAmountInput(totalSalesValueInput);
+      }
+      return;
+    }
+    const cleaned = sanitizeNumberInput(val);
+    const numVal = cleaned === '' ? '' : Math.max(0, Number(cleaned));
     setCashAmountInput(numVal);
     if (autoBalanceSplit) {
-      const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+      const numericVal = Number(numVal) || 0;
+      const rem = Math.max(0, Math.round((totalSalesValueInput - numericVal) * 100) / 100);
       setFormalInvoiceAmountInput(rem);
     }
   };
@@ -1079,8 +1098,19 @@ export const ProformaInvoicesPage = () => {
                     <div className="w-28">
                       <input
                         type="number"
-                        value={otherCharges}
-                        onChange={(e) => setOtherCharges(Number(e.target.value))}
+                        placeholder="0.00"
+                        value={otherCharges ?? ''}
+                        onFocus={handleNumberInputFocus}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === '') { setOtherCharges(''); return; }
+                          const cleaned = sanitizeNumberInput(raw);
+                          if (cleaned !== raw) e.target.value = cleaned;
+                          setOtherCharges(cleaned === '' ? '' : Number(cleaned));
+                        }}
+                        onBlur={() => {
+                          if (otherCharges === '') setOtherCharges(0);
+                        }}
                         className="w-full p-1 text-right border border-slate-300 rounded font-mono text-xs"
                       />
                     </div>
@@ -1231,8 +1261,17 @@ export const ProformaInvoicesPage = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formalInvoiceAmountInput}
-                          onChange={(e) => handleInvoiceAmountChange(e.target.value)}
+                          value={formalInvoiceAmountInput ?? ''}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            handleInvoiceAmountChange(cleaned);
+                          }}
+                          onBlur={() => {
+                            if (formalInvoiceAmountInput === '') setFormalInvoiceAmountInput(0);
+                          }}
                           className="w-full p-2 border border-blue-300 rounded-lg bg-blue-50/30 text-blue-950 font-mono font-bold text-sm focus:ring-2 focus:ring-blue-500"
                           placeholder="0.00"
                         />
@@ -1303,8 +1342,17 @@ export const ProformaInvoicesPage = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={cashAmountInput}
-                          onChange={(e) => handleCashAmountChange(e.target.value)}
+                          value={cashAmountInput ?? ''}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            handleCashAmountChange(cleaned);
+                          }}
+                          onBlur={() => {
+                            if (cashAmountInput === '') setCashAmountInput(0);
+                          }}
                           className="w-full p-2 border border-amber-300 rounded-lg bg-amber-50/30 text-amber-950 font-mono font-bold text-sm focus:ring-2 focus:ring-amber-500"
                           placeholder="0.00"
                         />

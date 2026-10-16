@@ -9,6 +9,7 @@ import PartyWizardModal from '../../components/common/PartyWizardModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { EntityHeroCard } from '../../components/common/EntityHeroCard';
 import { getInitial, safeString } from '../../utils/stringUtils';
+import RecordPartyFundsModal from '../../components/common/RecordPartyFundsModal';
 import {
   Users,
   UserCheck,
@@ -26,7 +27,8 @@ import {
   X,
   Layers,
   FileSpreadsheet,
-  CheckCircle2
+  CheckCircle2,
+  IndianRupee
 } from 'lucide-react';
 
 const partiesGuide = {
@@ -52,7 +54,7 @@ export default function PartiesPage() {
   const isCustomerContext = location.pathname.includes('/crm/customers') || typeParam?.toLowerCase() === 'customer';
   const isVendorContext = location.pathname.includes('/purchase/vendors') || typeParam?.toLowerCase() === 'vendor';
 
-  const { parties = [], addParty, updateParty, formatCurrency } = useERP();
+  const { parties = [], addParty, updateParty, formatCurrency, getPartyFinancialSummary } = useERP();
   const [selectedType, setSelectedType] = useState(() => {
     if (typeParam && ['customer', 'vendor', 'both'].includes(typeParam.toLowerCase())) {
       return typeParam.charAt(0).toUpperCase() + typeParam.slice(1).toLowerCase();
@@ -64,6 +66,7 @@ export default function PartiesPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingParty, setEditingParty] = useState(null);
   const [viewingParty, setViewingParty] = useState(null);
+  const [fundsParty, setFundsParty] = useState(null);
 
   useEffect(() => {
     if (typeParam && ['customer', 'vendor', 'both'].includes(typeParam.toLowerCase())) {
@@ -92,7 +95,7 @@ export default function PartiesPage() {
       .reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
     const totalPayable = parties
       .filter((p) => p.type === 'Vendor' || p.type === 'Both')
-      .reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
+      .reduce((sum, p) => sum + (p.balance < 0 ? Math.abs(p.balance) : 0), 0);
     return { total, customers, vendors, both, totalReceivable, totalPayable };
   }, [parties]);
 
@@ -211,14 +214,50 @@ export default function PartiesPage() {
       width: '14%',
       render: (party) => {
         const bal = party.balance || 0;
+        const isNegative = bal < 0;
         const isPositive = bal > 0;
+        const isVendor = party.type === 'Vendor';
+        const isCustomer = party.type === 'Customer';
+
+        let subLabel = 'Settled';
+        let colorClass = 'text-slate-500 dark:text-slate-400 font-medium';
+
+        if (isVendor) {
+          if (isNegative) {
+            subLabel = 'Payable (Bill Due)';
+            colorClass = 'text-rose-600 dark:text-rose-400 font-bold';
+          } else if (isPositive) {
+            subLabel = 'Advance Balance';
+            colorClass = 'text-emerald-600 dark:text-emerald-400 font-bold';
+          }
+        } else if (isCustomer) {
+          if (isPositive) {
+            subLabel = 'Receivable';
+            colorClass = 'text-amber-600 dark:text-amber-400 font-bold';
+          } else if (isNegative) {
+            subLabel = 'Customer Advance';
+            colorClass = 'text-emerald-600 dark:text-emerald-400 font-bold';
+          }
+        } else {
+          // Dual Role (Both)
+          if (isNegative) {
+            subLabel = 'Net Payable (Due)';
+            colorClass = 'text-rose-600 dark:text-rose-400 font-bold';
+          } else if (isPositive) {
+            subLabel = 'Net Receivable';
+            colorClass = 'text-amber-600 dark:text-amber-400 font-bold';
+          }
+        }
+
         return (
           <div className="text-right">
-            <div className={`font-semibold font-mono text-xs ${isPositive ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-text-secondary'}`}>
+            <div className={`font-mono text-xs ${colorClass}`}>
               {formatCurrency(bal)}
             </div>
-            <div className="text-[10px] text-muted">
-              {party.type === 'Vendor' ? 'Payable' : 'Receivable'}
+            <div className="text-[10px]">
+              <span className={isNegative ? 'text-rose-500 font-medium' : isPositive ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-muted'}>
+                {subLabel}
+              </span>
             </div>
           </div>
         );
@@ -237,9 +276,17 @@ export default function PartiesPage() {
       header: 'Actions',
       key: 'actions',
       align: 'right',
-      width: '8%',
+      width: '10%',
       render: (party) => (
         <div className="flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setFundsParty(party)}
+            title="Record Funds (Formal & Cash Amounts)"
+            className="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition cursor-pointer shadow-2xs"
+          >
+            <IndianRupee className="w-3.5 h-3.5" />
+          </button>
           <button
             type="button"
             onClick={() => handleView(party)}
@@ -308,10 +355,10 @@ export default function PartiesPage() {
           colorScheme="amber"
         />
         <MetricChip
-          icon={TrendingUp}
-          label="Total Receivables"
-          value={formatCurrency(stats.totalReceivable, { noDecimals: true })}
-          colorScheme="rose"
+          icon={selectedType === 'Vendor' ? TrendingDown : TrendingUp}
+          label={selectedType === 'Vendor' ? 'Total Payables Due' : 'Total Receivables'}
+          value={formatCurrency(selectedType === 'Vendor' ? stats.totalPayable : stats.totalReceivable, { noDecimals: true })}
+          colorScheme={selectedType === 'Vendor' ? 'amber' : 'rose'}
         />
       </div>
 
@@ -465,8 +512,13 @@ export default function PartiesPage() {
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Current Balance</span>
-                    <span className="font-mono font-bold text-amber-700">
-                      ₹{(viewingParty.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    <span className={`font-mono font-bold ${(viewingParty.balance || 0) < 0 ? 'text-rose-600 dark:text-rose-400' : (viewingParty.balance || 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {formatCurrency(viewingParty.balance || 0)}
+                    </span>
+                    <span className="text-[10px] block font-medium">
+                      {viewingParty.type === 'Vendor'
+                        ? ((viewingParty.balance || 0) < 0 ? 'Payable (Bill Due)' : (viewingParty.balance || 0) > 0 ? 'Advance Balance' : 'Settled')
+                        : ((viewingParty.balance || 0) > 0 ? 'Receivable' : (viewingParty.balance || 0) < 0 ? 'Customer Advance' : 'Settled')}
                     </span>
                   </div>
                   <div>
@@ -483,6 +535,57 @@ export default function PartiesPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Dual-Stream Financial Standing (Formal & Cash) */}
+              {(() => {
+                const viewingSummary = viewingParty && getPartyFinancialSummary ? getPartyFinancialSummary(viewingParty.id || viewingParty.name) : null;
+                if (!viewingSummary) return null;
+                return (
+                  <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 rounded-xl border border-blue-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <IndianRupee className="w-3.5 h-3.5 text-emerald-600" /> Financial Standing (Formal & Cash)
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = viewingParty;
+                          setFundsParty(target);
+                        }}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer shadow-xs transition"
+                      >
+                        <Plus className="w-3 h-3" /> Record Funds
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="p-2.5 bg-white rounded-lg border border-blue-100">
+                        <span className="text-[10px] text-blue-600 font-bold block uppercase">Formal Received</span>
+                        <span className="font-mono font-bold text-slate-900 text-xs">{formatCurrency(viewingSummary.formalAmountReceived)}</span>
+                        <span className="text-[9px] text-slate-400 block">GST / With Bill</span>
+                      </div>
+
+                      <div className="p-2.5 bg-white rounded-lg border border-amber-100">
+                        <span className="text-[10px] text-amber-700 font-bold block uppercase">Cash Received</span>
+                        <span className="font-mono font-bold text-slate-900 text-xs">{formatCurrency(viewingSummary.cashAmountReceived)}</span>
+                        <span className="text-[9px] text-slate-400 block">Without Bill</span>
+                      </div>
+
+                      <div className="p-2.5 bg-white rounded-lg border border-emerald-100">
+                        <span className="text-[10px] text-emerald-700 font-bold block uppercase">Available Credit</span>
+                        <span className="font-mono font-bold text-emerald-600 text-xs">{formatCurrency(viewingSummary.availableCredit)}</span>
+                        <span className="text-[9px] text-slate-400 block">Advances + Returns</span>
+                      </div>
+
+                      <div className="p-2.5 bg-white rounded-lg border border-rose-100">
+                        <span className="text-[10px] text-rose-600 font-bold block uppercase">Outstanding Due</span>
+                        <span className="font-mono font-bold text-rose-700 text-xs">{formatCurrency(viewingSummary.outstandingDue)}</span>
+                        <span className="text-[9px] text-slate-400 block">Unpaid Invoices</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Addresses */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -543,6 +646,13 @@ export default function PartiesPage() {
           </div>
         </div>
       )}
+
+      {/* Record Party Funds Modal */}
+      <RecordPartyFundsModal
+        isOpen={!!fundsParty}
+        onClose={() => setFundsParty(null)}
+        party={fundsParty}
+      />
     </div>
   );
 }

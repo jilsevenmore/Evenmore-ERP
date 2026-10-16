@@ -1,17 +1,21 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
 import { usePmsStore, nextProjectId, getProjectManagers } from '../../../../stores/pmsStore';
 import { useERP } from '../../../../context/ERPContext';
 import { formatCurrency } from '../../../../utils/currencyUtils';
-import { AlertCircle, Link2, PackageCheck } from 'lucide-react';
+import { AlertCircle, Link2, PackageCheck, Info, Clock, Check } from 'lucide-react';
+import { StageStatusBadge } from '../../components/StageStatusBadge';
 
 /**
  * CreateProjectModal — turns a confirmed CRM/ERP sales order into a project.
  *
- * Orders come from the ERP sales orders the server returned, and
- * any order already linked to a project is excluded so the same order cannot be
- * converted twice. Selecting an order auto-fills customer, product and value.
+ * Each stage in the stage list displays and allows editing its own stage-specific
+ * planned duration (e.g. Design stage default 3 days, user can change to 5 days).
+ * The stage-wise durations dynamically calculate the project's total planned duration
+ * and final expected completion date.
+ * If an order already has a linked project, its saved stage durations and details
+ * are loaded and editable instead of creating duplicate projects.
  */
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
@@ -24,6 +28,15 @@ function todayLocalDate() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
+}
+
+function formatExpectedDate(d) {
+  if (!d || isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNumber = '' }) {
@@ -41,9 +54,6 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
   );
   const managers = useMemo(() => getProjectManagers(employees), [employees]);
 
-  // An order already converted into a project cannot be converted twice, but it
-  // still appears in the list — disabled, naming the project that owns it — so
-  // an empty dropdown never looks like a loading failure.
   const { availableOrders, linkedOrders } = useMemo(() => {
     const linkedBy = new Map();
     for (const p of projects) {
@@ -69,11 +79,12 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
   }
 
   const [orderNumber, setOrderNumber] = useState(initialOrderNumber || '');
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialOrderNumber && isOpen) {
       setOrderNumber(initialOrderNumber);
     }
   }, [initialOrderNumber, isOpen]);
+
   const [managerId, setManagerId] = useState('');
   const [priority, setPriority] = useState('Medium');
   const [startDate, setStartDate] = useState(todayLocalDate());
@@ -82,24 +93,140 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
   const [stagePercentages, setStagePercentages] = useState(() =>
     distributeEvenly(activeConfigs.map((c) => c.id))
   );
+
+  // Per-stage planned durations and units
+  const [stageDurations, setStageDurations] = useState({});
+  const [stageDurationUnits, setStageDurationUnits] = useState({});
   const [errors, setErrors] = useState({});
 
   // Opened from a sales order's "PMS Project" button: the order is fixed and the
   // picker is not shown; its details come straight from that order.
   const isFixedOrder = Boolean(initialOrderNumber);
   const effectiveOrderNumber = isFixedOrder ? initialOrderNumber : orderNumber;
-  const selectedOrder = availableOrders.find((o) => o.orderNumber === effectiveOrderNumber) ?? null;
-  const fixedOrderLinkedTo = isFixedOrder
-    ? linkedOrders.find((o) => o.orderNumber === initialOrderNumber)?.linkedProjectId ?? null
-    : null;
+
+  const existingProject = useMemo(() => {
+    if (!effectiveOrderNumber) return null;
+    return (
+      projects.find(
+        (p) =>
+          p.crmOrderId === effectiveOrderNumber ||
+          p.salesOrderId === effectiveOrderNumber ||
+          p.salesOrder?.orderNumber === effectiveOrderNumber
+      ) ?? null
+    );
+  }, [projects, effectiveOrderNumber]);
+
+  const selectedOrder = useMemo(() => {
+    if (!effectiveOrderNumber) return null;
+    return salesOrders.find((o) => o.orderNumber === effectiveOrderNumber) ?? null;
+  }, [salesOrders, effectiveOrderNumber]);
+
   const projectCode = useMemo(() => nextProjectId(projects), [projects]);
 
+  // Synchronize default durations from activeConfigs for new projects
+  useEffect(() => {
+    if (activeConfigs.length > 0 && !existingProject) {
+      setStageDurations((prev) => {
+        const next = { ...prev };
+        for (const c of activeConfigs) {
+          if (next[c.id] === undefined) {
+            next[c.id] = c.defaultDuration ?? 1;
+          }
+        }
+        return next;
+      });
+      setStageDurationUnits((prev) => {
+        const next = { ...prev };
+        for (const c of activeConfigs) {
+          if (!next[c.id]) {
+            next[c.id] = c.durationUnit || 'Days';
+          }
+        }
+        return next;
+      });
+    }
+  }, [activeConfigs, existingProject]);
+
+  // Load existing project details and saved stage durations when order is linked
+  useEffect(() => {
+    if (existingProject) {
+      setManagerId(existingProject.projectManager?.id || '');
+      setPriority(existingProject.priority || 'Medium');
+      if (existingProject.startDate) {
+        setStartDate(existingProject.startDate.slice(0, 10));
+      }
+      setSpecifications(existingProject.productDetails?.specifications || '');
+
+      if (existingProject.stages && existingProject.stages.length > 0) {
+        const durMap = {};
+        const unitMap = {};
+        const weightMap = {};
+        const ids = [];
+        existingProject.stages.forEach((s) => {
+          const key = s.id;
+          ids.push(key);
+          durMap[key] = s.plannedDuration !== undefined && s.plannedDuration !== null ? s.plannedDuration : 1;
+          unitMap[key] = s.durationUnit || 'Days';
+          weightMap[key] = s.percentage ?? s.weightPct ?? s.weight ?? 0;
+        });
+        setStageDurations(durMap);
+        setStageDurationUnits(unitMap);
+        setStagePercentages(weightMap);
+      }
+    }
+  }, [existingProject]);
+
+  // Live calculation of Total Planned Duration and Final Expected Completion Date
+  const { totalPlannedDays, finalExpectedCompletionDate } = useMemo(() => {
+    let days = 0;
+    if (existingProject && existingProject.stages && existingProject.stages.length > 0) {
+      for (const s of existingProject.stages) {
+        const durVal = stageDurations[s.id] !== undefined ? stageDurations[s.id] : s.plannedDuration;
+        const dur = Number(durVal) || 0;
+        const unit = stageDurationUnits[s.id] || s.durationUnit || 'Days';
+        days += unit === 'Hours' ? dur / 24 : dur;
+      }
+    } else {
+      for (const id of selectedConfigIds) {
+        const cfg = activeConfigs.find((c) => c.id === id);
+        const durVal = stageDurations[id] !== undefined ? stageDurations[id] : cfg?.defaultDuration;
+        const dur = Number(durVal) || 0;
+        const unit = stageDurationUnits[id] || cfg?.durationUnit || 'Days';
+        days += unit === 'Hours' ? dur / 24 : dur;
+      }
+    }
+    const roundedDays = Math.round(days * 100) / 100;
+    let expectedDate = null;
+    if (startDate && !isNaN(new Date(startDate).getTime())) {
+      const dt = new Date(`${startDate}T09:00:00`);
+      dt.setTime(dt.getTime() + roundedDays * 24 * 60 * 60 * 1000);
+      expectedDate = dt;
+    }
+    return {
+      totalPlannedDays: roundedDays,
+      finalExpectedCompletionDate: expectedDate,
+    };
+  }, [
+    existingProject,
+    selectedConfigIds,
+    stageDurations,
+    stageDurationUnits,
+    activeConfigs,
+    startDate,
+  ]);
+
   const totalPercentage = useMemo(() => {
+    if (existingProject && existingProject.stages && existingProject.stages.length > 0) {
+      return existingProject.stages.reduce(
+        (acc, s) => acc + (Number(stagePercentages[s.id] ?? s.percentage ?? s.weightPct ?? 0) || 0),
+        0
+      );
+    }
     return selectedConfigIds.reduce(
       (acc, id) => acc + (Number(stagePercentages[id]) || 0),
       0
     );
-  }, [selectedConfigIds, stagePercentages]);
+  }, [existingProject, selectedConfigIds, stagePercentages]);
 
   function toggleConfig(id) {
     setSelectedConfigIds((prev) => {
@@ -118,6 +245,21 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     }));
   }
 
+  function handleDurationChange(id, val) {
+    setStageDurations((prev) => ({
+      ...prev,
+      [id]: val,
+    }));
+    setErrors((prev) => ({ ...prev, stages: undefined }));
+  }
+
+  function handleDurationUnitChange(id, unit) {
+    setStageDurationUnits((prev) => ({
+      ...prev,
+      [id]: unit,
+    }));
+  }
+
   function handleDistributeEvenly() {
     setStagePercentages(distributeEvenly(selectedConfigIds));
   }
@@ -131,6 +273,14 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     const defaultIds = activeConfigs.map((c) => c.id);
     setSelectedConfigIds(defaultIds);
     setStagePercentages(distributeEvenly(defaultIds));
+    const initDurs = {};
+    const initUnits = {};
+    for (const c of activeConfigs) {
+      initDurs[c.id] = c.defaultDuration ?? 1;
+      initUnits[c.id] = c.durationUnit || 'Days';
+    }
+    setStageDurations(initDurs);
+    setStageDurationUnits(initUnits);
     setErrors({});
   }
 
@@ -143,18 +293,68 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     e.preventDefault();
 
     const nextErrors = {};
-    if (!selectedOrder) {
+    if (!selectedOrder && !existingProject) {
       nextErrors.order = isFixedOrder
-        ? fixedOrderLinkedTo
-          ? `${initialOrderNumber} already has project ${fixedOrderLinkedTo}.`
-          : `Sales order ${initialOrderNumber} could not be found.`
+        ? `Sales order ${initialOrderNumber} could not be found.`
         : 'Select a CRM sales order.';
     }
+
+    if (existingProject) {
+      // Validate stage durations for existing project
+      if (existingProject.stages && existingProject.stages.length > 0) {
+        for (const s of existingProject.stages) {
+          const val = stageDurations[s.id];
+          if (val !== undefined && (isNaN(Number(val)) || Number(val) <= 0)) {
+            nextErrors.stages = `Duration for stage '${s.name}' must be greater than zero.`;
+            break;
+          }
+        }
+      }
+      setErrors(nextErrors);
+      if (Object.keys(nextErrors).length > 0) return;
+
+      if (existingProject.status !== 'Completed') {
+        try {
+          await createProjectFromOrder({
+            order: {
+              id: existingProject.crmOrderId || existingProject.salesOrderId || existingProject.id,
+              orderNumber: existingProject.crmOrderId || existingProject.salesOrderId || existingProject.id,
+            },
+            projectManager: { id: existingProject.projectManager?.id || managerId },
+            priority,
+            startDate: new Date(`${startDate}T09:00:00`).toISOString(),
+            stageDurations,
+            stageDurationUnits,
+            specifications,
+          });
+          showToast(`Stage durations and timeline updated for ${existingProject.code || existingProject.id}.`, 'success');
+        } catch (err) {
+          console.error('[CreateProjectModal] Update error:', err);
+        }
+      }
+      reset();
+      onCreated?.(existingProject.id);
+      onClose?.();
+      return;
+    }
+
+    // Creating a new project
     if (!managerId) nextErrors.manager = 'Assign a project manager.';
     if (selectedConfigIds.length === 0) nextErrors.stages = 'Pick at least one stage.';
     if (selectedConfigIds.length > 0 && Math.round(totalPercentage * 100) / 100 !== 100) {
       nextErrors.stages = `Total stage percentage must equal 100% (currently ${Math.round(totalPercentage * 100) / 100}%).`;
     }
+
+    // Validate stage durations
+    for (const cid of selectedConfigIds) {
+      const dur = stageDurations[cid];
+      if (dur === undefined || isNaN(Number(dur)) || Number(dur) <= 0) {
+        const cfg = activeConfigs.find((c) => c.id === cid);
+        nextErrors.stages = `Planned duration for stage '${cfg?.name || cid}' must be greater than zero.`;
+        break;
+      }
+    }
+
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -176,14 +376,18 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
         startDate: new Date(`${startDate}T09:00:00`).toISOString(),
         stageConfigIds: selectedConfigIds,
         stageWeights,
+        stageDurations,
+        stageDurationUnits,
         specifications,
+        plannedDuration: totalPlannedDays,
+        durationUnit: 'Days',
       });
     } catch (err) {
       setErrors({ order: err?.message || 'The project could not be created.' });
       return;
     }
 
-    showToast(`${id} created from ${selectedOrder.orderNumber}.`);
+    showToast(`${id} created from ${selectedOrder.orderNumber}.`, 'success');
     reset();
     onCreated?.(id);
   }
@@ -192,8 +396,18 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isFixedOrder ? `Create Project from ${initialOrderNumber}` : 'Create Project from CRM Order'}
-      subtitle={`New project will be created as ${projectCode}`}
+      title={
+        existingProject
+          ? `PMS Project: ${existingProject.code || existingProject.id} (${effectiveOrderNumber})`
+          : isFixedOrder
+          ? `Create Project from ${initialOrderNumber}`
+          : 'Create Project from CRM Order'
+      }
+      subtitle={
+        existingProject
+          ? `Existing project linked to Sales Order ${effectiveOrderNumber}`
+          : `New project will be created as ${projectCode}`
+      }
       size="lg"
       footer={
         <>
@@ -201,63 +415,65 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
             Cancel
           </Button>
           <Button type="submit" form="pms-create-project" icon={PackageCheck}>
-            Create Project
+            {existingProject
+              ? existingProject.status === 'Completed'
+                ? 'Open Project'
+                : 'Save Stage Durations & Open'
+              : 'Create Project'}
           </Button>
         </>
       }
     >
       <form id="pms-create-project" onSubmit={handleSubmit} className="space-y-4">
-        {/* CRM order — picked here only when the modal was not opened from a sales order. */}
-        {isFixedOrder ? (
-          (!selectedOrder || errors.order) && (
-            <p className="flex items-center gap-1 text-[11px] text-rose-600">
-              <AlertCircle size={11} />
-              {selectedOrder
-                ? errors.order
-                : fixedOrderLinkedTo
-                  ? `${initialOrderNumber} already has project ${fixedOrderLinkedTo}.`
-                  : `Sales order ${initialOrderNumber} could not be found. Refresh the page and try again.`}
-            </p>
-          )
-        ) : (
-        <div>
-          <label className={labelClass} htmlFor="pms-order">
-            CRM Sales Order <span className="text-rose-500">*</span>
-          </label>
-          <select
-            id="pms-order"
-            className={fieldClass}
-            value={orderNumber}
-            onChange={(e) => setOrderNumber(e.target.value)}
-          >
-            <option value="">Select a confirmed sales order…</option>
-            {availableOrders.map((o) => (
-              <option key={o.orderNumber} value={o.orderNumber}>
-                {o.orderNumber} — {o.customer} ({formatCurrency(o.total ?? o.amount ?? 0)})
-              </option>
-            ))}
-            {linkedOrders.length > 0 && (
-              <optgroup label="Already converted">
-                {linkedOrders.map((o) => (
-                  <option key={o.orderNumber} value={o.orderNumber} disabled>
-                    {o.orderNumber} — {o.customer} · linked to {o.linkedProjectId}
-                  </option>
-                ))}
-              </optgroup>
+        {existingProject && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50/80 p-3 flex items-start gap-2.5">
+            <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-blue-900">
+              <div className="font-bold">Project {existingProject.code || existingProject.id} already exists for this order</div>
+              <p className="text-[11px] text-blue-700 mt-0.5">
+                Saved stage durations and project details have been loaded. You can adjust stage durations below to recalculate the project's final due date without creating duplicate projects.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Order picker: only shown when not launched with an order */}
+        {!isFixedOrder && !existingProject && (
+          <div>
+            <label className={labelClass} htmlFor="pms-order">
+              CRM Sales Order <span className="text-rose-500">*</span>
+            </label>
+            <select
+              id="pms-order"
+              className={fieldClass}
+              value={orderNumber}
+              onChange={(e) => {
+                setOrderNumber(e.target.value);
+                setErrors((prev) => ({ ...prev, order: undefined }));
+              }}
+            >
+              <option value="">Select a confirmed sales order…</option>
+              {availableOrders.map((o) => (
+                <option key={o.orderNumber} value={o.orderNumber}>
+                  {o.orderNumber} — {o.customer} ({formatCurrency(o.total ?? o.amount ?? 0)})
+                </option>
+              ))}
+              {linkedOrders.length > 0 && (
+                <optgroup label="Already converted (Loads existing project)">
+                  {linkedOrders.map((o) => (
+                    <option key={o.orderNumber} value={o.orderNumber}>
+                      {o.orderNumber} — {o.customer} · linked to {o.linkedProjectId}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            {errors.order && (
+              <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1.5">
+                <AlertCircle size={11} /> {errors.order}
+              </p>
             )}
-          </select>
-          {availableOrders.length === 0 && (
-            <p className="text-[11px] text-amber-600 mt-1.5">
-              Every sales order already has a project. Add a sales order in ERP, or unlink one,
-              to create another project.
-            </p>
-          )}
-          {errors.order && (
-            <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1.5">
-              <AlertCircle size={11} /> {errors.order}
-            </p>
-          )}
-        </div>
+          </div>
         )}
 
         {/* Auto-filled order summary */}
@@ -287,7 +503,37 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Project Attributes (Start Date, Priority, Project Manager) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass} htmlFor="pms-start">Start Date</label>
+            <input
+              id="pms-start"
+              type="date"
+              className={fieldClass}
+              value={startDate}
+              disabled={Boolean(existingProject)}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className={labelClass} htmlFor="pms-priority">Priority</label>
+            <select
+              id="pms-priority"
+              className={fieldClass}
+              value={priority}
+              disabled={Boolean(existingProject)}
+              onChange={(e) => setPriority(e.target.value)}
+            >
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelClass} htmlFor="pms-pm">
               Project Manager <span className="text-rose-500">*</span>
@@ -296,6 +542,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
               id="pms-pm"
               className={fieldClass}
               value={managerId}
+              disabled={Boolean(existingProject)}
               onChange={(e) => setManagerId(e.target.value)}
             >
               <option value="">Select a manager…</option>
@@ -313,130 +560,238 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
           </div>
 
           <div>
-            <label className={labelClass} htmlFor="pms-priority">Priority</label>
-            <select
-              id="pms-priority"
-              className={fieldClass}
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelClass} htmlFor="pms-start">Start Date</label>
+            <label className={labelClass} htmlFor="pms-specs">Specifications</label>
             <input
-              id="pms-start"
-              type="date"
+              id="pms-specs"
+              type="text"
               className={fieldClass}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              value={specifications}
+              disabled={Boolean(existingProject)}
+              onChange={(e) => setSpecifications(e.target.value)}
+              placeholder="Technical notes, tolerances, finish requirements…"
             />
           </div>
         </div>
 
-        <div>
-          <label className={labelClass} htmlFor="pms-specs">Specifications</label>
-          <textarea
-            id="pms-specs"
-            rows={2}
-            className={fieldClass}
-            value={specifications}
-            onChange={(e) => setSpecifications(e.target.value)}
-            placeholder="Technical notes, tolerances, finish requirements…"
-          />
+        {/* Dynamic Timeline Calculation Preview Banner */}
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/60 border border-blue-200/90 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Clock size={18} strokeWidth={2.2} />
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Calculated Project Timeline</div>
+              <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
+                <span className="text-sm font-extrabold text-slate-800">
+                  Total Duration: {totalPlannedDays} {totalPlannedDays === 1 ? 'Day' : 'Days'}
+                </span>
+                <span className="text-xs text-slate-600 font-medium">
+                  · Final Due Date: <strong className="text-blue-900 font-bold">{formatExpectedDate(finalExpectedCompletionDate)}</strong>
+                </span>
+              </div>
+            </div>
+          </div>
+          <span className="text-[10px] font-semibold text-slate-400 hidden sm:inline">
+            Stage durations calculate final due date
+          </span>
         </div>
 
-        {/* Stage template picker */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className={labelClass + ' mb-0'}>Stage Templates & Weights</span>
-              <span className="text-[10px] text-slate-400">
-                ({selectedConfigIds.length} of {activeConfigs.length} selected)
+        {/* Existing Project Stages with Editable Stage Durations */}
+        {existingProject && existingProject.stages && existingProject.stages.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+              <span className={labelClass + ' mb-0'}>Configured Project Stages & Durations</span>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Total Weight: {Math.round(totalPercentage * 100) / 100}%
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              {selectedConfigIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleDistributeEvenly}
-                  className="text-[10px] font-semibold text-blue-600 hover:underline"
-                >
-                  Distribute Evenly
-                </button>
-              )}
-              <span
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                  Math.round(totalPercentage * 100) / 100 === 100
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-rose-50 text-rose-700 border border-rose-200'
-                }`}
-              >
-                Total: {Math.round(totalPercentage * 100) / 100}% / 100%
-              </span>
+            <div className="rounded-lg border border-[#dce5f4] divide-y divide-slate-100 max-h-60 overflow-y-auto bg-white">
+              {existingProject.stages.map((s) => {
+                const isClosed = s.status === 'Completed' || s.status === 'Approved';
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-slate-50/80 flex-wrap"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-[11px] font-bold text-slate-800 truncate">
+                        {s.sequence}. {s.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">
+                        {s.department}
+                      </span>
+                      <StageStatusBadge status={s.status} size="sm" />
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      {/* Stage-wise Duration Input */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-medium">Duration:</span>
+                        {isClosed ? (
+                          <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                            {stageDurations[s.id] ?? s.plannedDuration} {stageDurationUnits[s.id] || s.durationUnit || 'Days'}
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0.1"
+                              step="any"
+                              value={stageDurations[s.id] !== undefined ? stageDurations[s.id] : s.plannedDuration ?? 1}
+                              onChange={(e) => handleDurationChange(s.id, e.target.value)}
+                              className="w-16 text-right text-xs rounded-md border border-[#dce5f4] px-1.5 py-1 text-slate-800 font-bold focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                            />
+                            <select
+                              value={stageDurationUnits[s.id] || s.durationUnit || 'Days'}
+                              onChange={(e) => handleDurationUnitChange(s.id, e.target.value)}
+                              className="text-[10px] text-slate-600 bg-white border border-[#dce5f4] rounded px-1.5 py-1 focus:outline-none"
+                            >
+                              <option value="Days">Days</option>
+                              <option value="Hours">Hours</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Weight % */}
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-400">Weight:</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {s.percentage ?? s.weightPct ?? s.weight ?? 0}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+            {errors.stages && (
+              <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1.5">
+                <AlertCircle size={11} /> {errors.stages}
+              </p>
+            )}
+            <p className="text-[10px] text-slate-400 mt-1.5">
+              Adjusting stage durations recalculates sequential deadlines and project expected completion date.
+            </p>
           </div>
-          <div className="rounded-lg border border-[#dce5f4] divide-y divide-slate-100 max-h-56 overflow-y-auto">
-            {activeConfigs.map((c) => {
-              const isSelected = selectedConfigIds.includes(c.id);
-              return (
-                <div
-                  key={c.id}
-                  className={`flex items-center justify-between gap-2.5 px-3 py-2 ${
-                    isSelected ? 'bg-blue-50/30 hover:bg-blue-50/50' : 'hover:bg-slate-50'
+        )}
+
+        {/* Stage Template Picker with Per-Stage Duration Inputs for New Projects */}
+        {!existingProject && (
+          <div>
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className={labelClass + ' mb-0'}>Stage Templates, Durations & Weights</span>
+                <span className="text-[10px] text-slate-400">
+                  ({selectedConfigIds.length} of {activeConfigs.length} selected)
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedConfigIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleDistributeEvenly}
+                    className="text-[10px] font-semibold text-blue-600 hover:underline"
+                  >
+                    Distribute Evenly
+                  </button>
+                )}
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                    Math.round(totalPercentage * 100) / 100 === 100
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200'
                   }`}
                 >
-                  <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleConfig(c.id)}
-                      className="accent-blue-600"
-                    />
-                    <span className="text-[11px] font-semibold text-slate-700 truncate">
-                      {c.sequence}. {c.name}
-                    </span>
-                    <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">
-                      {c.department}
-                    </span>
-                  </label>
-                  {isSelected ? (
-                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-[10px] text-slate-400">Weight:</span>
+                  Total Weight: {Math.round(totalPercentage * 100) / 100}% / 100%
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-[#dce5f4] divide-y divide-slate-100 max-h-60 overflow-y-auto bg-white">
+              {activeConfigs.map((c) => {
+                const isSelected = selectedConfigIds.includes(c.id);
+                return (
+                  <div
+                    key={c.id}
+                    className={`flex items-center justify-between gap-2.5 px-3 py-2 ${
+                      isSelected ? 'bg-blue-50/30 hover:bg-blue-50/50' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer">
                       <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="any"
-                        value={stagePercentages[c.id] ?? ''}
-                        onChange={(e) => handlePercentageChange(c.id, e.target.value)}
-                        className="w-16 text-right text-xs rounded-md border border-[#dce5f4] px-1.5 py-1 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
-                        placeholder="0"
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleConfig(c.id)}
+                        className="accent-blue-600"
                       />
-                      <span className="text-[11px] font-bold text-slate-500">%</span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 shrink-0">
-                      {c.defaultDuration} {c.durationUnit}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {errors.stages && (
-            <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1.5">
-              <AlertCircle size={11} /> {errors.stages}
+                      <span className="text-[11px] font-semibold text-slate-700 truncate">
+                        {c.sequence}. {c.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">
+                        {c.department}
+                      </span>
+                    </label>
+
+                    {isSelected ? (
+                      <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        {/* Per-Stage Duration Input */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-slate-500 font-medium">Duration:</span>
+                          <input
+                            type="number"
+                            min="0.1"
+                            step="any"
+                            value={stageDurations[c.id] !== undefined ? stageDurations[c.id] : c.defaultDuration ?? 1}
+                            onChange={(e) => handleDurationChange(c.id, e.target.value)}
+                            className="w-16 text-right text-xs rounded-md border border-[#dce5f4] px-1.5 py-1 text-slate-800 font-bold focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                            placeholder="1"
+                          />
+                          <select
+                            value={stageDurationUnits[c.id] || c.durationUnit || 'Days'}
+                            onChange={(e) => handleDurationUnitChange(c.id, e.target.value)}
+                            className="text-[10px] text-slate-600 bg-white border border-[#dce5f4] rounded px-1.5 py-1 focus:outline-none"
+                          >
+                            <option value="Days">Days</option>
+                            <option value="Hours">Hours</option>
+                          </select>
+                        </div>
+
+                        {/* Weight % */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-slate-400">Weight:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="any"
+                            value={stagePercentages[c.id] ?? ''}
+                            onChange={(e) => handlePercentageChange(c.id, e.target.value)}
+                            className="w-14 text-right text-xs rounded-md border border-[#dce5f4] px-1.5 py-1 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                            placeholder="0"
+                          />
+                          <span className="text-[11px] font-bold text-slate-500">%</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        Default: {c.defaultDuration} {c.durationUnit}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {errors.stages && (
+              <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1.5">
+                <AlertCircle size={11} /> {errors.stages}
+              </p>
+            )}
+            <p className="text-[10px] text-slate-400 mt-1.5">
+              Enter individual stage durations (e.g. Design: 5 Days). They sum up to determine the final project due date.
             </p>
-          )}
-          <p className="text-[10px] text-slate-400 mt-1.5">
-            Stage percentage weights define overall project progress contribution and must total 100%.
-          </p>
-        </div>
+          </div>
+        )}
       </form>
     </Modal>
   );

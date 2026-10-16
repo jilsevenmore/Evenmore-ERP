@@ -9,9 +9,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 export function Pagination({
   total = 0,
   page = 1,
-  pageSize = 5,
+  pageSize = 20,
   onChange,
   showTotalRecords = false,
+  pageSizeOptions,
+  onPageSizeChange,
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = Math.min((page - 1) * pageSize + 1, total);
@@ -30,15 +32,34 @@ export function Pagination({
 
   return (
     <div className="pagination">
-      {showTotalRecords ? (
-        <span className="pagination-total">
-          Total Records <strong>{total}</strong>
-        </span>
-      ) : (
-        <span>
-          {total > 0 ? `${start}–${end} of ${total} records` : 'No records'}
-        </span>
-      )}
+      <div className="flex items-center gap-3">
+        {showTotalRecords ? (
+          <span className="pagination-total">
+            Total Records <strong>{total}</strong>
+          </span>
+        ) : (
+          <span>
+            {total > 0 ? `${start}–${end} of ${total} records` : 'No records'}
+          </span>
+        )}
+
+        {pageSizeOptions && onPageSizeChange && (
+          <div className="flex items-center gap-1.5 text-xs text-muted">
+            <span className="hidden sm:inline">Per page:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              className="border border-border rounded-lg px-2 py-0.5 text-xs bg-card text-text focus:outline-none focus:border-primary cursor-pointer"
+            >
+              {pageSizeOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       <div className="pagination-pages">
         <button

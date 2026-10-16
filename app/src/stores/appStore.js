@@ -252,11 +252,35 @@ const useAppStoreBase = create((set) => ({
       });
   },
 
-  approveLeave: (id, delegate) =>
-    useAppStore.getState().updateLeaveStatus(id, "Approved", { delegate }),
+  approveLeave: (id, delegate) => {
+    const employees = useAppStore.getState().employees || [];
+    let delegateId = undefined;
+    let delegateName = delegate;
+    if (typeof delegate === "string") {
+      const emp = employees.find(
+        (e) => String(e.id) === delegate || String(e.name).toLowerCase() === delegate.toLowerCase()
+      );
+      if (emp) {
+        delegateId = emp.id;
+        delegateName = emp.name;
+      }
+    } else if (delegate && typeof delegate === "object") {
+      delegateId = delegate.id;
+      delegateName = delegate.name;
+    }
+    return useAppStore.getState().updateLeaveStatus(id, "Approved", {
+      delegate: delegateName,
+      delegateId,
+      approved: true,
+    });
+  },
 
   rejectLeave: (id, reason = "") =>
-    useAppStore.getState().updateLeaveStatus(id, "Rejected", { rejectReason: reason }),
+    useAppStore.getState().updateLeaveStatus(id, "Rejected", {
+      rejectReason: reason,
+      remark: reason,
+      approved: false,
+    }),
 
   // ── attendance ────────────────────────────────────────────────────────────
 

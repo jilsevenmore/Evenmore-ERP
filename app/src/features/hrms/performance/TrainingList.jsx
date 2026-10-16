@@ -81,17 +81,18 @@ export default function TrainingList({ embedded = false, onBack }) {
   }
 
   const cols = [
-    { key: "name", header: "Training Name", sortable: true, render: (r) => <span className="font-medium text-slate-900">{r.name}</span> },
-    { key: "trainer", header: "Trainer", render: (r) => <div className="flex items-center gap-2">{r.avatar ? <img src={r.avatar} alt="" className="w-6 h-6 rounded-full" /> : <div className="w-6 h-6 rounded-full bg-slate-200 grid place-items-center text-[10px]">{r.trainer ? r.trainer[0] : "U"}</div>}<span>{r.trainer}</span></div> },
+    { key: "name", header: "Training Name", sortable: true, render: (r) => <span className="font-medium text-slate-900">{r.name || r.title}</span> },
+    { key: "trainer", header: "Trainer", render: (r) => <div className="flex items-center gap-2">{r.avatar ? <img src={r.avatar} alt="" className="w-6 h-6 rounded-full" /> : <div className="w-6 h-6 rounded-full bg-slate-200 grid place-items-center text-[10px]">{(r.trainer || r.trainerName || "U")[0]}</div>}<span>{r.trainer || r.trainerName || "Unassigned"}</span></div> },
     { key: "department", header: "Department" },
-    { key: "participants", header: "Participants", sortable: true },
+    { key: "participants", header: "Participants", sortable: true, render: (r) => <span>{Array.isArray(r.participants) ? r.participants.length : (r.participants ?? 0)}</span> },
     { key: "cost", header: "Cost", render: (r) => <span className="font-semibold">₹ {Number(r.cost || 0).toLocaleString("en-IN")}</span> },
-    { key: "start", header: "Dates", sortable: true, render: (r) => `${r.start}${r.end && r.end !== r.start ? ` – ${r.end}` : ""}` },
+    { key: "start", header: "Dates", sortable: true, render: (r) => `${r.start || r.startDate || ""}${r.end && r.end !== r.start ? ` – ${r.end}` : ""}` },
     { key: "status", header: "Stage / Status", render: (r) => <StatusBadge status={r.status || r.stage} /> },
     { key: "actions", header: "Actions", render: (r) => <div className="flex gap-1">
         <button onClick={() => setViewRow(r)} className="w-7 h-7 rounded-xl hover:bg-off grid place-items-center text-slate-600"><Eye size={14} /></button>
         <button onClick={() => {
-          setForm({ name: r.name, trainer: r.trainer, department: r.department, type: r.type, participants: r.participants, cost: r.cost || 0, start: r.start, end: r.end, status: r.status || r.stage });
+          const pCount = Array.isArray(r.participants) ? r.participants.length : (r.participants || 1);
+          setForm({ name: r.name || r.title || "", trainer: r.trainer || r.trainerName || "Unassigned", department: r.department || "General", type: r.type || "Technical", participants: pCount, cost: r.cost || 0, start: r.start || r.startDate || "", end: r.end || r.endDate || "", status: r.status || r.stage || "Requested" });
           setEditRow(r);
         }} className="w-7 h-7 rounded-xl hover:bg-off grid place-items-center text-slate-600"><Pencil size={14} /></button>
         <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
@@ -218,15 +219,15 @@ export default function TrainingList({ embedded = false, onBack }) {
         <FormFields />
       </Modal>
 
-      <Drawer isOpen={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.name ?? ""} subtitle={`${viewRow?.trainer} \u2022 ${viewRow?.department}`} footer={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
+      <Drawer isOpen={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.name || viewRow?.title || ""} subtitle={`${viewRow?.trainer || viewRow?.trainerName || "Unassigned"} • ${viewRow?.department || "General"}`} footer={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && (
           <div className="space-y-3 text-[13px]">
-            <div><strong>Trainer:</strong> {viewRow.trainer}</div>
-            <div><strong>Department:</strong> {viewRow.department}</div>
-            <div><strong>Type:</strong> {viewRow.type}</div>
-            <div><strong>Participants:</strong> {viewRow.participants}</div>
+            <div><strong>Trainer:</strong> {viewRow.trainer || viewRow.trainerName || "Unassigned"}</div>
+            <div><strong>Department:</strong> {viewRow.department || "General"}</div>
+            <div><strong>Type:</strong> {viewRow.type || "Technical"}</div>
+            <div><strong>Participants:</strong> {Array.isArray(viewRow.participants) ? viewRow.participants.length : (viewRow.participants ?? 0)}</div>
             <div><strong>Budget / Cost:</strong> ₹ {Number(viewRow.cost || 0).toLocaleString("en-IN")}</div>
-            <div><strong>Schedule:</strong> {viewRow.start} – {viewRow.end}</div>
+            <div><strong>Schedule:</strong> {viewRow.start || viewRow.startDate || "—"}{viewRow.end && viewRow.end !== viewRow.start ? ` – ${viewRow.end}` : ""}</div>
             <div><strong>Stage / Status:</strong> <StatusBadge status={viewRow.status || viewRow.stage} /></div>
             {viewRow.description && <div><strong>Description:</strong> <p className="text-muted mt-1">{viewRow.description}</p></div>}
           </div>

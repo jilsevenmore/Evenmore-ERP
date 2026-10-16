@@ -122,7 +122,10 @@ export default function DelayDashboardPage() {
             aria-label="Filter by department"
           >
             <option value="all">All departments</option>
-            {options.departments.map((d) => <option key={d} value={d}>{d}</option>)}
+            {options.departments.map((d) => {
+              const label = typeof d === 'object' ? (d?.name || d?.label || '') : String(d);
+              return <option key={label} value={label}>{label}</option>;
+            })}
           </select>
 
           <select
@@ -132,7 +135,10 @@ export default function DelayDashboardPage() {
             aria-label="Filter by stage"
           >
             <option value="all">All stages</option>
-            {options.stageNames.map((s) => <option key={s} value={s}>{s}</option>)}
+            {options.stageNames.map((s) => {
+              const label = typeof s === 'object' ? (s?.name || s?.label || '') : String(s);
+              return <option key={label} value={label}>{label}</option>;
+            })}
           </select>
 
           <select
@@ -142,7 +148,10 @@ export default function DelayDashboardPage() {
             aria-label="Filter by root cause"
           >
             <option value="all">All root causes</option>
-            {DELAY_REASON_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {DELAY_REASON_CATEGORIES.map((c) => {
+              const label = typeof c === 'object' ? (c?.name || c?.label || '') : String(c);
+              return <option key={label} value={label}>{label}</option>;
+            })}
           </select>
         </div>
 

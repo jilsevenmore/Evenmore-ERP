@@ -85,7 +85,7 @@ const getInitialFormData = (party) => {
             bankAccountNumber: '',
             ifscCode: '',
             accountHolderName: '',
-            openingBalance: 0,
+            openingBalance: '',
             balance: 0,
             billingAddress: {
                 line1: '',
@@ -136,7 +136,7 @@ const getInitialFormData = (party) => {
         bankAccountNumber: party.bankAccountNumber || '',
         ifscCode: party.ifscCode || '',
         accountHolderName: party.accountHolderName || partyName,
-        openingBalance: party.openingBalance ?? 0,
+        openingBalance: party.openingBalance !== undefined && party.openingBalance !== null ? party.openingBalance : '',
         balance: party.balance ?? 0,
         billingAddress: party.billingAddress ? {
             line1: party.billingAddress.line1 || '',
@@ -289,6 +289,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
         const payload = {
             ...formData,
+            openingBalance: formData.openingBalance === '' ? 0 : (Number(formData.openingBalance) || 0),
             shippingAddress: sameAsBilling ? { ...formData.billingAddress } : formData.shippingAddress,
         };
         onSave(payload);
@@ -843,8 +844,10 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         <label className="block font-semibold text-muted text-[11px] mb-1">Bank Account Number</label>
                                         <input
                                             type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             value={formData.bankAccountNumber}
-                                            onChange={(e) => updateField('bankAccountNumber', e.target.value)}
+                                            onChange={(e) => updateField('bankAccountNumber', e.target.value.replace(/\D/g, ''))}
                                             className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                             placeholder="992810029311"
                                         />
@@ -866,8 +869,10 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         <label className="block font-semibold text-muted text-[11px] mb-1">Opening Balance</label>
                                         <input
                                             type="number"
-                                            value={formData.openingBalance}
-                                            onChange={(e) => updateField('openingBalance', parseFloat(e.target.value) || 0)}
+                                            step="any"
+                                            placeholder="0.00"
+                                            value={formData.openingBalance ?? ''}
+                                            onChange={(e) => updateField('openingBalance', e.target.value)}
                                             className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                         />
                                     </div>

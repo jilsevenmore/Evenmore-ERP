@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Package, ShoppingCart, Boxes, AlertTriangle, Search, X, Layers, ChevronDown, Scale } from 'lucide-react';
+import { Plus, Trash2, Package, ShoppingCart, Boxes, AlertTriangle, Search, X, Layers, ChevronDown, Scale, Truck } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../ui/Button';
 import { SALES_LINE_KINDS, lineTotalWeight, formatKg, lineSpecText } from '../../utils/salesLineMetal';
@@ -7,6 +7,7 @@ import {
   METAL_MATERIALS, METAL_FORMS, METAL_FINISHES, materialOf, formOf, dimLabel, KIND_DEFAULT_FORM,
   kindUsesCalculator, suggestHsn, calcPieceWeight, pieceWeightOf, applySheetSpec, linePieces, sheetAutoDescription,
 } from '../../utils/salesLineMetal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 const createEmptyLine = () => ({
   id: `li-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
@@ -16,21 +17,34 @@ const createEmptyLine = () => ({
   name: '',
   description: '',
   qty: 1,
-  rate: 0,
-  discount: 0,
+  rate: '',
+  discount: '',
   tax: 18,
   amount: 0,
   isUserModified: false,
+  lineKind: 'Custom',
+  isCustomManual: true,
+  addToInventory: false,
+  uom: 'Nos',
 });
 
-// Sheet-metal sales (allowCustomLines): a new line starts as an MS sheet billed
-// by weight -- Sweven's everyday line. Fabrication is priced per piece.
+// Sheet-metal sales (allowCustomLines): a new line starts as a custom manual product or sheet metal
 const createMetalLine = (kind = 'Sheet Metal', extra = {}) => {
-  const base = { ...createEmptyLine(), lineKind: kind, uom: kind === 'Service' ? 'Job' : 'Nos', ...extra };
+  const base = { ...createEmptyLine(), lineKind: kind, isCustomManual: false, uom: kind === 'Service' ? 'Job' : 'Nos', ...extra };
   if (!kindUsesCalculator(kind)) return base;
   const spec = { material: 'MS', form: KIND_DEFAULT_FORM[kind] || 'Sheet', pieces: 1, basis: kind === 'Fabrication' ? 'pcs' : 'kg' };
   return { ...base, ...applySheetSpec(spec), qty: 1 };
 };
+
+const createCustomProductLine = (extra = {}) => ({
+  ...createEmptyLine(),
+  lineKind: 'Custom',
+  isCustomManual: true,
+  addToInventory: false,
+  uom: 'Nos',
+  tax: 18,
+  ...extra,
+});
 
 // Processing / logistics charges added as service lines in one click.
 const CHARGE_PRESETS = [
@@ -108,14 +122,13 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
       });
     }, [items, masterItems]);
 
-    // Sheet-metal mode starts every blank row as a metal line (was: createEmptyLine()).
-    const newLine = () => (allowCustomLines ? createMetalLine() : createEmptyLine());
+    // Custom-first mode starts every blank row as a custom manual product line
+    const newLine = () => (allowCustomLines ? createCustomProductLine() : createEmptyLine());
 
     // Ensure there is at least one default empty line item for editable forms
     useEffect(() => {
       if (!readOnly && items.length === 0 && onChange) {
-        // Replaced: onChange([createEmptyLine()]);
-        onChange([allowCustomLines ? createMetalLine() : createEmptyLine()]);
+        onChange([newLine()]);
       }
     }, [items.length, readOnly, onChange, allowCustomLines]);
 
@@ -288,7 +301,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             itemSku: selected.sku,
             name: selected.name,
             description: selected.name,
-            rate: unitRate,
+            rate: unitRate > 0 ? unitRate : '',
             amount,
             isUserModified: false,
             // [PHASE-2A] propagate weight-item config (steel by kg) onto the transaction line
@@ -493,9 +506,75 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         onChange(updated);
     };
 
-    const addChargeLine = (description) => {
+    const [chargeModal, setChargeModal] = useState({
+      isOpen: false,
+      chargeName: '',
+      payableValue: '',
+      sacCode: '9965',
+      tax: 18,
+      notes: '',
+    });
+
+    const handleOpenChargeModal = (preset) => {
+      if (!preset) return;
+      const isTransport = preset.toLowerCase().includes('transport') || preset.toLowerCase().includes('loading');
+      setChargeModal({
+        isOpen: true,
+        chargeName: preset,
+        payableValue: '',
+        sacCode: isTransport ? '9965' : '9988',
+        tax: 18,
+        notes: '',
+      });
+    };
+
+    const handleConfirmAddCharge = () => {
+      const rateVal = chargeModal.payableValue !== '' ? Number(chargeModal.payableValue) : '';
+      const taxVal = chargeModal.tax !== '' ? Number(chargeModal.tax) : 18;
+      const gross = (rateVal || 0) * 1;
+      const amt = Math.round(gross * (1 + taxVal / 100) * 100) / 100;
+      const newCharge = {
+        ...createEmptyLine(),
+        lineKind: 'Service',
+        isCustomManual: false,
+        name: chargeModal.chargeName,
+        description: chargeModal.chargeName,
+        specification: chargeModal.notes || '',
+        uom: 'Job',
+        qty: 1,
+        rate: rateVal,
+        tax: taxVal,
+        discount: 0,
+        amount: amt,
+        hsnCode: chargeModal.sacCode || '',
+        sacCode: chargeModal.sacCode || '',
+      };
+      onChange([...items, newCharge]);
+      setChargeModal({ isOpen: false, chargeName: '', payableValue: '', sacCode: '9965', tax: 18, notes: '' });
+    };
+
+    const addChargeLine = (description, payable = '') => {
         if (!description) return;
-        onChange([...items, createMetalLine('Service', { description, uom: 'Job' })]);
+        const rateVal = payable !== '' ? Number(payable) : '';
+        const taxVal = 18;
+        const gross = (rateVal || 0) * 1;
+        const amt = Math.round(gross * (1 + taxVal / 100) * 100) / 100;
+        const isTransport = description.toLowerCase().includes('transport') || description.toLowerCase().includes('loading');
+        onChange([...items, {
+            ...createEmptyLine(),
+            lineKind: 'Service',
+            isCustomManual: false,
+            name: description,
+            description,
+            uom: 'Job',
+            qty: 1,
+            rate: rateVal,
+            tax: taxVal,
+            discount: 0,
+            amount: amt,
+            hsnCode: isTransport ? '9965' : '9988',
+            sacCode: isTransport ? '9965' : '9988',
+        }]);
     };
 
     const handleRemove = (index) => {
@@ -690,64 +769,141 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                           ) : (
                             /* Top-Level Item / Machine Selector */
                             <div>
-                              <div className="flex items-center gap-2">
-                                <select
-                                  value={item.itemId || ''}
-                                  onChange={(e) => handleItemSelect(index, e.target.value)}
-                                  className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition cursor-pointer"
-                                >
-                                  <option value="">{allowCustomLines ? '-- Custom / service line (no inventory item) --' : '-- Select Master Item --'}</option>
-                                  {masterItems.map((mi) => (
-                                    <option key={mi.id} value={mi.id}>
-                                      [{mi.sku}] {mi.name} {mi.itemKind === 'Machine' ? '(Machine & BOM)' : ''}
-                                    </option>
-                                  ))}
-                                </select>
-                                {/* [PHASE-2A] weight-based steel line indicator */}
-                                {item.isWeightItem && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 px-2 py-0.5 rounded-full shrink-0" title="Weighed at intake — stock & billing follow received kg">
-                                    <Scale size={10} /> kg
-                                  </span>
-                                )}
-                              </div>
-                              {isMachine && (
-                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                  {childPartsCount > 0 && (
+                              {allowCustomLines && (item.isCustomManual ?? (!item.itemId && item.lineKind !== 'Service' && !kindUsesCalculator(item.lineKind))) ? (
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      placeholder="Product Name * (e.g. Custom MS Flange / Machine Table)"
+                                      value={item.name || item.description || ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        handleFieldChange(index, 'name', val);
+                                        handleFieldChange(index, 'description', val);
+                                      }}
+                                      className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                                    />
                                     <button
                                       type="button"
-                                      onClick={() => toggleCollapse(item.id)}
-                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold rounded-md text-purple-700 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-700 transition cursor-pointer shadow-2xs"
+                                      onClick={() => handleFieldChange(index, 'isCustomManual', false)}
+                                      className="shrink-0 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary-subtle border border-border rounded-lg transition flex items-center gap-1 cursor-pointer"
+                                      title="Switch to select existing item from inventory"
                                     >
-                                      <ChevronDown
-                                        size={12}
-                                        className={`transition-transform duration-200 ${collapsedMachines[item.id] ? '-rotate-90' : 'rotate-0'}`}
-                                      />
-                                      <Layers size={11} />
-                                      <span>
-                                        {collapsedMachines[item.id]
-                                          ? `Show ${childPartsCount} Components`
-                                          : `${childPartsCount} Components Included`}
-                                      </span>
+                                      <Boxes size={12} />
+                                      <span>Select Item</span>
                                     </button>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                    <input
+                                      type="text"
+                                      placeholder="Specification / model / serial notes..."
+                                      value={item.customNotes || (item.name && item.description !== item.name ? item.description : '')}
+                                      onChange={(e) => handleFieldChange(index, 'customNotes', e.target.value)}
+                                      className="flex-1 min-w-[140px] text-[11px] px-2 py-0.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted"
+                                    />
+                                    <label
+                                      className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded border transition cursor-pointer select-none shrink-0 ${
+                                        item.addToInventory
+                                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                                      }`}
+                                      title="When checked, this product will be automatically added to the inventory catalog when the estimate is created"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(item.addToInventory)}
+                                        onChange={(e) => handleFieldChange(index, 'addToInventory', e.target.checked)}
+                                        className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                                      />
+                                      <span>Add to Inventory</span>
+                                      {item.addToInventory && (
+                                        <span className="text-[9px] bg-emerald-600 text-white px-1 rounded font-bold">New</span>
+                                      )}
+                                    </label>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <select
+                                      value={item.itemId || ''}
+                                      onChange={(e) => {
+                                        if (e.target.value === '__custom_manual__') {
+                                          handleFieldChange(index, 'isCustomManual', true);
+                                          handleFieldChange(index, 'itemId', '');
+                                          return;
+                                        }
+                                        handleItemSelect(index, e.target.value);
+                                      }}
+                                      className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition cursor-pointer"
+                                    >
+                                      {allowCustomLines && (
+                                        <option value="__custom_manual__">✏️ Custom / New Product (Manual entry)</option>
+                                      )}
+                                      <option value="">{allowCustomLines ? '-- Service / custom line (no inventory item) --' : '-- Select Master Item --'}</option>
+                                      {masterItems.map((mi) => (
+                                        <option key={mi.id} value={mi.id}>
+                                          [{mi.sku}] {mi.name} {mi.itemKind === 'Machine' ? '(Machine & BOM)' : ''}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {allowCustomLines && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleFieldChange(index, 'isCustomManual', true)}
+                                        className="shrink-0 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:text-primary border border-border rounded-lg transition cursor-pointer"
+                                        title="Switch back to manual custom product"
+                                      >
+                                        Manual
+                                      </button>
+                                    )}
+                                    {/* [PHASE-2A] weight-based steel line indicator */}
+                                    {item.isWeightItem && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 px-2 py-0.5 rounded-full shrink-0" title="Weighed at intake — stock & billing follow received kg">
+                                        <Scale size={10} /> kg
+                                      </span>
+                                    )}
+                                  </div>
+                                  {isMachine && (
+                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                      {childPartsCount > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleCollapse(item.id)}
+                                          className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold rounded-md text-purple-700 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-700 transition cursor-pointer shadow-2xs"
+                                        >
+                                          <ChevronDown
+                                            size={12}
+                                            className={`transition-transform duration-200 ${collapsedMachines[item.id] ? '-rotate-90' : 'rotate-0'}`}
+                                          />
+                                          <Layers size={11} />
+                                          <span>
+                                            {collapsedMachines[item.id]
+                                              ? `Show ${childPartsCount} Components`
+                                              : `${childPartsCount} Components Included`}
+                                          </span>
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => openStockPicker(item.id)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-700 transition cursor-pointer shadow-2xs"
+                                        title={`Pick from stock to add component specifically to ${item.name || 'this machine'}`}
+                                      >
+                                        <Boxes size={10} />
+                                        <span>+ Add Component</span>
+                                      </button>
+                                    </div>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => openStockPicker(item.id)}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-700 transition cursor-pointer shadow-2xs"
-                                    title={`Pick from stock to add component specifically to ${item.name || 'this machine'}`}
-                                  >
-                                    <Boxes size={10} />
-                                    <span>+ Add Component</span>
-                                  </button>
+                                  <input
+                                    type="text"
+                                    placeholder={allowCustomLines && !item.itemId ? 'Description * (e.g. Custom MS Fabrication Work)' : 'Custom line description / serial notes...'}
+                                    value={item.description || ''}
+                                    onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
+                                    className="w-full text-[11px] px-2.5 py-1 mt-1.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                                  />
                                 </div>
                               )}
-                              <input
-                                type="text"
-                                placeholder={allowCustomLines && !item.itemId ? 'Description * (e.g. Custom MS Fabrication Work)' : 'Custom line description / serial notes...'}
-                                value={item.description || ''}
-                                onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
-                                className="w-full text-[11px] px-2.5 py-1 mt-1.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
-                              />
                               {allowCustomLines && USE_COMPACT_METAL_ROW && (
                                 /* Metal-industry detail: kind, material / grade, size / specification, weight per unit.
                                    Replaced by the sheet-metal calculator row below the line; kept switched off. */
@@ -784,7 +940,17 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                     aria-label="Weight per unit (kg)"
                                     placeholder="Wt kg/unit"
                                     value={item.unitWeight ?? ''}
-                                    onChange={(e) => handleFieldChange(index, 'unitWeight', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                    onFocus={handleNumberInputFocus}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      if (raw === '') {
+                                        handleFieldChange(index, 'unitWeight', '');
+                                        return;
+                                      }
+                                      const cleaned = sanitizeNumberInput(raw);
+                                      if (cleaned !== raw) e.target.value = cleaned;
+                                      handleFieldChange(index, 'unitWeight', cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                                    }}
                                     className="text-[11px] text-right px-2 py-1 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
                                   />
                                 </div>
@@ -876,13 +1042,27 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                               type="number"
                               min={allowsDecimal ? "0.01" : "1"}
                               step={allowsDecimal ? "0.01" : "1"}
-                              value={item.qty ?? 1}
+                              placeholder="1"
+                              value={item.qty ?? ''}
+                              onFocus={handleNumberInputFocus}
                               onChange={(e) => {
-                                const val = parseFloat(e.target.value);
+                                const raw = e.target.value;
+                                if (raw === '') {
+                                  handleFieldChange(index, 'qty', '');
+                                  return;
+                                }
+                                const cleaned = sanitizeNumberInput(raw);
+                                if (cleaned !== raw) e.target.value = cleaned;
+                                const val = parseFloat(cleaned);
                                 if (isNaN(val) || val <= 0) {
-                                  handleFieldChange(index, 'qty', allowsDecimal ? 0.01 : 1);
+                                  handleFieldChange(index, 'qty', '');
                                 } else {
                                   handleFieldChange(index, 'qty', allowsDecimal ? val : Math.floor(val));
+                                }
+                              }}
+                              onBlur={() => {
+                                if (!item.qty || Number(item.qty) <= 0) {
+                                  handleFieldChange(index, 'qty', allowsDecimal ? 0.01 : 1);
                                 }
                               }}
                               className="w-16 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
@@ -914,8 +1094,19 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             type="number"
                             min="0"
                             step="0.01"
-                            value={item.rate ?? 0}
-                            onChange={(e) => handleFieldChange(index, 'rate', Math.max(0, Number(e.target.value)))}
+                            placeholder="0.00"
+                            value={item.rate ?? ''}
+                            onFocus={handleNumberInputFocus}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') {
+                                handleFieldChange(index, 'rate', '');
+                                return;
+                              }
+                              const cleaned = sanitizeNumberInput(raw);
+                              if (cleaned !== raw) e.target.value = cleaned;
+                              handleFieldChange(index, 'rate', cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                            }}
                             className="w-24 text-right font-mono text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition ml-auto"
                           />
                         ) : (
@@ -932,8 +1123,20 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             type="number"
                             min="0"
                             max="100"
-                            value={item.discount || 0}
-                            onChange={(e) => handleFieldChange(index, 'discount', Number(e.target.value))}
+                            placeholder="0"
+                            value={item.discount ?? ''}
+                            onFocus={handleNumberInputFocus}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') {
+                                handleFieldChange(index, 'discount', '');
+                                return;
+                              }
+                              const cleaned = sanitizeNumberInput(raw);
+                              if (cleaned !== raw) e.target.value = cleaned;
+                              const num = Number(cleaned);
+                              handleFieldChange(index, 'discount', Math.min(100, Math.max(0, num)));
+                            }}
                             className="w-14 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
                           />
                         ) : (
@@ -947,8 +1150,19 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             type="number"
                             min="0"
                             max="100"
-                            value={item.tax ?? 18}
-                            onChange={(e) => handleFieldChange(index, 'tax', Number(e.target.value))}
+                            placeholder="18"
+                            value={item.tax ?? ''}
+                            onFocus={handleNumberInputFocus}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') {
+                                handleFieldChange(index, 'tax', '');
+                                return;
+                              }
+                              const cleaned = sanitizeNumberInput(raw);
+                              if (cleaned !== raw) e.target.value = cleaned;
+                              handleFieldChange(index, 'tax', Number(cleaned));
+                            }}
                             className="w-14 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
                           />
                         ) : (
@@ -1018,28 +1232,129 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                   </>
                                 )}
                                 <MetalField label="HSN / SAC">
-                                  <input value={item.hsnCode || ''} onChange={(e) => handleFieldChange(index, 'hsnCode', e.target.value)} placeholder={calc ? `e.g. ${suggestHsn(spec)}` : 'HSN / SAC'} className={`${metalInput} w-24 font-mono`} />
+                                  <input
+                                    value={item.hsnCode || item.sacCode || ''}
+                                    onChange={(e) => {
+                                      handleFieldChange(index, 'hsnCode', e.target.value);
+                                      handleFieldChange(index, 'sacCode', e.target.value);
+                                    }}
+                                    placeholder={calc ? `e.g. ${suggestHsn(spec)}` : (item.lineKind === 'Service' ? '9965 / 9988' : 'HSN / SAC')}
+                                    className={`${metalInput} w-24 font-mono`}
+                                  />
                                 </MetalField>
                                 {!calc && (
-                                  <>
-                                    <MetalField label="Specification" className="flex-1 min-w-[180px]">
-                                      <input value={item.specification || ''} onChange={(e) => handleFieldChange(index, 'specification', e.target.value)} placeholder="Model, size, capacity…" className={metalInput} />
-                                    </MetalField>
-                                    <MetalField label="Wt / unit (kg)">
-                                      <input type="number" min="0" step="0.01" value={item.unitWeight ?? ''} onChange={(e) => handleFieldChange(index, 'unitWeight', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} className={`${metalInput} w-24 text-right`} />
-                                    </MetalField>
-                                  </>
+                                  item.lineKind === 'Service' ? (
+                                    <>
+                                      <MetalField label="Payable Charge Value (₹) *" className="min-w-[150px]">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          value={item.rate ?? ''}
+                                          onFocus={handleNumberInputFocus}
+                                          onChange={(e) => {
+                                            const raw = e.target.value;
+                                            if (raw === '') {
+                                              handleFieldChange(index, 'rate', '');
+                                              return;
+                                            }
+                                            const cleaned = sanitizeNumberInput(raw);
+                                            if (cleaned !== raw) e.target.value = cleaned;
+                                            handleFieldChange(index, 'rate', cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                                          }}
+                                          className={`${metalInput} w-32 text-right font-mono font-bold text-primary`}
+                                        />
+                                      </MetalField>
+                                      <MetalField label="Charge Details / Remarks" className="flex-1 min-w-[200px]">
+                                        <input
+                                          value={item.specification || item.description || ''}
+                                          onChange={(e) => handleFieldChange(index, 'specification', e.target.value)}
+                                          placeholder="e.g. Transport from factory to site, crane loading..."
+                                          className={metalInput}
+                                        />
+                                      </MetalField>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <MetalField label="Specification" className="flex-1 min-w-[180px]">
+                                        <input value={item.specification || ''} onChange={(e) => handleFieldChange(index, 'specification', e.target.value)} placeholder="Model, size, capacity…" className={metalInput} />
+                                      </MetalField>
+                                      <MetalField label="Wt / unit (kg)">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          value={item.unitWeight ?? ''}
+                                          onFocus={handleNumberInputFocus}
+                                          onChange={(e) => {
+                                            const raw = e.target.value;
+                                            if (raw === '') {
+                                              handleFieldChange(index, 'unitWeight', '');
+                                              return;
+                                            }
+                                            const cleaned = sanitizeNumberInput(raw);
+                                            if (cleaned !== raw) e.target.value = cleaned;
+                                            handleFieldChange(index, 'unitWeight', cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                                          }}
+                                          className={`${metalInput} w-24 text-right`}
+                                        />
+                                      </MetalField>
+                                    </>
+                                  )
                                 )}
                               </div>
                               {calc && (
                                 <div className="flex flex-wrap items-end gap-2">
                                   {(form?.dims || []).map((dim) => (
                                     <MetalField key={dim} label={dimLabel(spec.form, dim)}>
-                                      <input type="number" min="0" step="0.01" value={spec[dim] ?? ''} onChange={(e) => handleSheetSpecChange(index, { [dim]: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })} className={`${metalInput} w-24 text-right font-mono`} />
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0"
+                                        value={spec[dim] ?? ''}
+                                        onFocus={handleNumberInputFocus}
+                                        onChange={(e) => {
+                                          const raw = e.target.value;
+                                          if (raw === '') {
+                                            handleSheetSpecChange(index, { [dim]: '' });
+                                            return;
+                                          }
+                                          const cleaned = sanitizeNumberInput(raw);
+                                          if (cleaned !== raw) e.target.value = cleaned;
+                                          handleSheetSpecChange(index, { [dim]: cleaned === '' ? '' : Math.max(0, Number(cleaned)) });
+                                        }}
+                                        className={`${metalInput} w-24 text-right font-mono`}
+                                      />
                                     </MetalField>
                                   ))}
                                   <MetalField label="Pieces">
-                                    <input type="number" min="0" step="1" value={spec.pieces ?? ''} onChange={(e) => handleSheetSpecChange(index, { pieces: e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))) })} className={`${metalInput} w-20 text-right font-mono`} />
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      placeholder="1"
+                                      value={spec.pieces ?? ''}
+                                      onFocus={handleNumberInputFocus}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        if (raw === '') {
+                                          handleSheetSpecChange(index, { pieces: '' });
+                                          return;
+                                        }
+                                        const cleaned = sanitizeNumberInput(raw);
+                                        if (cleaned !== raw) e.target.value = cleaned;
+                                        handleSheetSpecChange(index, { pieces: cleaned === '' ? '' : Math.max(0, Math.floor(Number(cleaned))) });
+                                      }}
+                                      onBlur={() => {
+                                        if (!spec.pieces || Number(spec.pieces) <= 0) {
+                                          handleSheetSpecChange(index, { pieces: 1 });
+                                        }
+                                      }}
+                                      className={`${metalInput} w-20 text-right font-mono`}
+                                    />
                                   </MetalField>
                                   <MetalField label={auto !== null && !spec.weightManual ? 'Wt / piece (auto)' : 'Wt / piece (kg)'}>
                                     {auto !== null && !spec.weightManual ? (
@@ -1049,7 +1364,25 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-1.5">
-                                        <input type="number" min="0" step="0.001" value={spec.weightPerPiece ?? ''} onChange={(e) => handleSheetSpecChange(index, { weightManual: true, weightPerPiece: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })} className={`${metalInput} w-24 text-right font-mono`} />
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.001"
+                                          placeholder="0.000"
+                                          value={spec.weightPerPiece ?? ''}
+                                          onFocus={handleNumberInputFocus}
+                                          onChange={(e) => {
+                                            const raw = e.target.value;
+                                            if (raw === '') {
+                                              handleSheetSpecChange(index, { weightManual: true, weightPerPiece: '' });
+                                              return;
+                                            }
+                                            const cleaned = sanitizeNumberInput(raw);
+                                            if (cleaned !== raw) e.target.value = cleaned;
+                                            handleSheetSpecChange(index, { weightManual: true, weightPerPiece: cleaned === '' ? '' : Math.max(0, Number(cleaned)) });
+                                          }}
+                                          className={`${metalInput} w-24 text-right font-mono`}
+                                        />
                                         {auto !== null && (
                                           <button type="button" onClick={() => handleSheetSpecChange(index, { weightManual: false })} className="text-[10px] font-semibold normal-case text-primary hover:underline cursor-pointer">Auto</button>
                                         )}
@@ -1120,20 +1453,22 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-primary bg-primary-subtle border border-primary/20 hover:bg-primary hover:text-white transition cursor-pointer shadow-2xs"
             >
               <Plus className="w-3.5 h-3.5"/>
-              {/* Replaced label in sheet-metal mode (was always "Add Line Item"). */}
-              {allowCustomLines ? 'Sheet / Plate' : 'Add Line Item'}
+              {allowCustomLines ? '+ Custom / New Product' : 'Add Line Item'}
             </button>
             {allowCustomLines && (
               <>
-                <button type="button" onClick={() => onChange([...items, createMetalLine('Section / Pipe')])} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-primary bg-primary-subtle border border-primary/20 hover:bg-primary hover:text-white transition cursor-pointer shadow-2xs">
+                <button type="button" onClick={() => onChange([...items, createMetalLine('Sheet Metal')])} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl text-text bg-card border border-border hover:bg-card-hover transition cursor-pointer shadow-2xs">
+                  <Plus className="w-3.5 h-3.5"/> Sheet / Plate
+                </button>
+                <button type="button" onClick={() => onChange([...items, createMetalLine('Section / Pipe')])} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl text-text bg-card border border-border hover:bg-card-hover transition cursor-pointer shadow-2xs">
                   <Plus className="w-3.5 h-3.5"/> Section / Pipe
                 </button>
-                <button type="button" onClick={() => onChange([...items, createMetalLine('Fabrication')])} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-primary bg-primary-subtle border border-primary/20 hover:bg-primary hover:text-white transition cursor-pointer shadow-2xs">
+                <button type="button" onClick={() => onChange([...items, createMetalLine('Fabrication')])} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl text-text bg-card border border-border hover:bg-card-hover transition cursor-pointer shadow-2xs">
                   <Plus className="w-3.5 h-3.5"/> Fabrication
                 </button>
                 <select
                   value=""
-                  onChange={(e) => addChargeLine(e.target.value)}
+                  onChange={(e) => handleOpenChargeModal(e.target.value)}
                   aria-label="Add a processing or transport charge"
                   className="px-3 py-2 text-xs font-bold rounded-xl text-text bg-card border border-border hover:bg-card-hover transition cursor-pointer"
                 >
@@ -1366,6 +1701,145 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                 onClick={() => setIsStockPickerOpen(false)}
               >
                 Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Charge Modal for Processing / Transport */}
+      {chargeModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card text-card-foreground border border-border rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b pb-3 border-border">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base leading-tight">Add Processing / Transport Charge</h3>
+                  <p className="text-xs text-muted-foreground">Charge will be added as a payable service line item</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChargeModal(prev => ({ ...prev, isOpen: false }))}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Charge Name / Service Description <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={chargeModal.chargeName}
+                  onChange={(e) => setChargeModal(prev => ({ ...prev, chargeName: e.target.value }))}
+                  placeholder="e.g. Transport & Delivery Charges"
+                  className="w-full px-3 py-2 text-sm border rounded-md bg-background border-input focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Payable Value / Amount (₹) <span className="text-destructive">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">₹</span>
+                  <input
+                    type="number"
+                    autoFocus
+                    min="0"
+                    step="any"
+                    value={chargeModal.payableValue}
+                    onChange={(e) => setChargeModal(prev => ({ ...prev, payableValue: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full pl-7 pr-3 py-2 text-sm border rounded-md bg-background border-input font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleConfirmAddCharge();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    GST Rate (%)
+                  </label>
+                  <select
+                    value={chargeModal.tax}
+                    onChange={(e) => setChargeModal(prev => ({ ...prev, tax: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 text-sm border rounded-md bg-background border-input focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value={0}>0% (Exempt)</option>
+                    <option value={5}>5%</option>
+                    <option value={12}>12%</option>
+                    <option value={18}>18% (Standard Service)</option>
+                    <option value={28}>28%</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    SAC / HSN Code
+                  </label>
+                  <input
+                    type="text"
+                    value={chargeModal.sacCode}
+                    onChange={(e) => setChargeModal(prev => ({ ...prev, sacCode: e.target.value }))}
+                    placeholder="e.g. 9965"
+                    className="w-full px-3 py-2 text-sm border rounded-md bg-background border-input focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Notes / Vehicle / Route / Remarks (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={chargeModal.notes}
+                  onChange={(e) => setChargeModal(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="e.g. Vehicle no, destination address, etc."
+                  className="w-full px-3 py-2 text-sm border rounded-md bg-background border-input focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {chargeModal.payableValue !== '' && Number(chargeModal.payableValue) > 0 && (
+                <div className="p-2.5 rounded-md bg-muted/60 border border-border text-xs flex justify-between items-center">
+                  <span className="text-muted-foreground">Total with GST:</span>
+                  <span className="font-semibold text-primary">
+                    ₹{(Number(chargeModal.payableValue) * (1 + (Number(chargeModal.tax) || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setChargeModal(prev => ({ ...prev, isOpen: false }))}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmAddCharge}
+                disabled={!chargeModal.chargeName.trim()}
+              >
+                Add to Estimate
               </Button>
             </div>
           </div>

@@ -3,6 +3,7 @@ import { useRecruitmentStore } from "../../stores/recruitmentStore";
 import { useAppStore } from "../../stores/appStore";
 import { Users, GripVertical, ArrowDownToLine, MoveHorizontal } from "lucide-react";
 import UserInitials from "../common/UserInitials";
+import OfferLetterModal from "../../features/hrms/organization/OfferLetterModal";
 
 const STAGE_CONFIG = [
   {
@@ -65,11 +66,19 @@ const STAGE_CONFIG = [
 
 export function CandidatePipeline({ onSelectCandidate }) {
   const candidates = useRecruitmentStore((s) => s.candidates);
+  const jobs = useRecruitmentStore((s) => s.jobs || []);
+  const offers = useRecruitmentStore((s) => s.offers || []);
+  const addOffer = useRecruitmentStore((s) => s.addOffer);
+  const updateOffer = useRecruitmentStore((s) => s.updateOffer);
   const changeStage = useRecruitmentStore((s) => s.changeStage);
   const showToast = useAppStore((s) => s.showToast);
 
   const [draggedCandidateId, setDraggedCandidateId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
+
+  // Offer Letter Form State
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [activeOffer, setActiveOffer] = useState(null);
 
   const handleDragStart = (e, candidate) => {
     e.dataTransfer.setData("text/plain", candidate.id);
@@ -96,6 +105,77 @@ export function CandidatePipeline({ onSelectCandidate }) {
     }
   };
 
+  const handleInitiateStageChange = (cand, targetStageKey, targetStageLabel) => {
+    if (cand.stage === targetStageKey) return;
+
+    // When moving to Offer or Hired, open the formal Offer Letter form
+    if (targetStageKey === "Offer" || targetStageKey === "Hired") {
+      const existingOffer = (offers || []).find((o) => o.candidateId === cand.id);
+      const matchedJob = (jobs || []).find((j) => j.id === cand.jobId || j.title === cand.position);
+
+      const offerData = existingOffer
+        ? { ...existingOffer }
+        : {
+            id: `OFF-${Math.floor(100 + Math.random() * 900)}`,
+            candidateId: cand.id,
+            candidateName: cand.name,
+            email: cand.email || "",
+            position: cand.position || matchedJob?.title || "Team Member",
+            jobType: "Full-time",
+            dept: matchedJob?.department || "",
+            salary: "",
+            location: cand.location || "",
+            workMode: "Hybrid",
+            sentDate: new Date().toISOString().split("T")[0],
+            joiningDate: new Date(Date.now() + 21 * 86400000).toISOString().split("T")[0],
+            reportingManager: matchedJob?.hiringManager || "",
+            probationPeriod: "3 Months",
+            status: targetStageKey === "Hired" ? "Accepted" : "Pending",
+          };
+
+      setActiveOffer(offerData);
+      setIsOfferModalOpen(true);
+      return;
+    }
+
+    // Direct transition for other stages
+    changeStage(cand.id, targetStageKey);
+    showToast(`${cand.name} moved to ${targetStageLabel}`);
+  };
+
+  const handleConfirmOffer = (offerData) => {
+    const existingIndex = (offers || []).findIndex(
+      (o) => o.id === offerData.id || o.candidateId === offerData.candidateId
+    );
+    if (existingIndex >= 0) {
+      updateOffer(offers[existingIndex].id, { ...offerData, status: "Pending" });
+    } else {
+      addOffer({ ...offerData, status: "Pending" });
+    }
+    changeStage(offerData.candidateId, "Offer");
+    showToast(`Offer letter issued and ${offerData.candidateName} moved to Offer stage.`);
+    setIsOfferModalOpen(false);
+  };
+
+  const handleAcceptOffer = (offerData) => {
+    const existingIndex = (offers || []).findIndex(
+      (o) => o.id === offerData.id || o.candidateId === offerData.candidateId
+    );
+    if (existingIndex >= 0) {
+      updateOffer(offers[existingIndex].id, { ...offerData, status: "Accepted" });
+    } else {
+      addOffer({ ...offerData, status: "Accepted" });
+    }
+    changeStage(offerData.candidateId, "Hired");
+    showToast(`Offer accepted! ${offerData.candidateName} converted to Hired and added to Employee Directory.`);
+    setIsOfferModalOpen(false);
+  };
+
+  const handleUpdateOffer = (offerData) => {
+    updateOffer(offerData.id, offerData);
+    showToast(`Offer letter updated for ${offerData.candidateName}`);
+  };
+
   const handleDrop = (e, targetStageKey, targetStageLabel) => {
     e.preventDefault();
     const candidateId = e.dataTransfer.getData("text/plain") || draggedCandidateId;
@@ -107,12 +187,7 @@ export function CandidatePipeline({ onSelectCandidate }) {
     const candidate = candidates.find((c) => c.id === candidateId);
     if (!candidate) return;
 
-    if (candidate.stage === targetStageKey) {
-      return; // Already in this stage, no-op
-    }
-
-    changeStage(candidateId, targetStageKey);
-    showToast(`${candidate.name} moved to ${targetStageLabel}`);
+    handleInitiateStageChange(candidate, targetStageKey, targetStageLabel);
   };
 
   return (
@@ -244,9 +319,8 @@ export function CandidatePipeline({ onSelectCandidate }) {
                           onChange={(e) => {
                             const newStage = e.target.value;
                             if (newStage !== c.stage) {
-                              changeStage(c.id, newStage);
                               const found = STAGE_CONFIG.find((s) => s.key === newStage);
-                              showToast(`${c.name} moved to ${found?.label || newStage}`);
+                              handleInitiateStageChange(c, newStage, found?.label || newStage);
                             }
                           }}
                           className="w-full h-6 px-1.5 bg-soft border border-border rounded-lg text-[10px] font-medium text-text focus:outline-none focus:border-primary cursor-pointer transition"
@@ -272,6 +346,18 @@ export function CandidatePipeline({ onSelectCandidate }) {
           );
         })}
       </div>
+
+      {/* Interactive Offer Letter Authoring & Acceptance Modal */}
+      {isOfferModalOpen && activeOffer && (
+        <OfferLetterModal
+          isOpen={isOfferModalOpen}
+          onClose={() => setIsOfferModalOpen(false)}
+          offer={activeOffer}
+          onConfirmOffer={handleConfirmOffer}
+          onAcceptOffer={handleAcceptOffer}
+          onUpdateOffer={handleUpdateOffer}
+        />
+      )}
     </div>
   );
 }

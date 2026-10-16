@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
-import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, TrendingUp, AlertTriangle, ArrowRightLeft, Plus, X, Calendar, FileText, Briefcase } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, TrendingUp, AlertTriangle, ArrowRightLeft, Plus, X, Calendar, FileText, Briefcase, Search, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
+import { useRecruitmentStore, syncCandidateToEmployee } from "../../../stores/recruitmentStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import UserInitials from "../../../components/common/UserInitials";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
@@ -14,12 +16,16 @@ import {
   fetchEmployeeWarnings,
   createEmployeeWarning,
   fetchEmployeeAwards,
-  createEmployeeAward
+  createEmployeeAward,
+  confirmEmployeeProbation,
+  extendEmployeeProbation,
+  evaluateEmployeeLifecycle,
 } from "../../../services/upgradeService";
+import PerformanceReportModal from "../performance/PerformanceReportModal";
 
 const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
-const STATUSES = ["All", "Active", "On Leave", "Probation"];
+const STATUSES = ["All Active", "Active", "On Leave", "Probation", "Notice Period", "Resigned", "Terminated", "All Records"];
 
 /** The employee's Administration login, kept in step with this record. */
 function LoginBadge({ login }) {
@@ -35,21 +41,59 @@ function LoginBadge({ login }) {
 const statusStyles = {
   Active: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
   "On Leave": { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
-  Probation: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+  Probation: { background: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  "Notice Period": { background: "#fff7ed", color: "#c2410c", border: "#ffedd5" },
+  Resigned: { background: "#f3f4f6", color: "#4b5563", border: "#e5e7eb" },
+  Terminated: { background: "#fee2e2", color: "#b91c1c", border: "#fca5a5" },
+};
+
+const confirmationBadgeStyles = {
+  "On Probation": { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+  "Due for Confirmation": { bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-300" },
+  Confirmed: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  Extended: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-300" },
 };
 
 export default function Employees() {
+  const location = useLocation();
   const storeEmployees = useAppStore((s) => s.employees || []);
   const addStoreEmployee = useAppStore((s) => s.addEmployee);
   const deleteStoreEmployee = useAppStore((s) => s.deleteEmployee);
   const refreshHrms = useAppStore((s) => s.refreshHrms);
   const setToast = useAppStore((s) => s.setToast || s.showToast);
+
+  const candidates = useRecruitmentStore((s) => s.candidates || []);
+  const offers = useRecruitmentStore((s) => s.offers || []);
+  const jobs = useRecruitmentStore((s) => s.jobs || []);
+
+  const [search, setSearch] = useState(location.state?.search || "");
   const [dept, setDept] = useState("All");
   const [status, setStatus] = useState("All");
   const [viewMode, setViewMode] = useState("Table");
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
+
+  // Performance Report Modal State
+  const [perfReportOpen, setPerfReportOpen] = useState(false);
+  const [selectedPerfEmp, setSelectedPerfEmp] = useState(null);
+
+  // Sync search state if navigating from Candidate page with a search query
+  useEffect(() => {
+    if (location.state?.search) {
+      setSearch(location.state.search);
+      setCurrentPage(1);
+    }
+  }, [location.state]);
+
+  // Ensure any hired candidates from recruitment pipeline are synced to Employee directory
+  useEffect(() => {
+    candidates.forEach((cand) => {
+      if (cand.stage === "Hired") {
+        syncCandidateToEmployee(cand, offers, jobs);
+      }
+    });
+  }, [candidates, offers, jobs]);
 
   // Use store employees, normalized with img/avatar
   const employees = useMemo(() => {
@@ -67,19 +111,100 @@ export default function Employees() {
 
   // Lifecycle State
   const [selectedLifecycleEmp, setSelectedLifecycleEmp] = useState(null);
-  const [lifecycleTab, setLifecycleTab] = useState("transfers"); // 'transfers' | 'promotions' | 'warnings' | 'awards'
+  const [lifecycleTab, setLifecycleTab] = useState("probation"); // 'probation' | 'transfers' | 'promotions' | 'warnings' | 'awards'
   const [transfers, setTransfers] = useState([]);
   const [promotions, setPromotions] = useState([]);
   const [warnings, setWarnings] = useState([]);
   const [awards, setAwards] = useState([]);
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
+  const [evaluatingLifecycle, setEvaluatingLifecycle] = useState(false);
 
   // Sub-forms for creating lifecycle events
   const [showEventCreateModal, setShowEventCreateModal] = useState(false);
+  const [probationAction, setProbationAction] = useState(null); // null | 'confirm' | 'extend'
+  const [actionLoading, setActionLoading] = useState(false);
+  const [confirmForm, setConfirmForm] = useState({ effective_date: new Date().toISOString().slice(0, 10), remarks: '' });
+  const [extendForm, setExtendForm] = useState({ extension_days: '30', reason: '' });
   const [transferForm, setTransferForm] = useState({ to_department: '', to_branch: '', effective_date: new Date().toISOString().slice(0, 10), reason: '' });
   const [promotionForm, setPromotionForm] = useState({ new_designation: '', previous_salary: '', new_salary: '', effective_date: new Date().toISOString().slice(0, 10), notes: '' });
   const [warningForm, setWarningForm] = useState({ warning_level: 'Medium', title: '', explanation: '', warning_date: new Date().toISOString().slice(0, 10) });
   const [awardForm, setAwardForm] = useState({ award_name: '', citation: '', cash_reward: '', presentation_date: new Date().toISOString().slice(0, 10) });
+
+  const handleEvaluateLifecycle = async () => {
+    setEvaluatingLifecycle(true);
+    try {
+      const res = await evaluateEmployeeLifecycle();
+      await refreshHrms?.("employees");
+      const data = res?.data || res;
+      setToast(
+        data?.message ||
+        `Lifecycle evaluated: ${data?.probation_due_count ?? 0} due for confirmation, ${data?.probation_confirmed_count ?? 0} confirmed, ${data?.exits_processed ?? 0} exit(s) processed.`
+      );
+    } catch (err) {
+      setToast("Failed to evaluate lifecycle: " + (err?.message || "Server error"), "error");
+    } finally {
+      setEvaluatingLifecycle(false);
+    }
+  };
+
+  const handleConfirmProbationSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedLifecycleEmp) return;
+    setActionLoading(true);
+    try {
+      const res = await confirmEmployeeProbation(selectedLifecycleEmp.id, {
+        effective_date: confirmForm.effective_date,
+        remarks: confirmForm.remarks,
+      });
+      setToast("Employee probation confirmed successfully.");
+      setProbationAction(null);
+      await refreshHrms?.("employees");
+      const updated = res?.data || res;
+      setSelectedLifecycleEmp((prev) => ({
+        ...prev,
+        status: updated.status || "Active",
+        confirmationStatus: updated.confirmationStatus || updated.confirmation_status || "Confirmed",
+        confirmationDate: updated.confirmationDate || updated.confirmation_date || confirmForm.effective_date,
+        confirmationRemarks: updated.confirmationRemarks || updated.confirmation_remarks || confirmForm.remarks,
+        probationHistory: updated.probationHistory || updated.probation_history || prev?.probationHistory || [],
+      }));
+    } catch (err) {
+      setToast("Failed to confirm probation: " + (err?.message || "Server error"), "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleExtendProbationSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedLifecycleEmp) return;
+    if (!extendForm.reason.trim()) {
+      setToast("Reason for probation extension is required.", "error");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await extendEmployeeProbation(selectedLifecycleEmp.id, {
+        extension_days: parseInt(extendForm.extension_days, 10),
+        reason: extendForm.reason,
+      });
+      setToast("Employee probation extended successfully.");
+      setProbationAction(null);
+      await refreshHrms?.("employees");
+      const updated = res?.data || res;
+      setSelectedLifecycleEmp((prev) => ({
+        ...prev,
+        confirmationStatus: updated.confirmationStatus || updated.confirmation_status || "Extended",
+        probationEndDate: updated.probationEndDate || updated.probation_end_date || prev?.probationEndDate,
+        probationPeriod: updated.probationPeriod || updated.probation_period || prev?.probationPeriod,
+        probationHistory: updated.probationHistory || updated.probation_history || prev?.probationHistory || [],
+      }));
+    } catch (err) {
+      setToast("Failed to extend probation: " + (err?.message || "Server error"), "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const loadLifecycleData = async (empId) => {
     setLifecycleLoading(true);
@@ -101,9 +226,17 @@ export default function Employees() {
     }
   };
 
-  const handleOpenLifecycle = (emp) => {
+  const handleOpenLifecycle = (emp, initialTab = 'probation') => {
     setSelectedLifecycleEmp(emp);
-    setLifecycleTab('transfers');
+    setLifecycleTab(initialTab);
+    setShowEventCreateModal(false);
+    setProbationAction(null);
+    setConfirmForm({ effective_date: new Date().toISOString().slice(0, 10), remarks: '' });
+    setExtendForm({ extension_days: '30', reason: '' });
+    setTransferForm({ to_department: '', to_branch: '', effective_date: new Date().toISOString().slice(0, 10), reason: '' });
+    setPromotionForm({ new_designation: '', previous_salary: emp.standardSalary || emp.standard_salary || '', new_salary: '', effective_date: new Date().toISOString().slice(0, 10), notes: '' });
+    setWarningForm({ warning_level: 'First Written', title: '', explanation: '', warning_date: new Date().toISOString().slice(0, 10) });
+    setAwardForm({ award_name: '', citation: '', cash_reward: '', presentation_date: new Date().toISOString().slice(0, 10), category: 'Excellence' });
     loadLifecycleData(emp.id);
   };
 
@@ -128,13 +261,27 @@ export default function Employees() {
     [departmentsList, employees]
   );
 
-  const filtered = useMemo(
-    () =>
-      employees.filter(
-        (e) => (dept === "All" || e.department === dept) && (status === "All" || e.status === status)
-      ),
-    [employees, dept, status]
-  );
+  const filtered = useMemo(() => {
+    return employees.filter((e) => {
+      if (dept !== "All" && e.department !== dept) return false;
+      if (status === "All Active") {
+        if (["Resigned", "Terminated"].includes(e.status)) return false;
+      } else if (status === "All Records") {
+        // Show everything including historical records
+      } else if (status !== "All") {
+        if (e.status !== status) return false;
+      } else {
+        // Default "All" excludes exited employees
+        if (["Resigned", "Terminated"].includes(e.status)) return false;
+      }
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const haystack = `${e.name || ""} ${e.email || ""} ${e.designation || ""} ${e.department || ""} ${e.employeeCode || e.empId || e.id || ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [employees, dept, status, search]);
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const paginatedEmployees = useMemo(() => {
@@ -213,6 +360,29 @@ export default function Employees() {
           </p>
         </div>
         <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            disabled={evaluatingLifecycle}
+            onClick={handleEvaluateLifecycle}
+            className="emp-export-btn"
+            style={{ borderColor: "#cbd5e1", color: "#334155", background: "#f8fafc" }}
+            title="Evaluate probation confirmations and notice periods across all employees"
+          >
+            <Clock size={15} className={evaluatingLifecycle ? "animate-spin text-blue-600" : "text-slate-600"} />
+            {evaluatingLifecycle ? "Evaluating..." : "Evaluate Lifecycle"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedPerfEmp(filtered[0] || employees[0] || null);
+              setPerfReportOpen(true);
+            }}
+            className="emp-export-btn"
+            style={{ borderColor: "#93c5fd", color: "#1d4ed8", background: "#eff6ff" }}
+            title="Generate Performance & Appraisal Report for Employees"
+          >
+            <FileText size={15} /> Performance Report
+          </button>
           <button type="button" onClick={handleExport} className="emp-export-btn">
             <Download size={15} /> Export
           </button>
@@ -224,7 +394,31 @@ export default function Employees() {
 
       {/* Filter Card */}
       <div className="emp-card emp-filter-card">
-        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+          {/* Search Bar */}
+          <div className="relative flex items-center min-w-[220px] max-w-[340px] flex-1">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search employee by name, role, email..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-7 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-100 placeholder-slate-400 transition"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => { setSearch(""); setCurrentPage(1); }}
+                className="absolute right-2.5 text-slate-400 hover:text-slate-600 text-xs cursor-pointer font-bold"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
           <div className={`emp-filter-dropdown ${dept !== "All" ? "active" : ""}`}>
             <span className="emp-filter-text">
               {dept === "All" ? "Department" : dept}
@@ -269,12 +463,13 @@ export default function Employees() {
             </select>
           </div>
 
-          {(dept !== "All" || status !== "All") && (
+          {(dept !== "All" || status !== "All" || search.trim() !== "") && (
             <button
               type="button"
               onClick={() => {
                 setDept("All");
                 setStatus("All");
+                setSearch("");
                 setCurrentPage(1);
               }}
               className="emp-btn-clear"
@@ -337,9 +532,27 @@ export default function Employees() {
                     <td style={{ color: "#374151" }}>{row.designation}</td>
                     <td style={{ color: "#374151" }}>{row.department}</td>
                     <td>
-                      <span className="emp-status" style={{ ...statusStyles[row.status] }}>
-                        {row.status}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="emp-status" style={{ ...statusStyles[row.status] }}>
+                          {row.status}
+                        </span>
+                        {row.confirmationStatus && row.confirmationStatus !== "Confirmed" && (
+                          <span
+                            onClick={() => handleOpenLifecycle(row, "probation")}
+                            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border cursor-pointer hover:opacity-80 transition ${
+                              row.confirmationStatus === "Due for Confirmation"
+                                ? "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                                : row.confirmationStatus === "Extended"
+                                ? "bg-purple-100 text-purple-800 border-purple-300"
+                                : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}
+                            title={`Click to review probation: ${row.confirmationStatus}${row.probationEndDate ? ` (Due ${row.probationEndDate})` : ""}`}
+                          >
+                            {row.confirmationStatus}
+                            {row.probationEndDate ? ` • Due ${row.probationEndDate}` : ""}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <LoginBadge login={row.login} />
@@ -347,7 +560,28 @@ export default function Employees() {
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       <button
                         type="button"
-                        onClick={() => handleOpenLifecycle(row)}
+                        onClick={() => handleOpenLifecycle(row, "probation")}
+                        className="emp-trash-btn inline-block mr-1"
+                        style={{ color: row.confirmationStatus === "Due for Confirmation" ? "#b45309" : "#0284c7" }}
+                        title="Probation & Notice Lifecycle"
+                      >
+                        <Clock size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPerfEmp(row);
+                          setPerfReportOpen(true);
+                        }}
+                        className="emp-trash-btn inline-block mr-1"
+                        style={{ color: "#059669" }}
+                        title="Generate Performance Report"
+                      >
+                        <FileText size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenLifecycle(row, "transfers")}
                         className="emp-trash-btn inline-block mr-1"
                         style={{ color: "#2563eb" }}
                         title="Employee Lifecycle (Transfers, Promotions, Warnings, Awards)"
@@ -381,14 +615,46 @@ export default function Employees() {
               <div key={row.id} className="emp-grid-item">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <UserInitials name={row.name} className="w-[44px] h-[44px] text-sm" iconSize={20} />
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(row.id, row.name)}
-                    className="emp-trash-btn"
-                    title="Delete employee"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPerfEmp(row);
+                        setPerfReportOpen(true);
+                      }}
+                      className="emp-trash-btn inline-block"
+                      style={{ color: "#059669" }}
+                      title="Performance Report"
+                    >
+                      <FileText size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenLifecycle(row, "probation")}
+                      className="emp-trash-btn inline-block"
+                      style={{ color: row.confirmationStatus === "Due for Confirmation" ? "#b45309" : "#0284c7" }}
+                      title="Probation & Notice Lifecycle"
+                    >
+                      <Clock size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenLifecycle(row, "transfers")}
+                      className="emp-trash-btn inline-block"
+                      style={{ color: "#2563eb" }}
+                      title="Employee Lifecycle"
+                    >
+                      <Award size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(row.id, row.name)}
+                      className="emp-trash-btn"
+                      title="Delete employee"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
                 <h3 style={{ margin: "10px 0 2px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>
                   {row.name}
@@ -400,9 +666,26 @@ export default function Employees() {
                 <LoginBadge login={row.login} />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
                   <span className="emp-id">{row.employeeCode || row.empId || row.id}</span>
-                  <span className="emp-status" style={{ ...statusStyles[row.status] }}>
-                    {row.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="emp-status" style={{ ...statusStyles[row.status] }}>
+                      {row.status}
+                    </span>
+                    {row.confirmationStatus && row.confirmationStatus !== "Confirmed" && (
+                      <span
+                        onClick={() => handleOpenLifecycle(row, "probation")}
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border cursor-pointer hover:opacity-80 transition ${
+                          row.confirmationStatus === "Due for Confirmation"
+                            ? "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                            : row.confirmationStatus === "Extended"
+                            ? "bg-purple-100 text-purple-800 border-purple-300"
+                            : "bg-blue-50 text-blue-700 border-blue-200"
+                        }`}
+                        title={`Click to review probation: ${row.confirmationStatus}${row.probationEndDate ? ` (Due ${row.probationEndDate})` : ""}`}
+                      >
+                        {row.confirmationStatus}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -589,10 +872,29 @@ export default function Employees() {
             </div>
 
             {/* Lifecycle Tabs */}
-            <div className="flex border-b border-slate-200 px-6 pt-2 bg-white">
+            <div className="flex border-b border-slate-200 px-6 pt-2 bg-white overflow-x-auto">
+              <button
+                onClick={() => { setLifecycleTab("probation"); setShowEventCreateModal(false); }}
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
+                  lifecycleTab === "probation" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Clock size={14} /> Probation & Notice
+                {selectedLifecycleEmp.confirmationStatus && (
+                  <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    selectedLifecycleEmp.confirmationStatus === "Due for Confirmation"
+                      ? "bg-amber-100 text-amber-800"
+                      : selectedLifecycleEmp.confirmationStatus === "Confirmed"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-blue-100 text-blue-800"
+                  }`}>
+                    {selectedLifecycleEmp.confirmationStatus}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => { setLifecycleTab("transfers"); setShowEventCreateModal(false); }}
-                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                   lifecycleTab === "transfers" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -600,7 +902,7 @@ export default function Employees() {
               </button>
               <button
                 onClick={() => { setLifecycleTab("promotions"); setShowEventCreateModal(false); }}
-                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                   lifecycleTab === "promotions" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -608,7 +910,7 @@ export default function Employees() {
               </button>
               <button
                 onClick={() => { setLifecycleTab("warnings"); setShowEventCreateModal(false); }}
-                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                   lifecycleTab === "warnings" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -616,7 +918,7 @@ export default function Employees() {
               </button>
               <button
                 onClick={() => { setLifecycleTab("awards"); setShowEventCreateModal(false); }}
-                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                   lifecycleTab === "awards" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -628,18 +930,21 @@ export default function Employees() {
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-slate-700">
+                  {lifecycleTab === "probation" && "Probation Period & Employment Confirmation Lifecycle"}
                   {lifecycleTab === "transfers" && "Department & Location Transfer History"}
                   {lifecycleTab === "promotions" && "Career Progression & Salary Revisions"}
                   {lifecycleTab === "warnings" && "Formal Performance & Conduct Notices"}
                   {lifecycleTab === "awards" && "Excellence Awards & Spot Recognition"}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setShowEventCreateModal(!showEventCreateModal)}
-                  className="px-3 py-1.5 bg-primary text-white rounded-lg font-semibold flex items-center gap-1 hover:bg-primary/90 transition"
-                >
-                  <Plus size={13} /> {showEventCreateModal ? "Close Form" : `Record ${lifecycleTab.slice(0, -1)}`}
-                </button>
+                {lifecycleTab !== "probation" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEventCreateModal(!showEventCreateModal)}
+                    className="px-3 py-1.5 bg-primary text-white rounded-lg font-semibold flex items-center gap-1 hover:bg-primary/90 transition"
+                  >
+                    <Plus size={13} /> {showEventCreateModal ? "Close Form" : `Record ${lifecycleTab.slice(0, -1)}`}
+                  </button>
+                )}
               </div>
 
               {/* Event Creation Forms */}
@@ -652,16 +957,22 @@ export default function Employees() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        await createEmployeeTransfer({
-                          employee: selectedLifecycleEmp.id,
-                          from_department: selectedLifecycleEmp.department,
-                          to_department: transferForm.to_department,
-                          to_branch: transferForm.to_branch,
-                          effective_date: transferForm.effective_date,
-                          reason: transferForm.reason,
-                        });
-                        setShowEventCreateModal(false);
-                        loadLifecycleData(selectedLifecycleEmp.id);
+                        try {
+                          await createEmployeeTransfer({
+                            employeeId: selectedLifecycleEmp.id,
+                            from_department: selectedLifecycleEmp.department,
+                            to_department: transferForm.to_department,
+                            effective_date: transferForm.effective_date,
+                            reason: transferForm.reason,
+                          });
+                          setToast("Transfer recorded successfully.");
+                          setShowEventCreateModal(false);
+                          setSelectedLifecycleEmp((prev) => prev ? { ...prev, department: transferForm.to_department } : prev);
+                          await loadLifecycleData(selectedLifecycleEmp.id);
+                          refreshHrms?.("employees");
+                        } catch (err) {
+                          setToast("Failed to record transfer: " + (err?.message || "Server error"), "error");
+                        }
                       }}
                       className="space-y-3"
                     >
@@ -671,11 +982,17 @@ export default function Employees() {
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Operations / R&D"
+                            list="department-options"
+                            placeholder="Select or enter department"
                             value={transferForm.to_department}
                             onChange={(e) => setTransferForm({ ...transferForm, to_department: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
                           />
+                          <datalist id="department-options">
+                            {departmentsList.map((d) => (
+                              <option key={d.id} value={d.name} />
+                            ))}
+                          </datalist>
                         </div>
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Effective Date *</label>
@@ -698,7 +1015,7 @@ export default function Employees() {
                           placeholder="Operational requirement or employee request..."
                         />
                       </div>
-                      <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg font-semibold">
+                      <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-95">
                         Confirm Transfer
                       </button>
                     </form>
@@ -708,17 +1025,24 @@ export default function Employees() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        await createEmployeePromotion({
-                          employee: selectedLifecycleEmp.id,
-                          previous_designation: selectedLifecycleEmp.designation,
-                          new_designation: promotionForm.new_designation,
-                          previous_salary: parseFloat(promotionForm.previous_salary) || 0,
-                          new_salary: parseFloat(promotionForm.new_salary) || 0,
-                          effective_date: promotionForm.effective_date,
-                          notes: promotionForm.notes,
-                        });
-                        setShowEventCreateModal(false);
-                        loadLifecycleData(selectedLifecycleEmp.id);
+                        try {
+                          await createEmployeePromotion({
+                            employeeId: selectedLifecycleEmp.id,
+                            previous_designation: selectedLifecycleEmp.designation,
+                            new_designation: promotionForm.new_designation,
+                            previous_salary: parseFloat(promotionForm.previous_salary) || 0,
+                            new_salary: parseFloat(promotionForm.new_salary) || 0,
+                            effective_date: promotionForm.effective_date,
+                            notes: promotionForm.notes,
+                          });
+                          setToast("Promotion confirmed successfully.");
+                          setShowEventCreateModal(false);
+                          setSelectedLifecycleEmp((prev) => prev ? { ...prev, designation: promotionForm.new_designation, standardSalary: promotionForm.new_salary } : prev);
+                          await loadLifecycleData(selectedLifecycleEmp.id);
+                          refreshHrms?.("employees");
+                        } catch (err) {
+                          setToast("Failed to confirm promotion: " + (err?.message || "Server error"), "error");
+                        }
                       }}
                       className="space-y-3"
                     >
@@ -728,11 +1052,17 @@ export default function Employees() {
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Senior Systems Engineer"
+                            list="designation-options"
+                            placeholder="Select or enter designation"
                             value={promotionForm.new_designation}
                             onChange={(e) => setPromotionForm({ ...promotionForm, new_designation: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
                           />
+                          <datalist id="designation-options">
+                            {designationsList.map((d) => (
+                              <option key={d.id} value={d.title || d.name} />
+                            ))}
+                          </datalist>
                         </div>
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Effective Date *</label>
@@ -765,7 +1095,17 @@ export default function Employees() {
                           />
                         </div>
                       </div>
-                      <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Promotion Notes / Justification</label>
+                        <textarea
+                          rows={2}
+                          value={promotionForm.notes}
+                          onChange={(e) => setPromotionForm({ ...promotionForm, notes: e.target.value })}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          placeholder="Reason for promotion and revised role responsibilities..."
+                        />
+                      </div>
+                      <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:opacity-95">
                         Confirm Promotion
                       </button>
                     </form>
@@ -775,15 +1115,20 @@ export default function Employees() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        await createEmployeeWarning({
-                          employee: selectedLifecycleEmp.id,
-                          warning_level: warningForm.warning_level,
-                          title: warningForm.title,
-                          explanation: warningForm.explanation,
-                          warning_date: warningForm.warning_date,
-                        });
-                        setShowEventCreateModal(false);
-                        loadLifecycleData(selectedLifecycleEmp.id);
+                        try {
+                          await createEmployeeWarning({
+                            employeeId: selectedLifecycleEmp.id,
+                            severity: warningForm.warning_level,
+                            subject: warningForm.title,
+                            description: warningForm.explanation,
+                            issue_date: warningForm.warning_date,
+                          });
+                          setToast("Disciplinary notice issued successfully.");
+                          setShowEventCreateModal(false);
+                          await loadLifecycleData(selectedLifecycleEmp.id);
+                        } catch (err) {
+                          setToast("Failed to issue warning: " + (err?.message || "Server error"), "error");
+                        }
                       }}
                       className="space-y-3"
                     >
@@ -793,7 +1138,7 @@ export default function Employees() {
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Unexcused Absence / Security Violation"
+                            placeholder="e.g. Unexcused Absence / Conduct Violation"
                             value={warningForm.title}
                             onChange={(e) => setWarningForm({ ...warningForm, title: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
@@ -806,9 +1151,10 @@ export default function Employees() {
                             onChange={(e) => setWarningForm({ ...warningForm, warning_level: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
                           >
-                            <option value="Low">Low (Informal Counseling)</option>
-                            <option value="Medium">Medium (Written Warning)</option>
-                            <option value="Severe">Severe (Final Notice / PIP)</option>
+                            <option value="Verbal">Verbal (Informal Counseling)</option>
+                            <option value="First Written">First Written (Official Warning)</option>
+                            <option value="Final Written">Final Written (Final Notice / PIP)</option>
+                            <option value="Suspension">Suspension (Formal Action)</option>
                           </select>
                         </div>
                       </div>
@@ -822,7 +1168,7 @@ export default function Employees() {
                           placeholder="Details of the infraction and corrective measures required..."
                         />
                       </div>
-                      <button type="submit" className="px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold">
+                      <button type="submit" className="px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:opacity-95">
                         Issue Warning Notice
                       </button>
                     </form>
@@ -832,29 +1178,49 @@ export default function Employees() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        await createEmployeeAward({
-                          employee: selectedLifecycleEmp.id,
-                          award_name: awardForm.award_name,
-                          citation: awardForm.citation,
-                          cash_reward: parseFloat(awardForm.cash_reward) || 0,
-                          presentation_date: awardForm.presentation_date,
-                        });
-                        setShowEventCreateModal(false);
-                        loadLifecycleData(selectedLifecycleEmp.id);
+                        try {
+                          await createEmployeeAward({
+                            employeeId: selectedLifecycleEmp.id,
+                            award_name: awardForm.award_name,
+                            category: awardForm.category || "Excellence",
+                            citation: awardForm.citation,
+                            gift_amount: parseFloat(awardForm.cash_reward) || 0,
+                            award_date: awardForm.presentation_date,
+                          });
+                          setToast("Award recorded and presented.");
+                          setShowEventCreateModal(false);
+                          await loadLifecycleData(selectedLifecycleEmp.id);
+                        } catch (err) {
+                          setToast("Failed to record award: " + (err?.message || "Server error"), "error");
+                        }
                       }}
                       className="space-y-3"
                     >
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-1">
                           <label className="font-semibold text-slate-700 block mb-1">Award Title *</label>
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Star Performer of the Quarter / Innovation Award"
+                            placeholder="e.g. Star Performer of Quarter"
                             value={awardForm.award_name}
                             onChange={(e) => setAwardForm({ ...awardForm, award_name: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
                           />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Category</label>
+                          <select
+                            value={awardForm.category || "Excellence"}
+                            onChange={(e) => setAwardForm({ ...awardForm, category: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                          >
+                            <option value="Excellence">Excellence</option>
+                            <option value="Star Performer">Star Performer</option>
+                            <option value="Innovation">Innovation</option>
+                            <option value="Customer Hero">Customer Hero</option>
+                            <option value="Leadership">Leadership</option>
+                          </select>
                         </div>
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Cash Reward (Rs)</label>
@@ -877,7 +1243,7 @@ export default function Employees() {
                           placeholder="Key milestone or client feedback leading to this recognition..."
                         />
                       </div>
-                      <button type="submit" className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold">
+                      <button type="submit" className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold hover:opacity-95">
                         Present Award
                       </button>
                     </form>
@@ -886,6 +1252,218 @@ export default function Employees() {
               )}
 
               {/* Data Tables */}
+              {lifecycleTab === "probation" && (
+                <div className="space-y-4">
+                  {/* Status & Timing Overview */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 text-sm">Lifecycle Status:</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border inline-flex items-center gap-1 ${
+                          selectedLifecycleEmp.confirmationStatus === "Due for Confirmation"
+                            ? "bg-amber-100 text-amber-800 border-amber-300"
+                            : selectedLifecycleEmp.confirmationStatus === "Confirmed"
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : selectedLifecycleEmp.confirmationStatus === "Extended"
+                            ? "bg-purple-100 text-purple-800 border-purple-300"
+                            : "bg-blue-100 text-blue-800 border-blue-300"
+                        }`}>
+                          {selectedLifecycleEmp.confirmationStatus === "Confirmed" && <CheckCircle2 size={13} />}
+                          {selectedLifecycleEmp.confirmationStatus === "Due for Confirmation" && <AlertCircle size={13} />}
+                          {selectedLifecycleEmp.confirmationStatus || "On Probation"}
+                        </span>
+                      </div>
+                      {selectedLifecycleEmp.confirmationStatus !== "Confirmed" && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setProbationAction(probationAction === 'confirm' ? null : 'confirm')}
+                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition flex items-center gap-1 text-xs cursor-pointer"
+                          >
+                            <CheckCircle2 size={13} /> Confirm Employee
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setProbationAction(probationAction === 'extend' ? null : 'extend')}
+                            className="px-3 py-1.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center gap-1 text-xs cursor-pointer"
+                          >
+                            <Clock size={13} /> Extend Probation
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="text-slate-400 font-medium">Probation Period</div>
+                        <div className="font-bold text-slate-800 mt-0.5">{selectedLifecycleEmp.probationPeriod || "90 Days (3 Months)"}</div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="text-slate-400 font-medium">Probation Start</div>
+                        <div className="font-mono font-bold text-slate-800 mt-0.5">{selectedLifecycleEmp.probationStartDate || selectedLifecycleEmp.joining || selectedLifecycleEmp.doj || "—"}</div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="text-slate-400 font-medium">Scheduled End Date</div>
+                        <div className="font-mono font-bold text-slate-800 mt-0.5">{selectedLifecycleEmp.probationEndDate || "—"}</div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="text-slate-400 font-medium">Standard Notice Period</div>
+                        <div className="font-bold text-slate-800 mt-0.5">{selectedLifecycleEmp.noticePeriod || `${selectedLifecycleEmp.noticePeriodDays || 60} Days`}</div>
+                      </div>
+                    </div>
+
+                    {selectedLifecycleEmp.confirmationStatus === "Confirmed" && (
+                      <div className="mt-3 p-3 bg-emerald-50/60 border border-emerald-200 rounded-lg text-xs">
+                        <span className="font-bold text-emerald-800">Confirmed on: </span>
+                        <span className="font-mono text-emerald-900">{selectedLifecycleEmp.confirmationDate || "—"}</span>
+                        {selectedLifecycleEmp.confirmationRemarks && (
+                          <p className="text-emerald-700 mt-1 italic">"{selectedLifecycleEmp.confirmationRemarks}"</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Inline Confirmation Action Form */}
+                  {probationAction === 'confirm' && (
+                    <form onSubmit={handleConfirmProbationSubmit} className="p-4 bg-emerald-50/40 border border-emerald-200 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-emerald-900 flex items-center gap-1.5">
+                          <CheckCircle2 size={16} className="text-emerald-600" /> Confirm Employee Probation
+                        </h4>
+                        <button type="button" onClick={() => setProbationAction(null)} className="text-slate-400 hover:text-slate-600">
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        Confirming marks the employee as Confirmed, transitions their status to Active, and records an official confirmation audit entry.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Effective Confirmation Date *</label>
+                          <input
+                            type="date"
+                            required
+                            value={confirmForm.effective_date}
+                            onChange={(e) => setConfirmForm({ ...confirmForm, effective_date: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Confirmation Remarks / Appraisal Notes</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Satisfactory completion of probation period and performance goals."
+                            value={confirmForm.remarks}
+                            onChange={(e) => setConfirmForm({ ...confirmForm, remarks: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setProbationAction(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer">
+                          Cancel
+                        </button>
+                        <button type="submit" disabled={actionLoading} className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition cursor-pointer">
+                          {actionLoading ? "Confirming..." : "Confirm Probation"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Inline Extension Action Form */}
+                  {probationAction === 'extend' && (
+                    <form onSubmit={handleExtendProbationSubmit} className="p-4 bg-purple-50/40 border border-purple-200 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-purple-900 flex items-center gap-1.5">
+                          <Clock size={16} className="text-purple-600" /> Extend Employee Probation
+                        </h4>
+                        <button type="button" onClick={() => setProbationAction(null)} className="text-slate-400 hover:text-slate-600">
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        Extending probation recalculates the end date, marks the status as Extended, and stores the reason in the employee's audit log.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Extension Duration *</label>
+                          <select
+                            value={extendForm.extension_days}
+                            onChange={(e) => setExtendForm({ ...extendForm, extension_days: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                          >
+                            <option value="30">30 Days (1 Month)</option>
+                            <option value="60">60 Days (2 Months)</option>
+                            <option value="90">90 Days (3 Months)</option>
+                            <option value="180">180 Days (6 Months)</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="font-semibold text-slate-700 block mb-1">Reason for Extension *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Additional performance review required for project deliveries."
+                            value={extendForm.reason}
+                            onChange={(e) => setExtendForm({ ...extendForm, reason: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setProbationAction(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer">
+                          Cancel
+                        </button>
+                        <button type="submit" disabled={actionLoading} className="px-4 py-1.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition cursor-pointer">
+                          {actionLoading ? "Extending..." : "Confirm Extension"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Probation History Table */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
+                      Probation & Lifecycle History
+                    </div>
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50/50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">Event</th>
+                          <th className="py-2.5 px-4">Date</th>
+                          <th className="py-2.5 px-4">Details / Remarks</th>
+                          <th className="py-2.5 px-4 text-right">Updated By</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(!selectedLifecycleEmp.probationHistory || selectedLifecycleEmp.probationHistory.length === 0) ? (
+                          <tr><td colSpan={4} className="py-6 text-center text-slate-400">No probation history events logged yet.</td></tr>
+                        ) : (
+                          selectedLifecycleEmp.probationHistory.map((item, idx) => (
+                            <tr key={idx}>
+                              <td className="py-2.5 px-4 font-semibold text-slate-800">
+                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                  (item.action || item.event) === "Confirmed" ? "bg-emerald-100 text-emerald-800" :
+                                  (item.action || item.event) === "Extended" ? "bg-purple-100 text-purple-800" :
+                                  "bg-blue-100 text-blue-800"
+                                }`}>
+                                  {item.action || item.event || "Lifecycle Event"}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 font-mono text-slate-600">{item.date || item.effective_date || item.timestamp || "—"}</td>
+                              <td className="py-2.5 px-4 text-slate-700">
+                                {item.remarks || item.reason || (item.new_end_date ? `End date set to ${item.new_end_date}` : "—")}
+                              </td>
+                              <td className="py-2.5 px-4 text-right text-slate-500 font-mono">{item.changed_by || item.user || "System"}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {lifecycleTab === "transfers" && (
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
                   <table className="w-full text-xs text-left">
@@ -903,9 +1481,9 @@ export default function Employees() {
                       ) : (
                         transfers.map((t, idx) => (
                           <tr key={idx}>
-                            <td className="py-2.5 px-4 text-slate-600">{t.from_department || "—"}</td>
-                            <td className="py-2.5 px-4 font-semibold text-slate-800">{t.to_department}</td>
-                            <td className="py-2.5 px-4 font-mono text-slate-600">{t.effective_date}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{t.fromDepartmentName || t.from_department || "—"}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{t.toDepartmentName || t.to_department || "—"}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{t.effective_date || t.effectiveDate || "—"}</td>
                             <td className="py-2.5 px-4 text-slate-600">{t.reason || "—"}</td>
                           </tr>
                         ))
@@ -932,11 +1510,11 @@ export default function Employees() {
                       ) : (
                         promotions.map((p, idx) => (
                           <tr key={idx}>
-                            <td className="py-2.5 px-4 text-slate-600">{p.previous_designation || "—"}</td>
-                            <td className="py-2.5 px-4 font-semibold text-emerald-700">{p.new_designation}</td>
-                            <td className="py-2.5 px-4 font-mono text-slate-600">{p.effective_date}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{p.fromDesignationTitle || p.previous_designation || "—"}</td>
+                            <td className="py-2.5 px-4 font-semibold text-emerald-700">{p.toDesignationTitle || p.new_designation || "—"}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{p.effective_date || p.effectiveDate || "—"}</td>
                             <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                              {p.new_salary ? `Rs ${p.new_salary}` : "—"}
+                              {p.new_salary ? `Rs ${Number(p.new_salary).toLocaleString("en-IN")}` : "—"}
                             </td>
                           </tr>
                         ))
@@ -963,17 +1541,17 @@ export default function Employees() {
                       ) : (
                         warnings.map((w, idx) => (
                           <tr key={idx}>
-                            <td className="py-2.5 px-4 font-semibold text-slate-800">{w.title}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{w.subject || w.title || "—"}</td>
                             <td className="py-2.5 px-4">
                               <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                                w.warning_level === "Severe" ? "bg-rose-100 text-rose-800" :
-                                w.warning_level === "Medium" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
+                                (w.severity || w.warning_level) === "Severe" || (w.severity || w.warning_level) === "Final Written" || (w.severity || w.warning_level) === "Suspension" ? "bg-rose-100 text-rose-800" :
+                                (w.severity || w.warning_level) === "Medium" || (w.severity || w.warning_level) === "First Written" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
                               }`}>
-                                {w.warning_level}
+                                {w.severity || w.warning_level || "Notice"}
                               </span>
                             </td>
-                            <td className="py-2.5 px-4 font-mono text-slate-600">{w.warning_date}</td>
-                            <td className="py-2.5 px-4 text-slate-600">{w.explanation || "—"}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{w.issue_date || w.warning_date || "—"}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{w.description || w.explanation || "—"}</td>
                           </tr>
                         ))
                       )}
@@ -1000,11 +1578,11 @@ export default function Employees() {
                         awards.map((a, idx) => (
                           <tr key={idx}>
                             <td className="py-2.5 px-4 font-semibold text-amber-800 flex items-center gap-1.5">
-                              <Award size={14} className="text-amber-600" /> {a.award_name}
+                              <Award size={14} className="text-amber-600" /> {a.award_name || a.title || "—"}
                             </td>
-                            <td className="py-2.5 px-4 font-mono text-slate-600">{a.presentation_date}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{a.award_date || a.presentation_date || "—"}</td>
                             <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">
-                              {a.cash_reward ? `Rs ${a.cash_reward}` : "—"}
+                              {(a.gift_amount || a.cash_reward) ? `Rs ${Number(a.gift_amount || a.cash_reward).toLocaleString("en-IN")}` : "—"}
                             </td>
                             <td className="py-2.5 px-4 text-slate-600">{a.citation || "—"}</td>
                           </tr>
@@ -1028,6 +1606,13 @@ export default function Employees() {
           </div>
         </div>
       )}
+
+      {/* Performance & Appraisal Report Modal */}
+      <PerformanceReportModal
+        isOpen={perfReportOpen}
+        onClose={() => setPerfReportOpen(false)}
+        employee={selectedPerfEmp}
+      />
 
       <style>{`
         .emp-dir-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }

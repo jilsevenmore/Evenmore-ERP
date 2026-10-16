@@ -5,6 +5,7 @@ import { StatCard } from '../../components/ui/StatCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PackageCheck, Truck, ClipboardCheck, ShieldCheck, X, CheckCircle2, AlertTriangle, Boxes, Scale, FileText, ArrowRight } from 'lucide-react';
 import { createShortSupplyDebitNote, fetchVendorWeightVariations } from '../../services/upgradeService';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 // ── [PHASE-2B] Standalone Goods Receipt (GRN) page ────────────────────────
 // New: before this page, goods receipt was an embedded action inside bill
@@ -669,7 +670,8 @@ export const GoodsReceiptPage = () => {
                                                             type="number"
                                                             min={0}
                                                             value={receivedQtys[key] ?? ordered}
-                                                            onChange={(e) => updateQty(key, e.target.value)}
+                                                            onFocus={handleNumberInputFocus}
+                                                            onChange={(e) => updateQty(key, sanitizeNumberInput(e.target.value))}
                                                             className="w-24 border border-slate-300 rounded-lg p-2 text-right font-mono text-slate-800"
                                                         />
                                                         <span className="text-[11px] font-semibold text-slate-600 w-12 text-left">{uom}</span>
@@ -685,7 +687,8 @@ export const GoodsReceiptPage = () => {
                                                             step="0.01"
                                                             value={receivedWeights[key] ?? ''}
                                                             placeholder={`Expected ~${(wMeta.theoreticalWeight * ordered).toFixed(2)} ${wMeta.weightUnit}`}
-                                                            onChange={(e) => updateWeight(key, e.target.value)}
+                                                            onFocus={handleNumberInputFocus}
+                                                            onChange={(e) => updateWeight(key, sanitizeNumberInput(e.target.value))}
                                                             className="w-32 border border-blue-200 rounded-lg p-2 text-right font-mono text-slate-800"
                                                         />
                                                         <span className="text-[10px] text-slate-400 w-14">{wMeta.weightUnit} weighed</span>

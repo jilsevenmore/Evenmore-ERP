@@ -10,7 +10,7 @@ import { lineSpecText, lineTotalWeight, formatKg } from '../../utils/salesLineMe
 const USE_LEGACY_LETTERHEAD = false;
 
 export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
-    const { companyProfile, resolvePartyAddresses } = useERP();
+    const { companyProfile, resolvePartyAddresses, salesOrders = [], formatCurrency } = useERP();
     const companyName = companyProfile?.name || '';
     const companyShort = companyInitial(companyName);
     const gstin = companyProfile?.gstin || '';
@@ -31,9 +31,21 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
         window.print();
     };
 
+    const linkedOrder = salesOrders.find(
+        (o) => o.id === challan.salesOrderId || o.orderNumber === (challan.salesOrderNumber || challan.linkedSo || challan.soRef)
+    );
+
+    const formalInvoiceAmt = Number(
+        challan.formalInvoiceAmount !== undefined
+            ? challan.formalInvoiceAmount
+            : linkedOrder?.formalInvoiceAmount !== undefined
+                ? linkedOrder.formalInvoiceAmount
+                : (linkedOrder?.amount || challan.amount || challan.total || 0)
+    );
+
     const items = challan.items || [];
     const totalUnits = items.reduce((sum, it) => sum + (Number(it.qty || it.dispatchedQty || it.quantity) || 1), 0);
-    const soRef = challan.soRef || challan.salesOrderRef || '';
+    const soRef = challan.soRef || challan.salesOrderRef || challan.salesOrderNumber || challan.linkedSo || '';
     const consigneeAddress = addressLines(challan.shippingAddress
         || resolvePartyAddresses?.(challan.customerId, challan.customer)?.shipping);
 
@@ -111,6 +123,16 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                                     <p className="text-xs text-blue-700 font-semibold">
                                         Waybill / LR #: {challan.lrNumber}
                                     </p>
+                                )}
+                                {formalInvoiceAmt > 0 && (
+                                    <div className="mt-1 pt-1 border-t border-slate-300">
+                                        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-sans font-bold">
+                                            Formal Invoice Value
+                                        </p>
+                                        <p className="text-sm font-black text-blue-900">
+                                            {formatCurrency ? formatCurrency(formalInvoiceAmt) : `₹${formalInvoiceAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                                        </p>
+                                    </div>
                                 )}
                             </div>
 
@@ -209,18 +231,23 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                                     <th className="py-2.5 px-3">Item Description & Specification</th>
                                     <th className="py-2.5 px-3 text-center">Serial / Batch #</th>
                                     <th className="py-2.5 px-3 text-center">Quantity</th>
-                                    <th className="py-2.5 px-3 text-center">Package Type</th>
-                                    <th className="py-2.5 px-3 text-center">Condition Check</th>
+                                    <th className="py-2.5 px-3 text-right">Unit Rate</th>
+                                    <th className="py-2.5 px-3 text-center">Tax %</th>
+                                    <th className="py-2.5 px-3 text-right">Formal Amount</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
                                 {items.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="py-4 px-3 text-center text-slate-400 italic">No line items on this challan.</td>
+                                        <td colSpan={7} className="py-4 px-3 text-center text-slate-400 italic">No line items on this challan.</td>
                                     </tr>
                                 ) : (
                                     items.map((it, idx) => {
-                                        const qty = it.qty || it.dispatchedQty || it.quantity || 1;
+                                        const qty = Number(it.qty || it.dispatchedQty || it.quantity || 1);
+                                        const orderLine = linkedOrder?.items?.find((oi) => oi.itemId === it.itemId || (it.itemSku && oi.itemSku === it.itemSku) || (it.name && oi.name === it.name));
+                                        const rate = Number(it.rate !== undefined ? it.rate : (orderLine?.rate ?? 0));
+                                        const taxRate = Number(it.tax !== undefined ? it.tax : (it.tax_pct !== undefined ? it.tax_pct : (orderLine?.tax ?? orderLine?.tax_pct ?? 18)));
+                                        const lineAmt = Number(it.amount !== undefined ? it.amount : (orderLine?.amount ?? (qty * rate)));
                                         return (
                                             <tr key={idx} className="hover:bg-slate-50/50">
                                                 <td className="py-2.5 px-3 text-center font-mono text-slate-500">{idx + 1}</td>
@@ -229,21 +256,24 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                                                     {it.itemSku && (
                                                         <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku}</p>
                                                     )}
+                                                    {it.hsn && <p className="text-[10px] text-slate-400 font-mono">HSN: {it.hsn}</p>}
                                                     {lineSpecText(it) && <p className="text-[10px] text-slate-500">{lineSpecText(it)}</p>}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center font-mono text-slate-600">
                                                     {it.serialNumber || '—'}
                                                 </td>
-                                                {/* Replaced: {qty} {it.unit || 'Units'} -- the server's field is `uom`. */}
                                                 <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
                                                     {qty} {it.uom || it.unit || 'Units'}
                                                     {Number(it.unitWeight) > 0 && <span className="block text-[10px] font-normal text-slate-500">{formatKg(lineTotalWeight({ ...it, qty }))}</span>}
                                                 </td>
-                                                <td className="py-2.5 px-3 text-center text-slate-600">
-                                                    {it.packaging || '—'}
+                                                <td className="py-2.5 px-3 text-right font-mono text-slate-800">
+                                                    {formatCurrency ? formatCurrency(rate) : `₹${rate.toFixed(2)}`}
                                                 </td>
-                                                <td className="py-2.5 px-3 text-center text-emerald-700 font-bold">
-                                                    {it.qcStatus || ''}
+                                                <td className="py-2.5 px-3 text-center font-mono text-slate-600">
+                                                    {taxRate}%
+                                                </td>
+                                                <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                                                    {formatCurrency ? formatCurrency(lineAmt) : `₹${lineAmt.toFixed(2)}`}
                                                 </td>
                                             </tr>
                                         );
@@ -253,16 +283,19 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                         </table>
                     </div>
 
-                    {/* Summary of Packages */}
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                    {/* Summary of Packages & Formal Invoicing */}
+                    <div className="flex flex-wrap items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs gap-3">
                         <div className="text-slate-600">
-                            Total Physical Units Dispatched: <strong className="text-slate-900 font-mono font-bold">{totalUnits} units</strong>
+                            Total Physical Units: <strong className="text-slate-900 font-mono font-bold">{totalUnits} units</strong>
                         </div>
                         {items.some((it) => Number(it.unitWeight) > 0) && (
                             <div className="text-slate-600">
                                 Total Weight: <strong className="text-slate-900 font-mono font-bold">{formatKg(items.reduce((acc, it) => acc + lineTotalWeight({ ...it, qty: it.qty || it.dispatchedQty || it.quantity || 1 }), 0))}</strong>
                             </div>
                         )}
+                        <div className="text-slate-600">
+                            Formal Invoice Total: <strong className="text-blue-900 font-mono font-bold">{formatCurrency ? formatCurrency(formalInvoiceAmt) : `₹${formalInvoiceAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}</strong>
+                        </div>
                     </div>
 
                     {/* Dual Signatures & POD (Proof of Delivery) */}
@@ -290,7 +323,7 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
 
                     {/* Footer Notice */}
                     <div className="text-center text-[10px] text-slate-400 pt-4 border-t border-slate-100">
-                        Official Goods In-Transit Waybill & Delivery Challan. Non-sale transport document under commercial transit laws.
+                        Official Goods In-Transit Waybill & Delivery Challan with formal product details. Non-cash consignment document.
                     </div>
                     <LetterpadFooter company={companyProfile} />
                 </div>

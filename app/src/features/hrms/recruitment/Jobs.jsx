@@ -48,7 +48,7 @@ function todayLabel() {
 }
 
 export default function Jobs() {
-  const { jobs, addJob, updateJob, deleteJob } = useRecruitmentStore();
+  const { jobs, addJob, updateJob, deleteJob, candidates = [] } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const location = useLocation();
@@ -226,8 +226,26 @@ export default function Jobs() {
     },
     { key: "department", header: "DEPARTMENT —", sortable: true },
     { key: "branch", header: "BRANCH" },
-    { key: "openings", header: "OPENINGS" },
-    { key: "applicants", header: "APPLICANTS —", sortable: true },
+    {
+      key: "applicants",
+      header: "APPLICANTS —",
+      sortable: true,
+      render: (r) => {
+        const count = candidates.filter(
+          (c) => c.jobId === r.id || c.position?.toLowerCase() === r.title?.toLowerCase()
+        ).length;
+        return (
+          <button
+            type="button"
+            onClick={() => navigate("/hrms/recruitment/candidates", { state: { jobFilter: r.title } })}
+            className="font-bold text-blue-600 hover:underline cursor-pointer"
+            title="View candidates for this job in pipeline"
+          >
+            {count || r.applicants || 0}
+          </button>
+        );
+      },
+    },
     { key: "startDate", header: "START DATE" },
     {
       key: "status",
@@ -249,13 +267,13 @@ export default function Jobs() {
       header: "ACTIONS",
       align: "right",
       render: (r) => (
-        <div className="flex items-center justify-end gap-1 text-slate-500">
+        <div className="flex items-center justify-end gap-1">
           <button
             type="button"
             title="View Details"
             aria-label="View"
             onClick={() => navigate(`/hrms/recruitment/jobs/${r.id}`)}
-            className="p-1.5 rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-400 dark:text-slate-500 transition cursor-pointer"
           >
             <Eye size={15} />
           </button>
@@ -264,7 +282,7 @@ export default function Jobs() {
             title="Edit Requisition"
             aria-label="Edit"
             onClick={() => openEdit(r)}
-            className="p-1.5 rounded-xl hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 transition cursor-pointer"
           >
             <Pencil size={15} />
           </button>
@@ -273,7 +291,7 @@ export default function Jobs() {
             title="View Applicants"
             aria-label="Applicants"
             onClick={() => navigate(`/hrms/recruitment/applications`)}
-            className="p-1.5 rounded-xl hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-400 dark:text-slate-500 transition cursor-pointer"
           >
             <Users size={15} />
           </button>
@@ -285,7 +303,7 @@ export default function Jobs() {
               addJob({ ...r, id: `JOB-${Date.now()}`, title: r.title + " Copy" });
               showToast("Job opening duplicated");
             }}
-            className="p-1.5 rounded-xl hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-400 dark:text-slate-500 transition cursor-pointer"
           >
             <Copy size={15} />
           </button>

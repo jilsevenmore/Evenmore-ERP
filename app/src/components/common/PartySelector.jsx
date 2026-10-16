@@ -55,22 +55,39 @@ export default function PartySelector({
         if (disabled) return;
         setMode(newMode);
         if (newMode === 'registered') {
-            const firstCust = customers.find(c => String(c.id) === String(value.customerId)) || customers[0];
-            const party = parties.find(p => String(p.id) === String(firstCust?.id)) || firstCust;
-            onChange?.({
-                isOneTimeParty: false,
-                selectedLeadId: '',
-                customerId: firstCust?.id || '',
-                customer: firstCust?.name || '',
-                partyName: firstCust?.name || '',
-                partyType: firstCust?.type || 'Customer',
-                partyPhone: party?.phone || firstCust?.phone || '',
-                partyEmail: party?.email || firstCust?.email || '',
-                partyGstin: party?.gstin || firstCust?.gstin || '',
-                placeOfSupply: party?.placeOfSupply || firstCust?.placeOfSupply || '',
-                billingAddress: party?.billingAddress || firstCust?.billingAddress || { line1: '', city: '', state: '', pincode: '', country: 'India' },
-                shippingAddress: party?.shippingAddress || firstCust?.shippingAddress || { line1: '', city: '', state: '', pincode: '', country: 'India' },
-            });
+            const currentCust = value.customerId ? customers.find(c => String(c.id) === String(value.customerId)) : null;
+            if (currentCust) {
+                const party = parties.find(p => String(p.id) === String(currentCust.id)) || currentCust;
+                onChange?.({
+                    isOneTimeParty: false,
+                    selectedLeadId: '',
+                    customerId: currentCust.id,
+                    customer: currentCust.name,
+                    partyName: currentCust.name,
+                    partyType: currentCust.type || 'Customer',
+                    partyPhone: party?.phone || currentCust.phone || '',
+                    partyEmail: party?.email || currentCust.email || '',
+                    partyGstin: party?.gstin || currentCust.gstin || '',
+                    placeOfSupply: party?.placeOfSupply || currentCust.placeOfSupply || '',
+                    billingAddress: party?.billingAddress || currentCust.billingAddress || { line1: '', city: '', state: '', pincode: '', country: 'India' },
+                    shippingAddress: party?.shippingAddress || currentCust.shippingAddress || { line1: '', city: '', state: '', pincode: '', country: 'India' },
+                });
+            } else {
+                onChange?.({
+                    isOneTimeParty: false,
+                    selectedLeadId: '',
+                    customerId: '',
+                    customer: '',
+                    partyName: '',
+                    partyType: 'Customer',
+                    partyPhone: '',
+                    partyEmail: '',
+                    partyGstin: '',
+                    placeOfSupply: '',
+                    billingAddress: { line1: '', city: '', state: '', pincode: '', country: 'India' },
+                    shippingAddress: { line1: '', city: '', state: '', pincode: '', country: 'India' },
+                });
+            }
         } else {
             onChange?.({
                 isOneTimeParty: true,
@@ -89,6 +106,24 @@ export default function PartySelector({
     };
 
     const handleRegisteredChange = (optionValue) => {
+        if (!optionValue) {
+            onChange?.({
+                isOneTimeParty: false,
+                selectedLeadId: '',
+                customerId: '',
+                customer: '',
+                partyName: '',
+                partyType: 'Customer',
+                partyPhone: '',
+                partyEmail: '',
+                partyGstin: '',
+                placeOfSupply: '',
+                billingAddress: { line1: '', city: '', state: '', pincode: '', country: 'India' },
+                shippingAddress: { line1: '', city: '', state: '', pincode: '', country: 'India' },
+            });
+            return;
+        }
+
         // A lead is not a party: it has no ledger, addresses or GSTIN, so it is
         // raised against the document's own party columns and linked by id.
         if (typeof optionValue === 'string' && optionValue.startsWith(LEAD_PREFIX)) {
@@ -229,7 +264,7 @@ export default function PartySelector({
                         onChange={(e) => handleRegisteredChange(e.target.value)}
                         className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-medium text-xs focus:ring-2 focus:ring-blue-500"
                     >
-                        <option value="" disabled>-- Select Customer Account --</option>
+                        <option value="">-- Select Customer Account --</option>
                         {customers.length > 0 && (
                             <optgroup label={`Customers (${customers.length})`}>
                                 {customers.map((c) => (

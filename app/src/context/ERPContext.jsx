@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { canOpenPath } from '../utils/navAccess';
 import { publishEstimates } from '../services/estimateStore';
@@ -44,6 +44,7 @@ function mapCategoryToHSN(category) {
  */
 const COLLECTION_ROUTE_MAP = {
     // Sales
+    estimates: '/sales/estimates',
     salesOrders: '/sales/orders',
     quotations: '/sales/quotations',
     proformaInvoices: '/sales/proforma',
@@ -470,14 +471,14 @@ export const ERPProvider = ({ children, }) => {
     /** Swap an optimistic record for the server's, matching on the local id. */
     const reconcile = (setter, localId, serverRecord) => {
         setter((prev) => prev.map((row) => (
-            row.id === localId ? { ...row, ...serverRecord, _synced: true } : row
+            row.id === localId || String(row.id) === String(localId) ? { ...row, ...serverRecord, _synced: true } : row
         )));
     };
 
     /** Flag the row so the UI can show it never reached the database. */
     const markSyncFailure = (setter, localId, err) => {
         setter((prev) => prev.map((row) => (
-            row.id === localId ? { ...row, _synced: false, _syncError: describeError(err) } : row
+            row.id === localId || String(row.id) === String(localId) ? { ...row, _synced: false, _syncError: describeError(err) } : row
         )));
     };
 
@@ -666,7 +667,11 @@ export const ERPProvider = ({ children, }) => {
                 }
             }
         });
-        const onHand = moves.length > 0 ? Math.max(0, openingStock + totalInward - totalOutward) : Math.max(0, item?.availableQty ?? item?.onHand ?? 0);
+        const hasOpeningMove = moves.some((m) => m.type === 'OPENING_STOCK' || (m.type === 'ADJUSTMENT' && String(m.notes || '').toLowerCase().includes('opening')));
+        const baseStock = (!hasOpeningMove && item)
+            ? Math.max(0, Number(item.availableQty ?? item.stock ?? item.onHand ?? 0) - totalInward + totalOutward)
+            : 0;
+        const onHand = moves.length > 0 ? Math.max(0, openingStock + baseStock + totalInward - totalOutward) : Math.max(0, item?.availableQty ?? item?.onHand ?? 0);
         if (moves.length === 0 && onHand > 0) {
             openingStock = onHand;
         }
@@ -833,15 +838,31 @@ export const ERPProvider = ({ children, }) => {
         if (!inv)
             return { total: 0, taxableAmount: 0, gst: 0, paid: 0, paidAgainstInvoice: 0, withoutBillCash: 0, totalReceived: 0, balanceDue: 0, outstanding: 0, status: 'Unpaid' };
         
-        // Sum all valid with-bill payments received for this invoice (exclude cancelled/voided and without-bill cash)
+        // Calculate valid with-bill payments received for this invoice (exclude cancelled/voided and without-bill cash)
         const relatedWithBillPayments = paymentIns.filter((p) => 
             p.status !== 'Cancelled' && 
             p.status !== 'Voided' && 
             p.paymentType !== 'WITHOUT_BILL' &&
-            (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()))
+            (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()) ||
+             (Array.isArray(p.allocations) && p.allocations.some(a => (a.invoiceId === inv.id || a.documentId === inv.id))))
         );
-        const paidAgainstInvoice = relatedWithBillPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0) + 
-            (inv.paidAmount && relatedWithBillPayments.length === 0 ? Number(inv.paidAmount) : 0);
+
+        let paidAgainstInvoice = Number(inv.amount_paid || inv.paidAmount || 0);
+        if (relatedWithBillPayments.length > 0) {
+            const summedFromPayments = relatedWithBillPayments.reduce((acc, p) => {
+                if (Array.isArray(p.allocations) && p.allocations.length > 0) {
+                    const matchedAlloc = p.allocations.find(a => a.invoiceId === inv.id || a.documentId === inv.id);
+                    if (matchedAlloc) {
+                        return acc + (Number(matchedAlloc.amount) || 0);
+                    }
+                }
+                if (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase())) {
+                    return acc + (Number(p.amount) || 0);
+                }
+                return acc;
+            }, 0);
+            paidAgainstInvoice = Math.max(paidAgainstInvoice, summedFromPayments);
+        }
 
         // Without-Bill cash received for this invoice
         const relatedCashReceipts = cashPaymentReceipts.filter((r) => 
@@ -863,9 +884,9 @@ export const ERPProvider = ({ children, }) => {
         const taxableAmount = Number(inv.taxableValue || inv.taxable_value || inv.subtotal || 0);
         const gst = Number(inv.totalTax || inv.total_tax || ((inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0)) || Math.max(0, total - taxableAmount));
         
-        // Important: Invoice Outstanding = Invoice Total - Valid With-Bill Payments
-        // Without-Bill Cash does NOT reduce invoice outstanding!
-        const balanceDue = Math.max(0, total - paidAgainstInvoice);
+        // Important: Remaining Due = Invoice Gross Amount - Credit Applied - Payments Allocated
+        const appliedCredit = Number(inv.appliedCredit || inv.creditApplied || (inv.creditAllocations ? inv.creditAllocations.reduce((s, c) => s + Number(c.allocatedAmount || 0), 0) : 0));
+        const balanceDue = Math.max(0, Math.round((total - paidAgainstInvoice - appliedCredit) * 100) / 100);
         const outstanding = balanceDue;
         const totalReceived = paidAgainstInvoice + withoutBillCash;
 
@@ -873,7 +894,7 @@ export const ERPProvider = ({ children, }) => {
         if (balanceDue <= 0.01) {
             status = 'Paid';
         }
-        else if (paidAgainstInvoice > 0) {
+        else if (paidAgainstInvoice > 0 || appliedCredit > 0) {
             status = 'Partially Paid';
         }
         else {
@@ -892,9 +913,12 @@ export const ERPProvider = ({ children, }) => {
             gst, 
             paid: paidAgainstInvoice, 
             paidAgainstInvoice, 
+            appliedCredit,
+            creditApplied: appliedCredit,
             withoutBillCash, 
             totalReceived, 
             balanceDue, 
+            remainingDue: balanceDue,
             outstanding, 
             status,
             totalSalesValue: totalSales,
@@ -955,13 +979,15 @@ export const ERPProvider = ({ children, }) => {
         setInventoryMovements((prev) => [newMovement, ...prev]);
         // Also update physical availableQty in InventoryItem state
         setItems((prev) => prev.map((item) => {
-            if (item.id === newMovement.itemId || item.sku?.toLowerCase() === newMovement.itemSku?.toLowerCase()) {
-                const newAvailable = Math.max(0, item.availableQty + newMovement.quantity);
+            if (item.id === newMovement.itemId || (newMovement.itemSku && item.sku?.toLowerCase() === newMovement.itemSku?.toLowerCase())) {
+                const currentAvail = Number(item.availableQty ?? item.stock ?? item.onHand ?? item.onHandQty ?? 0) || 0;
+                const newAvailable = Math.max(0, currentAvail + Number(newMovement.quantity || 0));
                 let newStatus = item.status;
-                if (newAvailable <= item.reorderLevel / 2) {
+                const rLevel = Number(item.reorderLevel ?? item.reorder_level ?? 5) || 5;
+                if (newAvailable <= rLevel / 2) {
                     newStatus = 'Critical';
                 }
-                else if (newAvailable <= item.reorderLevel) {
+                else if (newAvailable <= rLevel) {
                     newStatus = 'Low Stock';
                 }
                 else {
@@ -970,6 +996,9 @@ export const ERPProvider = ({ children, }) => {
                 return {
                     ...item,
                     availableQty: newAvailable,
+                    stock: newAvailable,
+                    onHand: newAvailable,
+                    onHandQty: newAvailable,
                     status: newStatus,
                 };
             }
@@ -1091,15 +1120,59 @@ export const ERPProvider = ({ children, }) => {
         return { billing, shipping };
     };
 
+    // Calculate party balance dynamically:
+    // For vendors: + unapplied advances (PO & vendor advances) - open due bills + debit notes
+    // When bills are due and exceed advances, balance is negative (in minus)
+    const getPartyCalculatedBalance = useCallback((party) => {
+        if (!party) return 0;
+        if (party.type === 'Customer') {
+            return party.balance ?? 0;
+        }
+        const match = (doc) => {
+            if (!doc) return false;
+            const docVendId = doc.vendorId || doc.partyId;
+            if (docVendId && (docVendId === party.id || docVendId === party.code)) return true;
+            const docVendName = doc.vendor || doc.partyName || doc.name;
+            if (docVendName && String(docVendName).toLowerCase() === String(party.name || '').toLowerCase()) return true;
+            return false;
+        };
+        const advReleased = paymentOuts
+            .filter((p) => p.paymentType === 'Advance' && match(p))
+            .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        const advApplied = paymentOuts
+            .filter((p) => p.advanceApplied === true && match(p))
+            .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        const openAdvance = Math.max(0, advReleased - advApplied);
+
+        const openBillsDue = purchaseBills
+            .filter((b) => b.status !== 'Cancelled' && b.status !== 'Paid' && match(b))
+            .reduce((s, b) => {
+                const due = b.balanceDue !== undefined && b.balanceDue !== null
+                    ? Number(b.balanceDue)
+                    : Math.max(0, (Number(b.total) || Number(b.amount) || 0) - (Number(b.paidAmount) || Number(b.amountPaid) || 0));
+                return s + (due || 0);
+            }, 0);
+
+        const debitNotes = purchaseReturns
+            .filter((pr) => pr.status !== 'Cancelled' && match(pr))
+            .reduce((s, pr) => s + (Number(pr.amount) || Number(pr.total) || 0), 0);
+
+        if (advReleased > 0 || advApplied > 0 || openBillsDue > 0 || debitNotes > 0) {
+            const opening = Number(party.openingBalance || 0);
+            return Math.round((opening + openAdvance + debitNotes - openBillsDue) * 100) / 100;
+        }
+        return party.balance ?? 0;
+    }, [paymentOuts, purchaseBills, purchaseReturns]);
+
     const syncVendorBalance = (vendorId, vendorName, deltaAmount) => {
         if (!deltaAmount) return;
         setVendors((prev) => prev.map((v) => {
             const match = (vendorId && v.id === vendorId) || (vendorName && v.name?.toLowerCase() === vendorName?.toLowerCase());
-            return match ? { ...v, balance: Math.max(0, (v.balance || 0) + deltaAmount) } : v;
+            return match ? { ...v, balance: Math.round(((v.balance || 0) + deltaAmount) * 100) / 100 } : v;
         }));
         setParties((prev) => prev.map((p) => {
             const match = (vendorId && p.id === vendorId) || (vendorName && p.name?.toLowerCase() === vendorName?.toLowerCase());
-            return match ? { ...p, balance: Math.max(0, (p.balance || 0) + deltaAmount) } : p;
+            return match ? { ...p, balance: Math.round(((p.balance || 0) + deltaAmount) * 100) / 100 } : p;
         }));
     };
 
@@ -1175,8 +1248,14 @@ export const ERPProvider = ({ children, }) => {
 
         const isDraft = newInvoice.status === 'Draft' || newInvoice.isDraft === true || newInvoice.finalized === false;
         const isPaid = newInvoice.status === 'Paid';
-        const finalStatus = isDraft ? 'Draft' : isPaid ? 'Paid' : (newInvoice.status || 'Unpaid');
         const isFinalized = !isDraft;
+
+        // Connect party/customer eligible available credit
+        const partyCredit = Number(newInvoice.appliedCredit ?? (isFinalized ? (party?.availableCredit || cust?.availableCredit || 0) : 0));
+        const directPaid = isPaid ? total : Number(newInvoice.paidAmount || newInvoice.amountPaid || 0);
+        const appliedCredit = Math.min(Math.max(0, total - directPaid), partyCredit);
+        const balanceDue = isPaid ? 0 : Math.max(0, Math.round((total - directPaid - appliedCredit) * 100) / 100);
+        const finalStatus = isDraft ? 'Draft' : (isPaid || balanceDue <= 0.01) ? 'Paid' : (appliedCredit > 0 || directPaid > 0) ? 'Partially Paid' : (newInvoice.status || 'Unpaid');
 
         const invoice = {
             id: newInvoice.id || `inv-${Date.now()}`,
@@ -1211,9 +1290,12 @@ export const ERPProvider = ({ children, }) => {
             total,
             grandTotal: total,
             amount: total,
-            paidAmount: isPaid ? total : (newInvoice.paidAmount || 0),
-            amountPaid: isPaid ? total : (newInvoice.paidAmount || 0),
-            balanceDue: isPaid ? 0 : Math.max(0, total - (newInvoice.paidAmount || 0)),
+            paidAmount: directPaid,
+            amountPaid: directPaid,
+            appliedCredit,
+            creditApplied: appliedCredit,
+            balanceDue,
+            remainingDue: balanceDue,
             totalSalesValue: newInvoice.totalSalesValue !== undefined ? Number(newInvoice.totalSalesValue) : (newInvoice.formalInvoiceAmount !== undefined ? (Number(newInvoice.formalInvoiceAmount) + (Number(newInvoice.cashAmount) || 0)) : total),
             formalInvoiceAmount: newInvoice.formalInvoiceAmount !== undefined ? Number(newInvoice.formalInvoiceAmount) : total,
             cashAmount: Number(newInvoice.cashAmount) || 0,
@@ -1258,11 +1340,28 @@ export const ERPProvider = ({ children, }) => {
                 });
             }
 
-            // Update customer outstanding balance
-            if (invoice.customer) {
-                setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === String(invoice.customer ?? '').toLowerCase() || (invoice.customerId && c.id === invoice.customerId)
-                    ? { ...c, balance: c.balance + invoice.total }
-                    : c));
+            // Update customer outstanding balance and available credit
+            if (invoice.customer || invoice.customerId) {
+                setCustomers((prev) => prev.map((c) => {
+                    const isTarget = String(c.name ?? '').toLowerCase() === String(invoice.customer ?? '').toLowerCase() || (invoice.customerId && c.id === invoice.customerId);
+                    if (!isTarget) return c;
+                    const currentCredit = Number(c.availableCredit || 0);
+                    return {
+                        ...c,
+                        balance: c.balance + invoice.total,
+                        availableCredit: Math.max(0, Math.round((currentCredit - appliedCredit) * 100) / 100),
+                    };
+                }));
+                setParties((prev) => prev.map((p) => {
+                    const isTarget = String(p.name ?? '').toLowerCase() === String(invoice.customer ?? '').toLowerCase() || (invoice.customerId && p.id === invoice.customerId);
+                    if (!isTarget) return p;
+                    const currentCredit = Number(p.availableCredit || 0);
+                    return {
+                        ...p,
+                        balance: p.balance + invoice.total,
+                        availableCredit: Math.max(0, Math.round((currentCredit - appliedCredit) * 100) / 100),
+                    };
+                }));
             }
 
             // Auto-create Journal Entry for Revenue & AR
@@ -1401,6 +1500,12 @@ export const ERPProvider = ({ children, }) => {
             return target;
         }
 
+        const lines = target.items || target.lineItems || [];
+        if (lines.length === 0) {
+            showToast('Cannot finalize invoice without line items. Add at least one item first.');
+            return undefined;
+        }
+
         let finalized = null;
         setInvoices((prev) => prev.map((inv) => {
             if (inv.id !== invoiceId) return inv;
@@ -1474,7 +1579,8 @@ export const ERPProvider = ({ children, }) => {
                 })
                 .catch((err) => {
                     console.warn('[ERP] could not finalize invoice on server:', err);
-                    showToast(`Finalized locally only — ${describeError(err)}`);
+                    setInvoices((prev) => prev.map((inv) => (inv.id === invoiceId ? target : inv)));
+                    showToast(`Could not finalize invoice on server: ${describeError(err)}`);
                 });
         }
 
@@ -1988,6 +2094,9 @@ export const ERPProvider = ({ children, }) => {
             sellingPrice: item.sellingPrice ?? 90,
             location: item.location || '',
             status: isService ? 'Optimal' : (calculatedQty <= (item.reorderLevel ?? 5) / 2 ? 'Critical' : calculatedQty <= (item.reorderLevel ?? 5) ? 'Low Stock' : 'Optimal'),
+            image: item.image || item.imageUrl || '',
+            imageUrl: item.imageUrl || item.image || '',
+            imageFileId: item.imageFileId || undefined,
             customFieldValues: item.customFieldValues || {},
         };
         setItems((prev) => [newItem, ...prev]);
@@ -2225,7 +2334,24 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Machine BOM part removed.`);
     };
 
-    // Derived compatibility helpers for customers / vendors
+    // Derived compatibility helpers with live calculated vendor balances
+    const resolvedParties = useMemo(() => {
+        return parties.map((p) => {
+            if (p.type === 'Vendor' || p.type === 'Both') {
+                const calcBal = getPartyCalculatedBalance(p);
+                return { ...p, balance: calcBal };
+            }
+            return p;
+        });
+    }, [parties, getPartyCalculatedBalance]);
+
+    const resolvedVendors = useMemo(() => {
+        return vendors.map((v) => {
+            const calcBal = getPartyCalculatedBalance(v);
+            return { ...v, balance: calcBal };
+        });
+    }, [vendors, getPartyCalculatedBalance]);
+
     const customersFromParties = parties
         .filter((p) => p.type === 'Customer' || p.type === 'Both')
         .map((p) => ({
@@ -2240,7 +2366,7 @@ export const ERPProvider = ({ children, }) => {
             status: p.status === 'Inactive' ? 'On Hold' : 'Active',
         }));
 
-    const vendorsFromParties = parties
+    const vendorsFromParties = resolvedParties
         .filter((p) => p.type === 'Vendor' || p.type === 'Both')
         .map((p) => ({
             id: p.id,
@@ -2550,7 +2676,11 @@ export const ERPProvider = ({ children, }) => {
     // ── ESTIMATES ACTIONS ──────────────────────────────────────────────
     // The CRM screens read estimates through `services/estimateStore`.
     useEffect(() => {
-        publishEstimates(estimates, { addEstimate, updateEstimate });
+        publishEstimates(estimates, {
+            addEstimate,
+            updateEstimate,
+            requestEstimates: () => requestCollection('estimates'),
+        });
     }, [estimates]);
 
     const addEstimate = (est) => {
@@ -2743,6 +2873,18 @@ export const ERPProvider = ({ children, }) => {
             persistCreate('deliveryChallans', challan, setDeliveryChallans);
         }
         return challan;
+    };
+    const updateQuotation = (id, updates) => {
+        setQuotations((prev) => prev.map((q) => (q.id === id ? {
+            ...q,
+            ...updates,
+            billingAddress: updates.billingAddress ? createAddressSnapshot(updates.billingAddress) : q.billingAddress,
+            shippingAddress: updates.shippingAddress ? createAddressSnapshot(updates.shippingAddress) : q.shippingAddress,
+        } : q)));
+        const { status, ...rest } = updates || {};
+        const toPersist = status === 'Converted' || status === 'Confirmed' ? rest : updates;
+        if (Object.keys(toPersist || {}).length) persistUpdate('quotations', id, toPersist, setQuotations);
+        showToast('Quotation updated.');
     };
     const updateQuotationStatus = (id, status) => {
         const target = quotations.find((q) => String(q.id) === String(id));
@@ -3061,10 +3203,28 @@ export const ERPProvider = ({ children, }) => {
         showToast('Sales order split updated locally.');
         return updated;
     };
-    const updateSalesOrderStage = (id, stage) => {
+    const updateSalesOrderStage = async (id, stage, options = {}) => {
+        const previousOrder = salesOrders.find((o) => o.id === id);
+        const previousStage = previousOrder?.stage;
+        const previousStatus = previousOrder?.status;
+
         setSalesOrders((prev) => prev.map((o) => (o.id === id ? { ...o, stage, status: stage } : o)));
-        // Draft → Confirmed is where the server enforces the credit limit.
-        persistUpdate('salesOrders', id, { stage }, setSalesOrders);
+
+        if (!isBackendEnabled() || !isServerId(id)) return { success: true };
+        try {
+            const updates = { stage, ...options };
+            const serverRecord = await pushUpdate('salesOrders', id, updates);
+            if (serverRecord) reconcile(setSalesOrders, id, serverRecord);
+            return { success: true, record: serverRecord };
+        } catch (err) {
+            console.warn('[ERP] could not update salesOrders:', err);
+            if (previousOrder) {
+                setSalesOrders((prev) => prev.map((o) => (o.id === id ? { ...o, stage: previousStage, status: previousStatus } : o)));
+            }
+            markSyncFailure(setSalesOrders, id, err);
+            showToast(`Change not saved to server — ${describeError(err)}`);
+            return { success: false, error: err };
+        }
     };
     const cancelSalesOrder = (orderId, reason = 'Cancelled by user') => {
         const order = salesOrders.find((o) => o.id === orderId);
@@ -3577,13 +3737,15 @@ export const ERPProvider = ({ children, }) => {
                     showToast('Cannot record payment against a draft invoice. Please finalize the invoice first.');
                     return null;
                 }
-                if (targetInv.status === 'Paid' || (targetInv.balanceDue !== undefined && targetInv.balanceDue <= 0.01)) {
+                const outBal = targetInv.balanceDue !== undefined 
+                    ? Number(targetInv.balanceDue) 
+                    : Math.max(0, Number(targetInv.total ?? targetInv.amount ?? 0) - Number(targetInv.paidAmount ?? targetInv.amountPaid ?? 0) - Number(targetInv.appliedCredit ?? targetInv.creditApplied ?? 0));
+                if (outBal <= 0.01) {
                     showToast('Invoice is already fully settled.');
                     return null;
                 }
-                const remainingBal = targetInv.balanceDue !== undefined ? targetInv.balanceDue : Math.max(0, targetInv.total - (targetInv.paidAmount || 0));
-                if (payAmt > remainingBal + 0.01) {
-                    showToast(`Payment amount (${formatCurrency(payAmt)}) exceeds remaining invoice balance (${formatCurrency(remainingBal)}).`);
+                if (payAmt > outBal + 0.01) {
+                    showToast(`Payment amount (${formatCurrency(payAmt)}) exceeds remaining invoice balance (${formatCurrency(outBal)}).`);
                     return null;
                 }
             }
@@ -3636,6 +3798,30 @@ export const ERPProvider = ({ children, }) => {
 
             setCashPaymentReceipts((prev) => [newCashReceipt, ...prev]);
             setPaymentIns((prev) => [newPay, ...prev]);
+
+            // If linked to an invoice, update invoice appliedCredit and balanceDue in local state
+            if (targetInv) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.id === targetInv.id || inv.invoiceNumber === targetInv.invoiceNumber) {
+                        const currentCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                        const updatedCredit = currentCredit + payAmt;
+                        const paid = Number(inv.paidAmount ?? inv.amountPaid ?? 0);
+                        const total = Number(inv.total ?? inv.amount ?? inv.grandTotal ?? 0);
+                        const remainingDue = Math.max(0, Math.round((total - paid - updatedCredit) * 100) / 100);
+                        const isFull = remainingDue <= 0.01;
+                        const derivedStatus = isFull ? 'Paid' : (paid > 0 || updatedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
+                        return {
+                            ...inv,
+                            appliedCredit: updatedCredit,
+                            creditApplied: updatedCredit,
+                            balanceDue: remainingDue,
+                            remainingDue: remainingDue,
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
 
             // Adjust customer balance
             if (custName) {
@@ -3703,13 +3889,16 @@ export const ERPProvider = ({ children, }) => {
                     const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
                     const updatedPaid = currentPaid + payAmt;
                     const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
-                    const isFull = updatedPaid >= (totalInvoice - 0.01);
-                    const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
+                    const appliedCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                    const remainingDue = Math.max(0, Math.round((totalInvoice - updatedPaid - appliedCredit) * 100) / 100);
+                    const isFull = remainingDue <= 0.01;
+                    const derivedStatus = isFull ? 'Paid' : (updatedPaid > 0 || appliedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
                     return {
                         ...inv,
                         paidAmount: updatedPaid,
                         amountPaid: updatedPaid,
-                        balanceDue: Math.max(0, totalInvoice - updatedPaid),
+                        balanceDue: remainingDue,
+                        remainingDue: remainingDue,
                         status: derivedStatus,
                     };
                 }
@@ -3781,13 +3970,16 @@ export const ERPProvider = ({ children, }) => {
                         const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
                         const updatedPaid = Math.max(0, currentPaid - payAmt);
                         const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
-                        const isFull = updatedPaid >= (totalInvoice - 0.01);
-                        const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
+                        const appliedCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                        const remainingDue = Math.max(0, Math.round((totalInvoice - updatedPaid - appliedCredit) * 100) / 100);
+                        const isFull = remainingDue <= 0.01;
+                        const derivedStatus = isFull ? 'Paid' : (updatedPaid > 0 || appliedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
                         return {
                             ...inv,
                             paidAmount: updatedPaid,
                             amountPaid: updatedPaid,
-                            balanceDue: Math.max(0, totalInvoice - updatedPaid),
+                            balanceDue: remainingDue,
+                            remainingDue: remainingDue,
                             status: derivedStatus,
                         };
                     }
@@ -3852,6 +4044,29 @@ export const ERPProvider = ({ children, }) => {
                     ? { ...p, status: 'Cancelled', cancellationReason: reason, cancelledAt: new Date().toISOString() }
                     : p
             ));
+            // If linked to an invoice, restore invoice outstanding
+            if (targetReceipt.invoiceId || targetReceipt.invoiceNumber) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.id === targetReceipt.invoiceId || inv.invoiceNumber === targetReceipt.invoiceNumber) {
+                        const currentCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                        const updatedCredit = Math.max(0, currentCredit - amt);
+                        const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
+                        const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
+                        const remainingDue = Math.max(0, Math.round((totalInvoice - currentPaid - updatedCredit) * 100) / 100);
+                        const isFull = remainingDue <= 0.01;
+                        const derivedStatus = isFull ? 'Paid' : (currentPaid > 0 || updatedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
+                        return {
+                            ...inv,
+                            appliedCredit: updatedCredit,
+                            creditApplied: updatedCredit,
+                            balanceDue: remainingDue,
+                            remainingDue: remainingDue,
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
             showToast(`Cash Receipt ${targetReceipt.receiptNumber} cancelled.`);
             if (isBackendEnabled() && isServerId(targetReceipt.id)) {
                 pushAction('cashPaymentReceipts', targetReceipt.id, 'cancel', { reason })
@@ -3900,6 +4115,29 @@ export const ERPProvider = ({ children, }) => {
                     ? { ...p, status: 'Cancelled', cancellationReason: reason, cancelledAt: new Date().toISOString() }
                     : p
             ));
+            // If linked to an invoice, restore invoice outstanding
+            if (targetReceipt.invoiceId || targetReceipt.invoiceNumber) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.id === targetReceipt.invoiceId || inv.invoiceNumber === targetReceipt.invoiceNumber) {
+                        const currentCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                        const updatedCredit = Math.max(0, currentCredit - amt);
+                        const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
+                        const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
+                        const remainingDue = Math.max(0, Math.round((totalInvoice - currentPaid - updatedCredit) * 100) / 100);
+                        const isFull = remainingDue <= 0.01;
+                        const derivedStatus = isFull ? 'Paid' : (currentPaid > 0 || updatedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
+                        return {
+                            ...inv,
+                            appliedCredit: updatedCredit,
+                            creditApplied: updatedCredit,
+                            balanceDue: remainingDue,
+                            remainingDue: remainingDue,
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
             showToast(`Cash Receipt ${targetReceipt.receiptNumber} voided.`);
             if (isBackendEnabled() && isServerId(targetReceipt.id)) {
                 pushAction('cashPaymentReceipts', targetReceipt.id, 'cancel', { reason, void: true })
@@ -3931,6 +4169,107 @@ export const ERPProvider = ({ children, }) => {
             persistUpdate('cashPaymentReceipts', updated.id, updated, setCashPaymentReceipts);
         }
         return updated;
+    };
+
+    const allocateCashReceiptToInvoice = async (receiptId, invoiceId, amount = null) => {
+        const receipt = cashPaymentReceipts.find((r) => r.id === receiptId || r.receiptNumber === receiptId);
+        if (!receipt) {
+            showToast('Cash receipt not found.');
+            return null;
+        }
+        if (receipt.status === 'CANCELLED' || receipt.status === 'VOIDED') {
+            showToast('Cannot allocate a cancelled or voided receipt.');
+            return null;
+        }
+        if (receipt.invoiceId) {
+            showToast('Cash receipt is already allocated to an invoice.');
+            return null;
+        }
+
+        const inv = invoices.find((i) => i.id === invoiceId || i.invoiceNumber === invoiceId);
+        if (!inv) {
+            showToast('Target invoice not found.');
+            return null;
+        }
+        if (inv.status === 'Cancelled' || inv.status === 'Draft' || inv.finalized === false) {
+            showToast('Cannot allocate to draft or cancelled invoice.');
+            return null;
+        }
+
+        // Validate party match
+        const receiptCust = receipt.customer || receipt.partyName || '';
+        const invCust = inv.customer || inv.partyName || '';
+        if (receipt.customerId && inv.customerId && receipt.customerId !== inv.customerId) {
+            showToast('Cannot allocate cash receipt to another customer’s invoice.');
+            return null;
+        }
+
+        const out = getInvoiceOutstanding(inv.id);
+        if (out.balanceDue <= 0.01) {
+            showToast('Target invoice has zero remaining balance due.');
+            return null;
+        }
+
+        const allocAmt = amount ? Math.min(Number(amount), receipt.amount, out.balanceDue) : Math.min(receipt.amount, out.balanceDue);
+        if (allocAmt <= 0) {
+            showToast('Invalid allocation amount.');
+            return null;
+        }
+
+        // Update local cash receipt
+        setCashPaymentReceipts((prev) => prev.map((r) =>
+            r.id === receipt.id || r.receiptNumber === receipt.receiptNumber
+                ? { ...r, invoiceId: inv.id, invoiceNumber: inv.invoiceNumber }
+                : r
+        ));
+
+        // Update local paymentIn
+        setPaymentIns((prev) => prev.map((p) =>
+            p.receiptNumber === receipt.receiptNumber || p.id === receipt.paymentId
+                ? { ...p, invoiceId: inv.id, invoiceNumber: inv.invoiceNumber }
+                : p
+        ));
+
+        // Update local invoice
+        setInvoices((prev) => prev.map((item) => {
+            if (item.id === inv.id || item.invoiceNumber === inv.invoiceNumber) {
+                const currentCredit = Number(item.appliedCredit ?? item.creditApplied ?? 0);
+                const updatedCredit = currentCredit + allocAmt;
+                const currentPaid = Number(item.amountPaid ?? item.paidAmount ?? 0);
+                const totalInvoice = Number(item.total ?? item.amount ?? 0);
+                const remainingDue = Math.max(0, Math.round((totalInvoice - currentPaid - updatedCredit) * 100) / 100);
+                const isFull = remainingDue <= 0.01;
+                const derivedStatus = isFull ? 'Paid' : (currentPaid > 0 || updatedCredit > 0) ? 'Partially Paid' : (item.status === 'Draft' ? 'Draft' : 'Unpaid');
+                return {
+                    ...item,
+                    appliedCredit: updatedCredit,
+                    creditApplied: updatedCredit,
+                    balanceDue: remainingDue,
+                    remainingDue: remainingDue,
+                    status: derivedStatus,
+                };
+            }
+            return item;
+        }));
+
+        showToast(`Allocated ${formatCurrency(allocAmt)} to invoice ${inv.invoiceNumber}.`);
+
+        if (isBackendEnabled() && isServerId(receipt.id)) {
+            try {
+                const serverRecord = await pushAction('cashPaymentReceipts', receipt.id, 'allocate-invoice', {
+                    invoice_id: inv.id,
+                    amount: allocAmt,
+                });
+                if (serverRecord) {
+                    reconcile(setCashPaymentReceipts, receipt.id, serverRecord);
+                }
+                refreshFromBackend();
+            } catch (err) {
+                console.warn('[ERP] allocate cash receipt failed on server:', err);
+                showToast(`Allocation saved locally only — ${describeError(err)}`);
+            }
+        }
+        return true;
     };
     const addSalesReturn = (ret) => {
         const inv = invoices.find((i) => i.id === ret.invoiceId || i.invoiceNumber === ret.invoiceRef);
@@ -4173,8 +4512,34 @@ export const ERPProvider = ({ children, }) => {
             showToast('Cannot modify a cancelled Purchase Order.');
             return;
         }
+
+        // When issuing a Purchase Order, intake and restock inventory for its line items
+        if (status === 'Issued' && po.status !== 'Issued') {
+            const poLines = po.items || po.lineItems || [];
+            poLines.forEach((line) => {
+                const targetSku = line.sku || line.itemSku;
+                const item = items.find((i) => (line.itemId && (i.id === line.itemId || String(i.id) === String(line.itemId))) || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+                const qtyToAdd = Number(line.qty) || 0;
+                if (qtyToAdd > 0) {
+                    recordMovement({
+                        itemId: item?.id || line.itemId || `itm-${Date.now()}`,
+                        itemSku: item?.sku || targetSku || 'GEN-SKU',
+                        itemName: item?.name || line.itemName || line.name || line.description,
+                        type: 'PURCHASE',
+                        quantity: qtyToAdd,
+                        unitCost: line.rate || item?.costPrice || 0,
+                        referenceType: 'PurchaseOrder',
+                        referenceId: po.id,
+                        referenceNumber: po.poNumber,
+                        notes: `Stock replenished via Purchase Order ${po.poNumber}`,
+                    });
+                }
+            });
+        }
+
         setPurchaseOrders((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
-        showToast(`PO updated to ${status}.`);
+        persistUpdate('purchaseOrders', id, { status }, setPurchaseOrders);
+        showToast(status === 'Issued' ? `PO ${po.poNumber} issued. Inventory restocked successfully!` : `PO updated to ${status}.`);
     };
     const getPoBilledStatus = (poId) => {
         const po = typeof poId === 'object' ? poId : purchaseOrders.find((p) => p.id === poId || p.poNumber === poId);
@@ -4234,7 +4599,31 @@ export const ERPProvider = ({ children, }) => {
             return { success: false, message: `Active bill ${activeBill.billNumber} exists.` };
         }
 
+        if (po.status === 'Issued') {
+            const poLines = po.items || po.lineItems || [];
+            poLines.forEach((line) => {
+                const targetSku = line.sku || line.itemSku;
+                const item = items.find((i) => (line.itemId && (i.id === line.itemId || String(i.id) === String(line.itemId))) || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+                const qtyToSubtract = Number(line.qty) || 0;
+                if (qtyToSubtract > 0) {
+                    recordMovement({
+                        itemId: item?.id || line.itemId || `itm-${Date.now()}`,
+                        itemSku: item?.sku || targetSku || 'GEN-SKU',
+                        itemName: item?.name || line.itemName || line.name || line.description,
+                        type: 'ADJUSTMENT',
+                        quantity: -qtyToSubtract,
+                        unitCost: line.rate || item?.costPrice || 0,
+                        referenceType: 'PurchaseOrder',
+                        referenceId: po.id,
+                        referenceNumber: po.poNumber,
+                        notes: `Stock reversed for cancelled Purchase Order ${po.poNumber}`,
+                    });
+                }
+            });
+        }
+
         setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: 'Cancelled' } : p));
+        persistUpdate('purchaseOrders', poId, { status: 'Cancelled' }, setPurchaseOrders);
         showToast(`Purchase Order ${po.poNumber} cancelled.`);
         return { success: true, message: `Purchase Order ${po.poNumber} cancelled.` };
     };
@@ -4426,8 +4815,8 @@ export const ERPProvider = ({ children, }) => {
             }
         }
 
-        // Increase vendor AP liability across vendors and parties
-        syncVendorBalance(newBill.vendorId, newBill.vendor, billAmt);
+        // Bill is due: reduce vendor balance (shows in minus when bill is due)
+        syncVendorBalance(newBill.vendorId, newBill.vendor, -billAmt);
         // Auto-create Journal Entry
         const newJe = {
             id: `je-${Date.now()}`,
@@ -4543,8 +4932,8 @@ export const ERPProvider = ({ children, }) => {
             });
         }
 
-        // Reverse vendor AP liability across vendors and parties
-        syncVendorBalance(bill.vendorId, bill.vendor, -(bill.total || bill.amount || 0));
+        // Reversing due bill restores vendor balance
+        syncVendorBalance(bill.vendorId, bill.vendor, (bill.total || bill.amount || 0));
 
         // Auto-create Journal Entry reversal
         const jeReversal = {
@@ -4780,6 +5169,7 @@ export const ERPProvider = ({ children, }) => {
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'ACH',
             amount: payAmt,
+            bankAccountId: pay.bankAccountId || (pay.mode !== 'Cash' ? (bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id) : undefined),
             reference: pay.reference || '',
             status: 'Paid',
         };
@@ -4804,16 +5194,20 @@ export const ERPProvider = ({ children, }) => {
                 return b;
             }));
         }
-        // Decrease vendor balance liability only for bill settlements.
-        // Advances are vendor receivables (Dr Vendor Advances) and do not reduce AP.
-        if (!isAdvance) {
-            syncVendorBalance(newPay.vendorId, newPay.vendor, -payAmt);
+        // Update vendor balance:
+        // Advances increase vendor asset balance (+payAmt).
+        // Bill payments settle bill liability (+payAmt towards 0).
+        // Advance applications against bills do not change net balance.
+        if (!newPay.advanceApplied) {
+            syncVendorBalance(newPay.vendorId, newPay.vendor, payAmt);
         }
         // Deduct from Operating Bank Account (advance-applied adjustments already drew cash earlier)
-        if (!newPay.advanceApplied) {
-            setBankAccounts((prev) => prev.map((acc, idx) => idx === 0
-                ? { ...acc, balance: Math.max(0, acc.balance - payAmt) }
-                : acc));
+        if (!newPay.advanceApplied && newPay.mode !== 'Cash') {
+            const targetAccId = newPay.bankAccountId;
+            setBankAccounts((prev) => prev.map((acc, idx) => {
+                const isTarget = targetAccId ? acc.id === targetAccId : idx === 0;
+                return isTarget ? { ...acc, balance: Math.max(0, (acc.balance || 0) - payAmt) } : acc;
+            }));
         }
         // Auto-create Journal Entry
         const newJe = {
@@ -5130,8 +5524,8 @@ export const ERPProvider = ({ children, }) => {
                 });
             }
         }
-        // Reduce vendor liability balance across vendors and parties
-        syncVendorBalance(newDebit.vendorId, newDebit.vendor, -retAmt);
+        // Reduce vendor liability / increase advance asset across vendors and parties
+        syncVendorBalance(newDebit.vendorId, newDebit.vendor, retAmt);
         // Auto-create Journal Entry
         const newJe = {
             id: `je-${Date.now()}`,
@@ -5181,8 +5575,8 @@ export const ERPProvider = ({ children, }) => {
             }
         });
 
-        // 2. Reverse vendor AP reduction across vendors and parties
-        syncVendorBalance(pr.vendorId, pr.vendor, pr.amount);
+        // 2. Reverse vendor balance credit across vendors and parties
+        syncVendorBalance(pr.vendorId, pr.vendor, -pr.amount);
 
         // 3. Reversal Journal Entry
         const jeReversal = {
@@ -5643,8 +6037,9 @@ export const ERPProvider = ({ children, }) => {
             invoices,
             zoneRequests,
             customers,
-            vendors,
-            parties,
+            vendors: resolvedVendors,
+            parties: resolvedParties,
+            getPartyCalculatedBalance,
             addParty,
             updateParty,
             units,
@@ -5750,6 +6145,7 @@ export const ERPProvider = ({ children, }) => {
             addVendor,
             updateVendor,
             addQuotation,
+            updateQuotation,
             updateQuotationStatus,
             recordQuotationActivity,
             syncQuotationShare,
@@ -5772,6 +6168,7 @@ export const ERPProvider = ({ children, }) => {
             cancelCashPaymentReceipt,
             voidCashPaymentReceipt,
             updateCashPaymentReceipt,
+            allocateCashReceiptToInvoice,
             addSalesReturn,
             cancelSalesReturn,
             addPurchaseOrder,

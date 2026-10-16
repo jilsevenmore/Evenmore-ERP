@@ -12,7 +12,7 @@ import { canOpenPath, canUse, canUseDashboard } from '../../utils/navAccess';
 //   purchaseBills, items, calculateItemStock), not from static CRM fixture data.
 // import { toISODate, getCurrentISODate } from '../../utils/dateUtils';
 import { toISODate } from '../../utils/dateUtils';
-import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown, Plus, ArrowDownLeft, ArrowUpRight, Layers, Eye } from 'lucide-react';
+import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown, Plus, ArrowDownLeft, ArrowUpRight, Layers, Eye, AlertTriangle } from 'lucide-react';
 function buildChart(values, width, height, padding) {
   const max = Math.max(...values);
   const min = 0;
@@ -77,6 +77,9 @@ export const DashboardPage = () => {
   const invoices = show.sales ? (erp.invoices || []) : [];
   const salesOrders = show.sales ? (erp.salesOrders || []) : [];
   const quotations = show.sales ? (erp.quotations || []) : [];
+  const estimates = show.sales ? (erp.estimates || []) : [];
+  const openEstimates = estimates.filter((e) => e.status !== 'Converted' && e.status !== 'Rejected');
+  const rejectedEstimates = estimates.filter((e) => e.status === 'Rejected');
   const deliveryChallans = show.sales ? (erp.deliveryChallans || []) : [];
   const paymentIns = show.sales ? (erp.paymentIns || []) : [];
   const salesReturns = show.sales ? (erp.salesReturns || []) : [];
@@ -277,13 +280,13 @@ export const DashboardPage = () => {
     // Old: { label: 'CRM', desc: `${leads.length} Leads | Deals | Tasks`, ... count: leads.length, tag: 'Leads' }
     { label: 'CRM', desc: `${quotations.length} Quotes | Deals | Tasks`, to: '/crm/dashboard', icon: Target, tone: 'blue', count: quotations.length, tag: 'Quotes' },
     { label: 'PMS', desc: 'Projects | Stages | Delays', to: '/pms', icon: BriefcaseBusiness, tone: 'purple', tag: 'Projects' },
-    { label: 'Sales', desc: `${salesOrders.length} Orders | ${quotations.length} Quotes | ${invoices.length} Invoices`, to: '/sales/quotations', icon: TrendingUp, tone: 'green', count: salesOrders.length, tag: 'Orders' },
+    { label: 'Sales', desc: `${estimates.length} Estimates | ${salesOrders.length} Orders | ${quotations.length} Quotes`, to: '/sales/estimates', icon: TrendingUp, tone: 'green', count: salesOrders.length, tag: 'Sales' },
     { label: 'Purchase', desc: `${purchaseOrders.length} Orders | ${purchaseBills.length} Bills`, to: '/purchase/orders', icon: Truck, tone: 'amber', count: purchaseOrders.length, tag: 'POs' },
     { label: 'Inventory', desc: `${items.length} SKUs | ${lowStockItems.length} Low Stock`, to: '/inventory/items', icon: Package, tone: 'purple', count: items.length, tag: 'SKUs' },
     { label: 'Parties', desc: `${parties.length} Parties | ${customers.length} Customers`, to: '/parties', icon: Building2, tone: 'teal', count: parties.length, tag: 'Parties' },
     { label: 'Accounts', desc: `Bank ₹${Math.round(bankBalance).toLocaleString()} | ${invoices.length} Invoices`, to: '/accounts/cash-bank', icon: Wallet, tone: 'blue', count: bankAccounts.length, tag: 'Accounts' },
     { label: 'HRMS', desc: 'Employees | Attendance | Payroll', to: '/hrms/dashboard', icon: UserCheck, tone: 'green', tag: 'Staff' },
-    { label: 'Reports', desc: 'Sales | Stock | Finance Reports', to: '/reports', icon: PieChart, tone: 'pink', tag: 'Reports' },
+    // { label: 'Reports', desc: 'Sales | Stock | Finance Reports', to: '/reports', icon: PieChart, tone: 'pink', tag: 'Reports' },
     { label: 'Administration', desc: 'Users | Roles | Settings', to: '/administration/users', icon: Shield, tone: 'amber', tag: 'Admin' },
   ].filter((m) => open(m.to));
 
@@ -297,6 +300,17 @@ export const DashboardPage = () => {
     { label: 'Settings', to: '/administration/settings' },
   ].filter((l) => open(l.to));
   const topStats = [
+    show.sales && (
+      <StatCard
+        key="estimates"
+        label="Sales Estimates"
+        value={fmt(estimates.length)}
+        icon={FileText}
+        tone={rejectedEstimates.length > 0 ? "rose" : "blue"}
+        trend={rejectedEstimates.length > 0 ? `${fmt(rejectedEstimates.length)} rejected` : `${fmt(openEstimates.length)} open`}
+        note={rejectedEstimates.length > 0 ? "review rejections" : "estimates"}
+      />
+    ),
     show.sales && <StatCard key="quotations" label="Quotations" value={fmt(quotations.length)} icon={FileText} tone="blue" trend={`${fmt(deliveryChallans.length)}`} note="challans issued" />,
     show.sales && <StatCard key="orders" label="Sales Orders" value={fmt(salesOrders.length)} icon={ShoppingCart} tone="green" trend={`${fmt(Math.round(salesTotal / 1000))}k`} note="order value" />,
     show.sales && <StatCard key="invoices" label="Invoices Value" value={`₹${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note="invoices" />,
@@ -343,7 +357,15 @@ export const DashboardPage = () => {
         )}
       />
       {topStats.length > 0 && (
-      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className={`grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 ${
+        topStats.length >= 7
+          ? 'min-[1600px]:grid-cols-7'
+          : topStats.length === 6
+          ? 'min-[1600px]:grid-cols-6'
+          : topStats.length === 5
+          ? 'min-[1600px]:grid-cols-5'
+          : 'min-[1600px]:grid-cols-4'
+      } gap-3 sm:gap-4`}>
         {topStats}
       </div>
       )}
@@ -461,10 +483,10 @@ export const DashboardPage = () => {
             <h3 className="font-bold text-text text-sm sm:text-base">Your Modules</h3>
             <p className="text-[11px] sm:text-xs text-muted">Single-click access to the modules your role uses</p>
           </div>
-          <Link to="/reports" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 self-start sm:self-auto">
+          {/* <Link to="/reports" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 self-start sm:self-auto">
             <span>View Reports</span>
             <ArrowRight size={13} />
-          </Link>
+          </Link> */}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
@@ -777,13 +799,39 @@ export const DashboardPage = () => {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="font-bold text-text text-sm">Sales Snapshot</h3>
-                  <p className="text-[11px] text-muted">Orders + Invoices + Challans</p>
+                  <p className="text-[11px] text-muted">Orders + Estimates + Invoices</p>
                 </div>
                 <Link to="/sales/orders" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
                   <span>View All</span>
                   <ArrowRight size={13} />
                 </Link>
               </div>
+
+              {/* Rejected Estimates Alert Callout */}
+              {rejectedEstimates.length > 0 && (
+                <div className="mb-3 p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="p-1 rounded-lg bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
+                      <AlertTriangle size={15} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-rose-700 dark:text-rose-400 truncate">
+                        {rejectedEstimates.length} Rejected Estimate{rejectedEstimates.length > 1 ? 's' : ''} Require Attention
+                      </p>
+                      <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 truncate">
+                        Client rejected — review, update or re-send
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to="/sales/estimates"
+                    className="shrink-0 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs transition"
+                  >
+                    Review & Edit
+                  </Link>
+                </div>
+              )}
+
               <div className="space-y-2 text-xs">
                 {salesOrders.length === 0 && <p className="text-[11px] text-muted">No sales orders yet.</p>}
                 {salesOrders.slice(0, 3).map((o) => (
@@ -828,6 +876,21 @@ export const DashboardPage = () => {
           </div>
 
           <div className="pt-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2 text-xs font-semibold">
+            {open('/sales/estimates') && (
+            <Link
+              to="/sales/estimates"
+              className={`btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate ${
+                rejectedEstimates.length > 0 ? 'border-rose-500/40 text-rose-600 dark:text-rose-400 bg-rose-500/5 font-bold' : ''
+              }`}
+            >
+              Estimates {rejectedEstimates.length > 0 ? `(${fmt(rejectedEstimates.length)} Rejected)` : fmt(estimates.length)}
+            </Link>
+            )}
+            {open('/sales/quotations') && (
+            <Link to="/sales/quotations" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
+              Quotes {fmt(quotations.length)}
+            </Link>
+            )}
             {open('/sales/invoices') && (
             <Link to="/sales/invoices" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Invoices ₹{fmt(Math.round(invoiceTotal))}
@@ -1067,13 +1130,13 @@ export const DashboardPage = () => {
               </span>
               <strong className="text-text font-mono font-bold shrink-0">₹{fmt(Math.round(bankBalance))}</strong>
             </Link>
-            <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
+            {/* <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold text-text min-w-0">
                 <FileText size={14} className="text-primary shrink-0" />
                 <span className="truncate">General Ledger</span>
               </span>
               <span className="text-primary text-xs font-bold shrink-0">Open →</span>
-            </Link>
+            </Link> */}
             <Link to="/accounts/reports" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold text-text min-w-0">
                 <PieChart size={14} className="text-primary shrink-0" />

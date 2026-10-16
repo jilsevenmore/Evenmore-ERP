@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, useEffect } from 'react';
 
 const listeners = new Set();
 
@@ -43,6 +43,9 @@ export function subscribeEstimates(fn) {
 }
 
 export function useEstimates() {
+  useEffect(() => {
+    erpBridge.requestEstimates?.();
+  }, []);
   return useSyncExternalStore(subscribeEstimates, getEstimates);
 }
 
@@ -50,12 +53,13 @@ export function useEstimates() {
  * ERPContext publishes its estimate collection and helpers here on mount, which
  * keeps this module free of a React dependency on the provider.
  */
-const erpBridge = { estimates: [], addEstimate: null, updateEstimate: null };
+const erpBridge = { estimates: [], addEstimate: null, updateEstimate: null, requestEstimates: null };
 
 export function publishEstimates(estimates, helpers = {}) {
   erpBridge.estimates = Array.isArray(estimates) ? estimates : [];
   erpBridge.addEstimate = helpers.addEstimate || null;
   erpBridge.updateEstimate = helpers.updateEstimate || null;
+  erpBridge.requestEstimates = helpers.requestEstimates || null;
   emit();
 }
 
