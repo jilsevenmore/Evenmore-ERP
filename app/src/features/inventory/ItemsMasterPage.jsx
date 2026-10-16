@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { BarcodeLabelModal } from '../../components/common/BarcodeLabelModal';
 import { ImportModal } from '../../components/common/ImportModal';
 import { ItemStockDetailModal } from '../../components/common/ItemStockDetailModal';
+import { resolveFileUrl } from '../../services/api';
 
 export const ItemsMasterPage = () => {
     const { items, categories = [], itemTypes = [], materialGrades = [], addInventoryItem, vendors, addPurchaseOrder, formatCurrency, calculateItemStock } = useERP();
@@ -184,57 +185,80 @@ export const ItemsMasterPage = () => {
             key: 'name',
             header: 'Description & Taxonomy',
             width: '26%',
-            render: (i) => (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-text hover:text-primary hover:underline">
-                      {i.name}
-                    </Link>
-                    {i.itemType && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
-                        {i.itemType}
-                      </span>
-                    )}
-                    {(i.gradeName || i.metalGrade) && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
-                        {i.gradeName || i.metalGrade}
-                      </span>
-                    )}
-                    {i.finishCoating && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                        {i.finishCoating}
-                      </span>
-                    )}
+            render: (i) => {
+              const imgUrl = resolveFileUrl(i.imageUrl || i.image);
+              return (
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-soft border border-border flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                    {imgUrl ? (
+                      <img
+                        src={imgUrl}
+                        alt={i.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.parentElement?.querySelector('.master-img-fallback');
+                          if (fallback) fallback.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <Package
+                      size={16}
+                      className={`text-muted master-img-fallback ${imgUrl ? 'hidden' : ''}`}
+                    />
                   </div>
-
-                  <div className="flex items-center gap-2 text-[11px] text-muted flex-wrap">
-                    <span className="font-medium text-text-secondary">{i.category}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-0.5">
-                      <MapPin size={10} className="text-muted"/> {i.location || '—'}
-                    </span>
-
-                    {/* Metal Dimensions Specs */}
-                    {(i.diameter || i.legA || i.hasTubeSpec || i.sheetThickness || i.specification || i.dimensions) && (
-                      <>
-                        <span>•</span>
-                        <span className="font-mono text-sky-800 dark:text-sky-300 text-[10px] bg-sky-50 dark:bg-sky-500/15 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-500/30">
-                          {i.specification || i.dimensions || (
-                            <>
-                              {i.diameter ? `Ø${i.diameter}mm` : ''}
-                              {i.legA && i.legB && !i.webThickness ? `L ${i.legA}×${i.legB}×${i.sheetThickness || i.wallThickness || ''}mm` : ''}
-                              {i.legA && i.legB && i.webThickness ? `${i.legA}×${i.legB}mm (Web:${i.webThickness}mm, Flg:${i.flangeThickness}mm)` : ''}
-                              {i.hasTubeSpec ? `${i.tubeProfile || 'Round'} OD:${i.outerDiameter || `${i.outerWidth}×${i.outerHeight}`}×${i.wallThickness}mm` : ''}
-                              {!i.hasTubeSpec && !i.diameter && !i.legA && i.sheetThickness ? `${i.sheetThickness}mm (${i.sheetLength || ''}×${i.sheetWidth || ''}mm)` : ''}
-                            </>
-                          )}
-                          {(i.weightPerPiece || i.theoreticalWeight) ? ` [${Number(i.weightPerPiece || i.theoreticalWeight).toFixed(2)} kg]` : ''}
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-text hover:text-primary hover:underline">
+                        {i.name}
+                      </Link>
+                      {i.itemType && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
+                          {i.itemType}
                         </span>
-                      </>
-                    )}
+                      )}
+                      {(i.gradeName || i.metalGrade) && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                          {i.gradeName || i.metalGrade}
+                        </span>
+                      )}
+                      {i.finishCoating && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {i.finishCoating}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11px] text-muted flex-wrap">
+                      <span className="font-medium text-text-secondary">{i.category}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-0.5">
+                        <MapPin size={10} className="text-muted"/> {i.location || '—'}
+                      </span>
+
+                      {/* Metal Dimensions Specs */}
+                      {(i.diameter || i.legA || i.hasTubeSpec || i.sheetThickness || i.specification || i.dimensions) && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono text-sky-800 dark:text-sky-300 text-[10px] bg-sky-50 dark:bg-sky-500/15 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-500/30">
+                            {i.specification || i.dimensions || (
+                              <>
+                                {i.diameter ? `Ø${i.diameter}mm` : ''}
+                                {i.legA && i.legB && !i.webThickness ? `L ${i.legA}×${i.legB}×${i.sheetThickness || i.wallThickness || ''}mm` : ''}
+                                {i.legA && i.legB && i.webThickness ? `${i.legA}×${i.legB}mm (Web:${i.webThickness}mm, Flg:${i.flangeThickness}mm)` : ''}
+                                {i.hasTubeSpec ? `${i.tubeProfile || 'Round'} OD:${i.outerDiameter || `${i.outerWidth}×${i.outerHeight}`}×${i.wallThickness}mm` : ''}
+                                {!i.hasTubeSpec && !i.diameter && !i.legA && i.sheetThickness ? `${i.sheetThickness}mm (${i.sheetLength || ''}×${i.sheetWidth || ''}mm)` : ''}
+                              </>
+                            )}
+                            {(i.weightPerPiece || i.theoreticalWeight) ? ` [${Number(i.weightPerPiece || i.theoreticalWeight).toFixed(2)} kg]` : ''}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-            ),
+              );
+            },
         },
         {
             key: 'itemKind',

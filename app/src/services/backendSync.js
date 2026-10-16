@@ -494,6 +494,9 @@ export const RESOURCES = {
       legB: item.legB ? num(item.legB) : undefined,
       webThickness: item.webThickness ? num(item.webThickness) : undefined,
       flangeThickness: item.flangeThickness ? num(item.flangeThickness) : undefined,
+      imageFileId: item.imageFileId !== undefined ? item.imageFileId : undefined,
+      image: item.image !== undefined ? item.image : undefined,
+      imageUrl: item.imageUrl !== undefined ? item.imageUrl : undefined,
       customFieldValues: item.customFieldValues || undefined,
     }),
     // `availableQty` / `status` come off the movement ledger, so the row the
@@ -533,6 +536,9 @@ export const RESOURCES = {
       webThickness: row.webThickness ?? row.web_thickness ?? '',
       flangeThickness: row.flangeThickness ?? row.flange_thickness ?? '',
       theoreticalWeight: row.theoreticalWeight ?? row.theoretical_weight ?? '',
+      image: row.imageUrl || row.image_url || row.image || '',
+      imageUrl: row.imageUrl || row.image_url || row.image || '',
+      imageFileId: row.imageFileId || row.image_file_id || '',
       _synced: true,
     }),
     // Derived columns are rejected on update (api.md §4.2).

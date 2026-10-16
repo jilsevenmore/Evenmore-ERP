@@ -2049,6 +2049,9 @@ export const ERPProvider = ({ children, }) => {
             sellingPrice: item.sellingPrice ?? 90,
             location: item.location || '',
             status: isService ? 'Optimal' : (calculatedQty <= (item.reorderLevel ?? 5) / 2 ? 'Critical' : calculatedQty <= (item.reorderLevel ?? 5) ? 'Low Stock' : 'Optimal'),
+            image: item.image || item.imageUrl || '',
+            imageUrl: item.imageUrl || item.image || '',
+            imageFileId: item.imageFileId || undefined,
             customFieldValues: item.customFieldValues || {},
         };
         setItems((prev) => [newItem, ...prev]);

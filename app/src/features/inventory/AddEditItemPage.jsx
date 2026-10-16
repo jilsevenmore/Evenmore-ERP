@@ -34,6 +34,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
+import { uploadFileToBackend } from '../../services/fileUploadService';
+import { resolveFileUrl } from '../../services/api';
 
 export const AddEditItemPage = () => {
   const { id } = useParams();
@@ -144,6 +146,10 @@ export const AddEditItemPage = () => {
 
   // Product Image Upload
   const [imagePreview, setImagePreview] = useState('');
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [imageFileId, setImageFileId] = useState('');
+  const [imageUploadError, setImageUploadError] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const [costPrice, setCostPrice] = useState('');
@@ -275,7 +281,10 @@ export const AddEditItemPage = () => {
       setHsnCode(existingItem.hsnCode || '');
       setSacCode(existingItem.sacCode || '');
       setSerialNumbersText((existingItem.serialNumbers || []).join('\n'));
-      setImagePreview(existingItem.image || existingItem.imageUrl || '');
+      setImagePreview(resolveFileUrl(existingItem.imageUrl || existingItem.image || ''));
+      setImageFileId(existingItem.imageFileId || '');
+      setSelectedImageFile(null);
+      setImageUploadError('');
       setCostPrice(String(existingItem.costPrice ?? existingItem.unitCost ?? ''));
       setSellingPrice(String(existingItem.sellingPrice ?? ''));
       setAvailableQty(String(existingItem.availableQty ?? existingItem.stock ?? '0'));
@@ -314,6 +323,10 @@ export const AddEditItemPage = () => {
       if (locations.length > 0 && !location) {
         setLocation(locations[0].name);
       }
+      setImagePreview('');
+      setImageFileId('');
+      setSelectedImageFile(null);
+      setImageUploadError('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, existingItem, categories, vendors, locations, queryKind]);
@@ -435,15 +448,31 @@ export const AddEditItemPage = () => {
   // Image Upload Handlers
   const handleFileSelect = (file) => {
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (PNG, JPG, JPEG, WEBP, or SVG).');
+    setImageUploadError('');
+
+    const validExtensions = /\.(png|jpe?g|webp|svg|gif)$/i;
+    if (!file.type.startsWith('image/') && !validExtensions.test(file.name)) {
+      setImageUploadError('Please select a valid image file (PNG, JPG, JPEG, WEBP, SVG, or GIF).');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target.result);
-    };
-    reader.readAsDataURL(file);
+
+    const maxSizeBytes = 25 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      setImageUploadError('Image file size exceeds the 25MB limit.');
+      return;
+    }
+
+    setSelectedImageFile(file);
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      setImagePreview(objectUrl);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleDropFile = (e) => {
@@ -456,6 +485,9 @@ export const AddEditItemPage = () => {
 
   const handleRemoveImage = () => {
     setImagePreview('');
+    setSelectedImageFile(null);
+    setImageFileId(null);
+    setImageUploadError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -504,8 +536,40 @@ export const AddEditItemPage = () => {
     setNewFieldOptions('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isUploadingImage) return;
+
+    let finalFileId = imageFileId || null;
+    let finalImageUrl = imagePreview || '';
+
+    if (selectedImageFile) {
+      try {
+        setIsUploadingImage(true);
+        setImageUploadError('');
+        const uploadRes = await uploadFileToBackend(
+          selectedImageFile,
+          selectedImageFile.name,
+          'product_image',
+          { returnDetails: true }
+        );
+        if (uploadRes?.fileId) {
+          finalFileId = uploadRes.fileId;
+        }
+        if (uploadRes?.url) {
+          finalImageUrl = uploadRes.url;
+        }
+      } catch (err) {
+        console.error('Failed to upload product image:', err);
+        setImageUploadError('Failed to upload product photo: ' + (err.message || 'Server error'));
+        setIsUploadingImage(false);
+        return;
+      }
+    } else if (!imagePreview) {
+      finalFileId = null;
+      finalImageUrl = '';
+    }
+
     const isService = itemKind === 'Service';
     const parsedCost = parseFloat(costPrice) || 0;
     const parsedSelling = parseFloat(sellingPrice) || 0;
@@ -591,8 +655,9 @@ export const AddEditItemPage = () => {
       reorderLevel: parsedReorder,
       location,
       status: computedStatus,
-      image: imagePreview,
-      imageUrl: imagePreview,
+      imageFileId: finalFileId,
+      image: finalImageUrl,
+      imageUrl: finalImageUrl,
       customFieldValues,
     };
 
@@ -604,6 +669,7 @@ export const AddEditItemPage = () => {
     }
 
     setSavedAlert(true);
+    setIsUploadingImage(false);
     setTimeout(() => {
       navigate('/inventory/items');
     }, 500);
@@ -2362,8 +2428,15 @@ export const AddEditItemPage = () => {
                         Drop high-resolution diagram or <span className="text-blue-600 underline">click to browse</span>
                       </p>
                       <span className="text-[10px] text-slate-400 mt-1">
-                        Supports PNG, JPG, JPEG, WEBP or SVG up to 10MB
+                        Supports PNG, JPG, JPEG, WEBP or SVG up to 25MB
                       </span>
+                    </div>
+                  )}
+
+                  {imageUploadError && (
+                    <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                      <AlertCircle size={14} className="shrink-0 text-rose-600" />
+                      <span>{imageUploadError}</span>
                     </div>
                   )}
                 </div>
@@ -2555,8 +2628,8 @@ export const AddEditItemPage = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" icon={Save}>
-              {isEditMode ? `Update ${itemKind} SKU` : `Save & Register ${itemKind}`}
+            <Button type="submit" icon={Save} disabled={isUploadingImage}>
+              {isUploadingImage ? 'Uploading Image & Saving...' : (isEditMode ? `Update ${itemKind} SKU` : `Save & Register ${itemKind}`)}
             </Button>
           </div>
         </form>
