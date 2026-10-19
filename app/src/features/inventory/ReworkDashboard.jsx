@@ -507,7 +507,7 @@ export const ReworkDashboard = () => {
                   onChange={(e) => setReworkForm({ ...reworkForm, itemId: e.target.value })}
                   className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
                 >
-                  <option value="">Select item from Item Master...</option>
+                  <option value="">Select item from Product Master...</option>
                   {stockItems.map((it) => (
                     <option key={it.id} value={it.id}>[{it.sku}] {it.name}</option>
                   ))}
@@ -638,7 +638,7 @@ export const ReworkDashboard = () => {
                     onChange={(e) => setScrapForm({ ...scrapForm, itemId: e.target.value })}
                     className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
                   >
-                    <option value="">Select item from Item Master...</option>
+                    <option value="">Select item from Product Master...</option>
                     {stockItems.map((it) => (
                       <option key={it.id} value={it.id}>[{it.sku}] {it.name}</option>
                     ))}

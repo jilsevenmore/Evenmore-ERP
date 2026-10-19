@@ -82,6 +82,7 @@ const getInitialFormData = (party) => {
             ledgerAccount: '1210 - Accounts Receivable',
             creditLimit: 50000,
             paymentTerms: 'Net 30',
+            pmsAdvancePaymentPercentage: 0,
             bankName: '',
             bankAccountNumber: '',
             ifscCode: '',
@@ -133,6 +134,9 @@ const getInitialFormData = (party) => {
         ledgerAccount: party.ledgerAccount || (party.type === 'Vendor' ? '2010 - Accounts Payable' : '1210 - Accounts Receivable'),
         creditLimit: party.creditLimit ?? 50000,
         paymentTerms: party.paymentTerms || 'Net 30',
+        pmsAdvancePaymentPercentage: party.pmsAdvancePaymentPercentage !== undefined && party.pmsAdvancePaymentPercentage !== null
+            ? party.pmsAdvancePaymentPercentage
+            : (party.pms_advance_payment_percentage ?? 0),
         bankName: party.bankName || '',
         bankAccountNumber: party.bankAccountNumber || '',
         ifscCode: party.ifscCode || '',
@@ -346,6 +350,8 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
         const payload = {
             ...formData,
             openingBalance: formData.openingBalance === '' ? 0 : (Number(formData.openingBalance) || 0),
+            pmsAdvancePaymentPercentage: Number(formData.pmsAdvancePaymentPercentage) || 0,
+            pms_advance_payment_percentage: Number(formData.pmsAdvancePaymentPercentage) || 0,
             shippingAddress: sameAsBilling ? { ...formData.billingAddress } : formData.shippingAddress,
         };
         onSave(payload);
@@ -880,6 +886,45 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                     </select>
                                 </div>
                             </div>
+
+                            {/* PMS Project Advance Payment Setting for Customers */}
+                            {(formData.type === 'Customer' || formData.type === 'Both') && (
+                                <div className="p-4 bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-blue-500/10 border border-violet-200/80 dark:border-violet-800/40 rounded-2xl space-y-2.5">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div className="space-y-0.5">
+                                            <label className="block font-bold text-text text-xs">
+                                                PMS Project Required Advance (%)
+                                            </label>
+                                            <p className="text-[11px] text-muted leading-relaxed">
+                                                Mandatory advance percentage (e.g. 10%, 20%) of sales order value required before converting order to a PMS project. Set to 0% for no advance requirement.
+                                            </p>
+                                        </div>
+                                        <div className="relative w-full sm:w-36 shrink-0">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="1"
+                                                value={formData.pmsAdvancePaymentPercentage ?? 0}
+                                                onChange={(e) => updateField('pmsAdvancePaymentPercentage', Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                                                className="w-full pr-8 pl-3 py-2 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text focus:ring-2 focus:ring-primary/20 text-right shadow-2xs"
+                                                placeholder="0"
+                                            />
+                                            <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted font-bold text-xs pointer-events-none">%</span>
+                                        </div>
+                                    </div>
+                                    {Number(formData.pmsAdvancePaymentPercentage) > 0 ? (
+                                        <div className="text-[11px] font-semibold text-violet-700 dark:text-violet-300 flex items-center gap-1.5 pt-1 border-t border-violet-200/60 dark:border-violet-800/30">
+                                            <CheckCircle2 size={13} className="shrink-0 text-violet-600" />
+                                            <span>Sales Orders for this customer will require at least <strong>{formData.pmsAdvancePaymentPercentage}% advance payment</strong> before PMS Project can be initiated.</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-[10px] text-muted pt-1 border-t border-border">
+                                            0% set: Confirmed sales orders can be converted to PMS projects immediately without prior advance payment.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="p-4 bg-soft/50 border border-border rounded-2xl space-y-3">
                                 <span className="font-bold text-text text-xs uppercase tracking-wider block">

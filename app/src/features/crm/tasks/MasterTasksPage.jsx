@@ -388,10 +388,7 @@ export default function MasterTasksPage() {
                     </td>
                     <td className="px-2 py-3 text-slate-500">{(safePage - 1) * perPage + idx + 1}</td>
                     <td className="px-3 py-3">
-                      <span className="inline-flex items-center gap-2 font-bold text-slate-800 whitespace-nowrap">
-                        <span className={`w-7 h-7 rounded-lg grid place-items-center shrink-0 ${ICON_STYLE[t.icon] || ICON_STYLE.call}`}>
-                          <Icon size={14} />
-                        </span>
+                      <span className="font-bold text-slate-800 whitespace-nowrap">
                         {t.name}
                       </span>
                     </td>
@@ -540,25 +537,6 @@ export default function MasterTasksPage() {
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
-                </div>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Icon</label>
-                <div className="grid grid-cols-6 gap-2">
-                  {ICONS.map((key) => {
-                    const Icon = iconFor(key);
-                    const active = form.icon === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setForm({ ...form, icon: key })}
-                        className={`h-10 rounded-lg border grid place-items-center transition ${active ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-400 hover:border-slate-300'}`}
-                      >
-                        <Icon size={16} />
-                      </button>
-                    );
-                  })}
                 </div>
               </div>
               {formError && <p className="text-[11px] font-semibold text-rose-600">{formError}</p>}

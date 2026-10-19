@@ -403,11 +403,11 @@ export const ItemsMasterPage = () => {
     const uniqueCategoriesCount = new Set(displayItems.map(i => i.category)).size;
 
     const guideConfig = {
-      title: 'Item Master Catalog',
+      title: 'Product Master',
       subtitle: 'Complete inventory product catalog, metal specifications, serial tracking, valuation, and stock buffers.',
-      purpose: 'The Item Master manages catalog inventory items, fabrication raw materials, components, consumables, and finished products.',
+      purpose: 'The Product Master catalog manages machines, spare parts, serial tracking instances, fabrication materials, and consumables.',
       workflow: [
-        'Create Inventory Item',
+        'Create Product',
         'Configure Metal Technical Specifications & Theoretical Weight',
         'Set Units of Measure & Conversion Factors',
         'Define Reorder Thresholds & Storage Bin',
@@ -427,8 +427,8 @@ export const ItemsMasterPage = () => {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Item Master Catalog"
-          subtitle="Unified product catalog for raw materials, metal profiles, component parts, finished goods, and services."
+          title="Product Master"
+          subtitle="Unified product catalog for machines, spare parts, metal profiles, raw materials, and serial instances."
           guide={guideConfig}
           actions={
             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
@@ -440,13 +440,13 @@ export const ItemsMasterPage = () => {
                 icon={Layers}
                 onClick={() => navigate('/inventory/categories')}
               >
-                Category Master
+                Spare-Part Categories
               </Button>
               <Button
                 icon={Plus}
                 onClick={() => navigate('/inventory/items/new')}
               >
-                Add New Item
+                Add Product
               </Button>
             </div>
           }
@@ -522,7 +522,7 @@ export const ItemsMasterPage = () => {
           </button>
         </div>
 
-        {/* Item Master KPI Stat Cards */}
+        {/* Product Master KPI Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Total Catalog Items" value={`${displayItems.length} SKUs`} icon={Package} />
           <StatCard label="Total Asset Valuation" value={formatCurrency(Math.round(totalCatalogValue), { noDecimals: true })} icon={DollarSign} />

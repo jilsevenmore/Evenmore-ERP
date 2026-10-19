@@ -14,6 +14,7 @@ import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import { importEstimatesExcel, convertEstimateToChallan, convertEstimateToOrder } from '../../services/upgradeService';
 import PartySelector from '../../components/common/PartySelector';
+import { validateLineProducts } from '../../utils/validators';
 
 
 function logLeadActivity(leadId, title, color) {
@@ -50,6 +51,7 @@ export const EstimatesPage = () => {
         addInventoryItem,
         formatCurrency,
         formatDateDDMMYYYY,
+        showToast,
     } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
@@ -68,6 +70,7 @@ export const EstimatesPage = () => {
     const [statusFilter, setStatusFilter] = useState('All');
     const [printEstimateTarget, setPrintEstimateTarget] = useState(null);
     const [approvalTarget, setApprovalTarget] = useState(null);
+    const [formError, setFormError] = useState('');
     const [partyData, setPartyData] = useState({
         isOneTimeParty: false,
         customerId: '',
@@ -79,6 +82,7 @@ export const EstimatesPage = () => {
 
     const handleOpenCreateModal = () => {
         setEditingEstimate(null);
+        setFormError('');
         setPartyData({
             isOneTimeParty: false,
             customerId: '',
@@ -93,6 +97,7 @@ export const EstimatesPage = () => {
 
     const handleEdit = (estimate) => {
         setEditingEstimate(estimate);
+        setFormError('');
         const match = customers.find((c) => String(c.id) === String(estimate.customerId));
         setPartyData({
             isOneTimeParty: Boolean(estimate.isOneTimeParty),
@@ -452,12 +457,24 @@ export const EstimatesPage = () => {
     const handleCreate = (e) => {
         e.preventDefault();
         if (!partyData.isOneTimeParty && !partyData.customerId && !partyData.selectedLeadId) {
-            alert('Please select a customer account before generating the estimate.');
+            const msg = 'Please select a customer account before generating the estimate.';
+            alert(msg);
+            showToast?.(msg);
+            setFormError(msg);
             return;
         }
 
+        const productValidation = validateLineProducts(lineItems, 'estimate');
+        if (!productValidation.isValid) {
+            alert(productValidation.message);
+            showToast?.(productValidation.message);
+            setFormError(productValidation.message);
+            return;
+        }
+        setFormError('');
+
         // Process any new custom product lines marked to be added to inventory
-        const finalItems = lineItems.map((it) => {
+        const finalItems = productValidation.validItems.map((it) => {
             if (it.addToInventory && (it.name || it.description) && !it.itemId && addInventoryItem) {
                 const prodName = it.name || it.description;
                 try {
@@ -745,6 +762,12 @@ export const EstimatesPage = () => {
                         )}
 
                         <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+                            {formError && (
+                                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                                    <AlertCircle size={14} className="shrink-0 text-rose-600" />
+                                    <span>{formError}</span>
+                                </div>
+                            )}
                             <FormSection number="01" title="Customer Details" />
                             <div className="space-y-3">
                                 <PartySelector

@@ -160,6 +160,14 @@ export const Customer360Drawer = ({ customer, onClose }) => {
                                         <span>Applied Credit Notes (Returns):</span>
                                         <span className="font-mono font-semibold text-slate-800">{formatCurrency(summary.appliedCredit || 0)}</span>
                                     </div>
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>PMS Project Advance Req.:</span>
+                                        <span className="font-mono font-semibold text-violet-700">
+                                            {Number(customer?.pmsAdvancePaymentPercentage ?? customer?.pms_advance_payment_percentage ?? summary?.pmsAdvancePaymentPercentage ?? 0) > 0
+                                                ? `${customer?.pmsAdvancePaymentPercentage ?? customer?.pms_advance_payment_percentage ?? summary?.pmsAdvancePaymentPercentage}% of Order`
+                                                : 'None (0%)'}
+                                        </span>
+                                    </div>
                                     <div className="flex justify-between text-slate-800 font-bold border-t border-slate-200 pt-1">
                                         <span>Total Usable Credit:</span>
                                         <span className="font-mono text-indigo-700">{formatCurrency(summary.availableCredit || 0)}</span>

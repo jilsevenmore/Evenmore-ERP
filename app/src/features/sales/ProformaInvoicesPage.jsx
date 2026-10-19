@@ -43,6 +43,7 @@ import { PrintProformaInvoiceModal } from '../../components/common/PrintProforma
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
+import { validateLineProducts } from '../../utils/validators';
 
 const proformaGuide = {
   title: 'Proforma Invoices',
@@ -121,6 +122,7 @@ export const ProformaInvoicesPage = () => {
     addDaysISO,
     companyProfile,
     bankAccounts = [],
+    showToast,
   } = useERP();
   const remitBank = bankAccounts.find((a) => a.accountNumber && a.isActive !== false) || null;
 
@@ -132,6 +134,7 @@ export const ProformaInvoicesPage = () => {
   const [deleteTargetPi, setDeleteTargetPi] = useState(null);
   const [printPiTarget, setPrintPiTarget] = useState(null);
   const [approvalTarget, setApprovalTarget] = useState(null);
+  const [formError, setFormError] = useState('');
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
@@ -352,6 +355,7 @@ export const ProformaInvoicesPage = () => {
     );
     setLineItems([]);
     setEditingPi(null);
+    setFormError('');
     setIsFullscreen(false);
     setFormalInvoiceAmountInput(0);
     setCashAmountInput(0);
@@ -367,6 +371,7 @@ export const ProformaInvoicesPage = () => {
   };
 
   const handleOpenEditModal = (pi) => {
+    setFormError('');
     setSelectedCustomerId(pi.customerId || customers[0]?.id || '');
     setProformaNumber(pi.proformaNumber);
     setProformaDate(pi.date || new Date().toISOString().split('T')[0]);
@@ -399,6 +404,7 @@ export const ProformaInvoicesPage = () => {
   const handleCloseCreateModal = () => {
     setShowCreateModal(false);
     setEditingPi(null);
+    setFormError('');
     setLineItems([]);
     setIsFullscreen(false);
   };
@@ -433,6 +439,15 @@ export const ProformaInvoicesPage = () => {
     const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
     const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
 
+    const productValidation = validateLineProducts(lineItems, 'proforma invoice');
+    if (!productValidation.isValid) {
+      alert(productValidation.message);
+      showToast?.(productValidation.message);
+      setFormError(productValidation.message);
+      return;
+    }
+    setFormError('');
+
     const effectivePiAmt = grandTotal;
     if (formalInvoiceAmountInput + cashAmountInput > effectivePiAmt + 0.01) {
       alert('Validation Error: Formal Invoice + Cash Receipt cannot exceed Total Proforma Value.');
@@ -460,7 +475,7 @@ export const ProformaInvoicesPage = () => {
       status: editingPi ? (status || editingPi.status) : status,
       paymentTerms: PAYMENT_PRESETS[paymentPresetKey]?.label || 'Custom Milestone Schedule',
       paymentSchedule: computedSchedule,
-      items: lineItems,
+      items: productValidation.validItems,
       subtotal,
       discountTotal,
       taxableAmount,
@@ -517,6 +532,12 @@ export const ProformaInvoicesPage = () => {
   };
 
   const handleDirectConvertToInvoice = (pi) => {
+    const prodVal = validateLineProducts(pi?.items, 'formal invoice');
+    if (!prodVal.isValid) {
+      alert(prodVal.message);
+      showToast?.(prodVal.message);
+      return;
+    }
     const createdInvoice = convertProformaToInvoice(pi.id);
     if (createdInvoice) {
       navigate('/sales/invoices');
@@ -847,6 +868,12 @@ export const ProformaInvoicesPage = () => {
 
             {/* Modal Form Body */}
             <form onSubmit={(e) => { e.preventDefault(); handleSave('Sent'); }} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              {formError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0 text-rose-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
               <FormSection number="01" title="Customer & proforma details" />
               {/* Header Details Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1432,7 +1459,7 @@ export const ProformaInvoicesPage = () => {
                   Save as Draft
                 </button>
                 <Button type="submit">
-                  {editingPi ? 'Update Proforma Invoice' : 'Save & Mark Sent'}
+                  {editingPi ? 'Update Proforma Invoice' : 'Generate Proforma Invoice'}
                 </Button>
               </div>
             </form>

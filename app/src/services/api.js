@@ -4,6 +4,8 @@
  * structured ApiError, safe JSON parsing, and unauthorized session handling.
  */
 
+import { isTokenValid } from '../utils/authUtils';
+
 const API_BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/+$/, '');
 const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 15000;
 
@@ -89,7 +91,7 @@ async function fetchWithTimeout(url, config, timeoutMs, externalSignal) {
 
 let refreshPromise = null;
 
-async function attemptTokenRefresh() {
+export async function attemptTokenRefresh() {
   if (refreshPromise) return refreshPromise;
   const refresh = getRefreshToken();
   if (!refresh) {
@@ -111,6 +113,9 @@ async function attemptTokenRefresh() {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('evenmore_auth_token', body.access);
         if (body.refresh) localStorage.setItem('evenmore_refresh_token', body.refresh);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('evenmore:token_refreshed', { detail: { token: body.access } }));
       }
     } catch {}
     return body.access;
@@ -163,8 +168,23 @@ export async function apiClient(
     ...customConfig
   } = {},
 ) {
-  const token = getAuthToken();
+  let token = getAuthToken();
   const normalizedEp = normalizeEndpoint(endpoint);
+  const isRefreshEndpoint = normalizedEp === '/auth/refresh/';
+  const isLoginEndpoint = normalizedEp.includes('/auth/login') || normalizedEp.includes('/auth/verify-otp');
+
+  let attempt = 0;
+  let refreshed = _retried;
+
+  // Proactive silent refresh: if access token is already expired or expiring within 10s,
+  // renew it before firing the request to avoid an unnecessary 401 roundtrip.
+  if (token && !isRefreshEndpoint && !isLoginEndpoint && !isTokenValid(token, 10000) && getRefreshToken()) {
+    try {
+      token = await attemptTokenRefresh();
+      refreshed = true;
+    } catch {}
+  }
+
   const url = `${API_BASE_URL}${normalizedEp}${query ? buildQuery(query) : ''}`;
 
   const requestHeaders = {
@@ -184,9 +204,6 @@ export async function apiClient(
     config.body = JSON.stringify(data);
   }
 
-  let attempt = 0;
-  let refreshed = _retried;
-  const isRefreshEndpoint = normalizedEp === '/auth/refresh/';
   for (;;) {
     try {
       const response = await fetchWithTimeout(url, config, timeoutMs, signal);
@@ -194,6 +211,7 @@ export async function apiClient(
 
       const authCodes = new Set([
         'TOKEN_INVALID', 'TOKEN_REVOKED', 'ACCOUNT_INACTIVE', 'TENANT_INACTIVE', 'TOKEN_EXPIRED',
+        'NOT_AUTHENTICATED', 'token_not_valid',
       ]);
       const backendCode = (result && (result.code || result.errorCode || result.error_code)) || '';
       const isAuthSessionFailure = !backendCode || authCodes.has(backendCode);

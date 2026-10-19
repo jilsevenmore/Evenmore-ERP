@@ -57,8 +57,8 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         { label: 'Proforma Invoices', path: '/sales/proforma', icon: FileSpreadsheet, category: 'Navigation' },
         { label: 'Delivery Challans', path: '/sales/delivery', icon: Truck, category: 'Navigation' },
         { label: 'Sales Invoices', path: '/sales/invoices', icon: Receipt, category: 'Navigation' },
-        { label: 'Quotations & Estimates', path: '/sales/quotations', icon: FileText, category: 'Navigation' },
-        { label: 'Inventory Items', path: '/inventory/items', icon: Package, category: 'Navigation' },
+        { label: 'Product Master', path: '/inventory/items', icon: Package, category: 'Navigation' },
+        { label: 'Spare-Part Categories', path: '/inventory/categories', icon: Layers, category: 'Navigation' },
         { label: 'Stock Position', path: '/inventory/stock', icon: BarChart3, category: 'Navigation' },
         { label: 'Purchase Orders', path: '/purchase/orders', icon: ShoppingCart, category: 'Navigation' },
         { label: 'Purchase Bills & AP', path: '/purchase/bills', icon: FileSpreadsheet, category: 'Navigation' },
@@ -81,7 +81,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         sub: `Stock: ${i.stock || 0} ${i.unit || 'pcs'} • Selling: $${i.sellingPrice}`,
         path: '/inventory/items',
         icon: Package,
-        category: 'Inventory Items',
+        category: 'Product Master',
     }));
     const matchedCustomers = customers
         .filter((c) => String(c.name ?? '').toLowerCase().includes(cleanQuery) ||

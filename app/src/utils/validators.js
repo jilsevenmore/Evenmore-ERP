@@ -1,6 +1,8 @@
 /**
  * Evenmore ERP — Statutory & Format Validation Utilities
  */
+import { sheetAutoDescription } from './salesLineMetal';
+
 
 /**
  * Validates Indian 15-character GSTIN format
@@ -122,4 +124,49 @@ export const validateAddress = (address, { requiredPincode = false } = {}) => {
     if (!pinRes.isValid) return pinRes;
   }
   return { isValid: true, cleanValue: address };
+};
+
+/**
+ * Validates that line items contain at least one valid selected product / line item
+ * (either linked to an inventory item, or with a custom item name / description or metal spec)
+ * @param {Array} items
+ * @param {string} docType
+ */
+export const validateLineProducts = (items = [], docType = 'document') => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return {
+      isValid: false,
+      message: `Please select at least one product before generating the ${docType}.`,
+      validItems: [],
+    };
+  }
+
+  const validItems = items
+    .map((it) => {
+      if (!it) return null;
+      if (!it.itemId && !String(it.description || it.name || '').trim() && it.sheetSpec && sheetAutoDescription(it.sheetSpec) && Number(it.rate)) {
+        return { ...it, description: sheetAutoDescription(it.sheetSpec) };
+      }
+      return it;
+    })
+    .filter((it) => it && (Boolean(it.itemId) || Boolean(String(it.description || it.name || '').trim()) || (it.sheetSpec && sheetAutoDescription(it.sheetSpec))));
+
+  if (validItems.length === 0) {
+    return {
+      isValid: false,
+      message: `Please select at least one product before generating the ${docType}.`,
+      validItems: [],
+    };
+  }
+
+  const unnamedIdx = validItems.findIndex((it) => !it.itemId && !String(it.description || it.name || '').trim());
+  if (unnamedIdx !== -1) {
+    return {
+      isValid: false,
+      message: `Line ${unnamedIdx + 1} needs a product name or description (or select an inventory item).`,
+      validItems,
+    };
+  }
+
+  return { isValid: true, message: '', validItems };
 };

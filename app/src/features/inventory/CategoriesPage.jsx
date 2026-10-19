@@ -7,9 +7,9 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 
 const categoryGuide = {
-    title: 'Category Hierarchy & Taxonomy',
-    subtitle: 'Organize catalog items by item type, manage lead times, and track asset group valuations',
-    purpose: 'Use this page to classify items into structured product families. Categories establish baseline procurement lead times, SKU code prefixes, GST HSN defaults, custom attribute definitions, and aggregated stock valuation analytics.',
+    title: 'Spare-Part Categories',
+    subtitle: 'Organize spare parts, machines, and fabrication catalog items by item type, manage lead times, and track asset group valuations',
+    purpose: 'Use this page to classify spare parts and inventory items into structured product families. Categories establish baseline procurement lead times, SKU code prefixes, GST HSN defaults, custom attribute definitions, and aggregated stock valuation analytics.',
     workflow: ['Create Category', 'Assign Item Type & Unit', 'Define HSN Code', 'Configure Custom Fields', 'Link SKUs to Category', 'Monitor Stock & Asset Valuation'],
     keyTerms: [
         {
@@ -35,7 +35,7 @@ const categoryGuide = {
     ],
     tips: [
         'Configuring accurate lead times helps forecast restock reorder triggers and prevents stockouts during spikes in demand.',
-        'Linking categories to Item Types enables automated dimensional parameters and metal weight calculators in Item Master.',
+        'Linking categories to Item Types enables automated dimensional parameters and metal weight calculators in Product Master.',
     ],
 };
 
@@ -399,8 +399,8 @@ export const CategoriesPage = () => {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Category Master"
-                subtitle="Organize inventory items into structured product families by item type, configure lead times, units, and asset valuation."
+                title="Spare-Part Categories"
+                subtitle="Organize spare parts, machines, and fabrication inventory into structured categories with lead times, units, and asset valuation."
                 guide={categoryGuide}
                 actions={
                     <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
@@ -415,7 +415,7 @@ export const CategoriesPage = () => {
                             variant="outline"
                             onClick={() => navigate('/inventory/items')}
                         >
-                            Item Master
+                            Product Master
                         </Button>
                         <Button icon={Plus} onClick={handleOpenAdd}>
                             Create Category

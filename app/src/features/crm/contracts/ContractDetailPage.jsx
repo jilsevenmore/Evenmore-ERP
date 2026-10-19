@@ -125,9 +125,13 @@ export default function ContractDetailPage() {
   // Upgradation Scope: Dual E-Signatures & Workflow Status (§2.1.3 & §2.1.4)
   const [sigModalOpen, setSigModalOpen] = useState(false);
   const [sigRole, setSigRole] = useState('client');
+  const [sigMode, setSigMode] = useState('draw'); // 'draw' | 'upload'
+  const [uploadedSigImage, setUploadedSigImage] = useState(null);
+  const [sigImageName, setSigImageName] = useState('');
   const [sigName, setSigName] = useState('');
   const [sigEmail, setSigEmail] = useState('');
   const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
   const isDrawing = useRef(false);
 
   const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
@@ -139,14 +143,30 @@ export default function ContractDetailPage() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
+  const getCanvasCoordinates = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches && e.touches[0]) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top,
+      };
+    }
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
   const startDrawing = (e) => {
     isDrawing.current = true;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
+    const { x, y } = getCanvasCoordinates(e);
     ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.moveTo(x, y);
   };
 
   const draw = (e) => {
@@ -154,11 +174,11 @@ export default function ContractDetailPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
+    const { x, y } = getCanvasCoordinates(e);
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#0f172a';
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.lineTo(x, y);
     ctx.stroke();
   };
 
@@ -173,22 +193,79 @@ export default function ContractDetailPage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
+  const handleImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file (PNG, JPG, SVG, WebP).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Signature image size should be less than 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUploadedSigImage(event.target.result);
+      setSigImageName(file.name);
+      setError('');
+    };
+    reader.onerror = () => {
+      setError('Failed to read signature image.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const openSigModal = (role, mode = 'draw') => {
+    setSigRole(role);
+    setSigMode(mode);
+    setSigName(
+      role === 'company'
+        ? (currentUser?.name || currentUser?.fullName || actor || '')
+        : (record?.contract?.customer || record?.deal?.client || '')
+    );
+    setSigEmail(
+      role === 'company'
+        ? (currentUser?.email || '')
+        : (record?.deal?.email || '')
+    );
+    setUploadedSigImage(null);
+    setSigImageName('');
+    setSigModalOpen(true);
+    setError('');
+    setTimeout(() => clearCanvas(), 50);
+  };
+
   const submitSignature = async (e) => {
     e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dataUrl = canvas.toDataURL('image/png');
+    let finalSignature = null;
+    if (sigMode === 'upload') {
+      if (!uploadedSigImage) {
+        setError('Please select or upload a signature image file.');
+        return;
+      }
+      finalSignature = uploadedSigImage;
+    } else {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      finalSignature = canvas.toDataURL('image/png');
+    }
+
     setBusy(true);
     try {
       await captureContractSignature(id, {
         role: sigRole,
-        signature: dataUrl,
-        signatoryName: sigName,
+        signatory_type: sigRole,
+        signature: finalSignature,
+        signatoryName: sigName || (sigRole === 'company' ? actor : (record?.contract?.customer || 'Client Signatory')),
         signatoryEmail: sigEmail,
       });
+      await useCrmStore.getState().refresh('contracts').catch(() => {});
       setNotice(`Successfully recorded ${sigRole === 'client' ? 'Client' : 'Company'} e-signature.`);
       setSigModalOpen(false);
       clearCanvas();
+      setUploadedSigImage(null);
+      setSigImageName('');
       refresh();
     } catch (err) {
       setError(describeError(err));
@@ -566,68 +643,115 @@ export default function ContractDetailPage() {
               </Panel>
               <div className="grid gap-4 content-start">
                 <Panel title="Dual E-Signatures (In-App Capture)" action={
-                  <button type="button" className="btn-primary btn-sm text-[11px]" onClick={() => { setSigRole('client'); setSigModalOpen(true); }}>
-                    <PenTool size={12} /> Capture Signature
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" className="btn-outline btn-sm text-[11px] gap-1" onClick={() => openSigModal('client', 'upload')}>
+                      <Upload size={12} /> Upload Sign Image
+                    </button>
+                    <button type="button" className="btn-primary btn-sm text-[11px] gap-1" onClick={() => openSigModal('client', 'draw')}>
+                      <PenTool size={12} /> Draw Signature
+                    </button>
+                  </div>
                 }>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     {/* Client Signature */}
-                    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-slate-700">Client Signature</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${contract.clientSignature ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                            {contract.clientSignature ? 'Signed' : 'Awaiting Sign'}
-                          </span>
+                    {(() => {
+                      const clientSig = contract.clientSignature || contract.client_signature;
+                      const clientSigner = contract.clientSignedBy || contract.client_signed_by;
+                      const isSigned = Boolean(clientSig);
+                      return (
+                        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-semibold text-slate-700">Client Signature</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isSigned ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                {isSigned ? 'Signed' : 'Awaiting Sign'}
+                              </span>
+                            </div>
+                            {isSigned ? (
+                              <div className="bg-white border border-slate-200 rounded-lg p-2 h-20 flex items-center justify-center overflow-hidden">
+                                <img src={clientSig} alt="Client Signature" className="max-h-full object-contain" />
+                              </div>
+                            ) : (
+                              <div className="bg-white/80 border border-dashed border-slate-300 rounded-lg h-20 flex flex-col items-center justify-center text-slate-400">
+                                <PenTool size={16} />
+                                <span className="text-[10px] mt-1">Pending client signature</span>
+                              </div>
+                            )}
+                            {clientSigner && (
+                              <p className="mt-1 text-[10px] text-slate-400 truncate">Signatory: <span className="text-slate-600 font-medium">{clientSigner}</span></p>
+                            )}
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-slate-200/70 flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openSigModal('client', 'draw')}
+                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <PenTool size={11} />
+                              <span>{isSigned ? 'Re-draw Sign' : '+ Draw Sign'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openSigModal('client', 'upload')}
+                              className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Upload size={11} />
+                              <span>{isSigned ? 'Change Image' : '+ Upload Image'}</span>
+                            </button>
+                          </div>
                         </div>
-                        {contract.clientSignature ? (
-                          <div className="bg-white border border-slate-200 rounded-lg p-2 h-20 flex items-center justify-center overflow-hidden">
-                            <img src={contract.clientSignature} alt="Client Signature" className="max-h-full object-contain" />
-                          </div>
-                        ) : (
-                          <div className="bg-white/80 border border-dashed border-slate-300 rounded-lg h-20 flex flex-col items-center justify-center text-slate-400">
-                            <PenTool size={16} />
-                            <span className="text-[10px] mt-1">Pending client signature</span>
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { setSigRole('client'); setSigModalOpen(true); }}
-                        className="mt-2 text-[11px] font-semibold text-blue-600 hover:underline text-left cursor-pointer"
-                      >
-                        {contract.clientSignature ? 'Re-sign as Client' : '+ Sign as Client'}
-                      </button>
-                    </div>
+                      );
+                    })()}
 
                     {/* Company Signature */}
-                    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-slate-700">Company Signature</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${contract.companySignature ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                            {contract.companySignature ? 'Signed' : 'Awaiting Sign'}
-                          </span>
+                    {(() => {
+                      const companySig = contract.companySignature || contract.company_signature;
+                      const companySigner = contract.companySignedBy || contract.company_signed_by;
+                      const isSigned = Boolean(companySig);
+                      return (
+                        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-semibold text-slate-700">Company Signature</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isSigned ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                {isSigned ? 'Signed' : 'Awaiting Sign'}
+                              </span>
+                            </div>
+                            {isSigned ? (
+                              <div className="bg-white border border-slate-200 rounded-lg p-2 h-20 flex items-center justify-center overflow-hidden">
+                                <img src={companySig} alt="Company Signature" className="max-h-full object-contain" />
+                              </div>
+                            ) : (
+                              <div className="bg-white/80 border border-dashed border-slate-300 rounded-lg h-20 flex flex-col items-center justify-center text-slate-400">
+                                <PenTool size={16} />
+                                <span className="text-[10px] mt-1">Pending company authorization</span>
+                              </div>
+                            )}
+                            {companySigner && (
+                              <p className="mt-1 text-[10px] text-slate-400 truncate">Signatory: <span className="text-slate-600 font-medium">{companySigner}</span></p>
+                            )}
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-slate-200/70 flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openSigModal('company', 'draw')}
+                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <PenTool size={11} />
+                              <span>{isSigned ? 'Re-draw Sign' : '+ Draw Sign'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openSigModal('company', 'upload')}
+                              className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Upload size={11} />
+                              <span>{isSigned ? 'Change Image' : '+ Upload Image'}</span>
+                            </button>
+                          </div>
                         </div>
-                        {contract.companySignature ? (
-                          <div className="bg-white border border-slate-200 rounded-lg p-2 h-20 flex items-center justify-center overflow-hidden">
-                            <img src={contract.companySignature} alt="Company Signature" className="max-h-full object-contain" />
-                          </div>
-                        ) : (
-                          <div className="bg-white/80 border border-dashed border-slate-300 rounded-lg h-20 flex flex-col items-center justify-center text-slate-400">
-                            <PenTool size={16} />
-                            <span className="text-[10px] mt-1">Pending company authorization</span>
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { setSigRole('company'); setSigModalOpen(true); }}
-                        className="mt-2 text-[11px] font-semibold text-blue-600 hover:underline text-left cursor-pointer"
-                      >
-                        {contract.companySignature ? 'Re-sign as Company' : '+ Sign as Company'}
-                      </button>
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {contract.status === 'Declined' && (
@@ -937,17 +1061,49 @@ export default function ContractDetailPage() {
           <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
             <button
               type="button"
-              onClick={() => setSigRole('client')}
+              onClick={() => {
+                setSigRole('client');
+                setSigName(record?.contract?.customer || record?.deal?.client || '');
+                setSigEmail(record?.deal?.email || '');
+              }}
               className={`flex-1 py-1.5 rounded-md font-semibold text-center cursor-pointer ${sigRole === 'client' ? 'bg-white text-primary shadow-xs' : 'text-slate-600'}`}
             >
               Client Signatory
             </button>
             <button
               type="button"
-              onClick={() => setSigRole('company')}
+              onClick={() => {
+                setSigRole('company');
+                setSigName(currentUser?.name || currentUser?.fullName || actor || '');
+                setSigEmail(currentUser?.email || '');
+              }}
               className={`flex-1 py-1.5 rounded-md font-semibold text-center cursor-pointer ${sigRole === 'company' ? 'bg-white text-primary shadow-xs' : 'text-slate-600'}`}
             >
               Company Authorization
+            </button>
+          </div>
+
+          {/* Mode Switcher: Draw Pad vs Upload Image */}
+          <div className="flex gap-2 p-1 bg-slate-100/80 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setSigMode('draw')}
+              className={`flex-1 py-1.5 rounded-md font-semibold text-center cursor-pointer flex items-center justify-center gap-1.5 ${
+                sigMode === 'draw' ? 'bg-white text-primary shadow-xs' : 'text-slate-600'
+              }`}
+            >
+              <PenTool size={13} />
+              <span>Draw on Pad</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSigMode('upload')}
+              className={`flex-1 py-1.5 rounded-md font-semibold text-center cursor-pointer flex items-center justify-center gap-1.5 ${
+                sigMode === 'upload' ? 'bg-white text-primary shadow-xs' : 'text-slate-600'
+              }`}
+            >
+              <Upload size={13} />
+              <span>Upload Signature Image</span>
             </button>
           </div>
 
@@ -964,26 +1120,79 @@ export default function ContractDetailPage() {
             </label>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-slate-600">Draw Signature on Touch/Mouse Pad</span>
-              <button type="button" onClick={clearCanvas} className="text-[11px] text-rose-600 hover:underline cursor-pointer">
-                Clear Pad
-              </button>
+          {sigMode === 'draw' ? (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-slate-600">Draw Signature on Touch/Mouse Pad</span>
+                <button type="button" onClick={clearCanvas} className="text-[11px] text-rose-600 hover:underline cursor-pointer">
+                  Clear Pad
+                </button>
+              </div>
+              <div className="border border-slate-300 rounded-xl bg-white overflow-hidden shadow-inner flex items-center justify-center">
+                <canvas
+                  ref={canvasRef}
+                  width={450}
+                  height={160}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="cursor-crosshair w-full h-[160px] touch-none"
+                />
+              </div>
             </div>
-            <div className="border border-slate-300 rounded-xl bg-white overflow-hidden shadow-inner flex items-center justify-center">
-              <canvas
-                ref={canvasRef}
-                width={450}
-                height={160}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                className="cursor-crosshair w-full h-[160px] touch-none"
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-slate-600">Upload Signature Image</span>
+                {uploadedSigImage && (
+                  <button
+                    type="button"
+                    onClick={() => { setUploadedSigImage(null); setSigImageName(''); }}
+                    className="text-[11px] text-rose-600 hover:underline cursor-pointer"
+                  >
+                    Remove Image
+                  </button>
+                )}
+              </div>
+              {uploadedSigImage ? (
+                <div className="border border-slate-200 rounded-xl bg-slate-50 p-4 flex flex-col items-center justify-center">
+                  <div className="bg-white border border-slate-200 rounded-lg p-2 max-h-36 max-w-full flex items-center justify-center overflow-hidden mb-2">
+                    <img src={uploadedSigImage} alt="Uploaded signature preview" className="max-h-28 object-contain" />
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-medium truncate max-w-xs">{sigImageName}</span>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-2 text-xs text-primary font-semibold hover:underline cursor-pointer"
+                  >
+                    Select different image
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 hover:border-primary/60 rounded-xl p-6 bg-slate-50/50 hover:bg-slate-50 text-center cursor-pointer transition flex flex-col items-center justify-center"
+                >
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-primary flex items-center justify-center mb-2">
+                    <Upload size={18} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700">Click to choose signature image</span>
+                  <span className="text-[11px] text-slate-400 mt-1">Supports PNG, JPG, JPEG, SVG, WebP (Transparent or white background)</span>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                className="hidden"
+                onChange={handleImageFileChange}
               />
             </div>
-          </div>
+          )}
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
             <button type="button" className="btn-outline" disabled={busy} onClick={() => setSigModalOpen(false)}>Cancel</button>

@@ -23,10 +23,20 @@ export async function convertEstimateToOrder(estimateId) {
   });
 }
 
-export async function captureContractSignature(contractId, { role, signature, signatoryName, signatoryEmail }) {
+export async function captureContractSignature(contractId, { role, signatory_type, signature, signatoryName, signatoryEmail }) {
+  const finalRole = (signatory_type || role || 'client').toLowerCase();
   return apiClient(`/crm/contracts/${contractId}/capture-signature/`, {
     method: 'POST',
-    data: { role, signature, signatoryName, signatoryEmail },
+    data: {
+      role: finalRole,
+      signatory_type: finalRole,
+      signature,
+      signature_data: signature,
+      signatoryName,
+      signatory_name: signatoryName,
+      signed_by: signatoryName,
+      signatoryEmail,
+    },
   });
 }
 

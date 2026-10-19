@@ -209,8 +209,8 @@ const NAV = [
     menu: 'menu_inventory',
     icon: Package,
     children: [
-      { label: 'Item Master', icon: Boxes, to: '/inventory/items' },
-      { label: 'Category Master', icon: Layers, to: '/inventory/categories' },
+      { label: 'Product Master', icon: Boxes, to: '/inventory/items' },
+      { label: 'Spare-Part Categories', icon: Layers, to: '/inventory/categories' },
       { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },

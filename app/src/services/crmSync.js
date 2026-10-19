@@ -330,12 +330,12 @@ function contractToApi(c) {
 function contractFromApi(row) {
   return {
     ...row,
-    contractNumber: row.contractNumber || '',
-    customer: row.customerName || '',
-    client: row.customerName || '',
-    contractType: row.contractType || '',
-    amount: num(row.value),
-    template: row.templateKey || '',
+    contractNumber: row.contractNumber || row.contract_number || '',
+    customer: row.customerName || row.customer_name || '',
+    client: row.customerName || row.customer_name || '',
+    contractType: row.contractType || row.contract_type || '',
+    amount: num(row.value ?? row.amount),
+    template: row.templateKey || row.template_key || '',
     description: row.description || '',
     terms: row.terms || '',
     dealId: row.dealId || row.deal || null,
@@ -343,6 +343,13 @@ function contractFromApi(row) {
     dealNumber: row.dealNumber || '',
     createdBy: row.createdByName || '',
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    clientSignature: row.clientSignature || row.client_signature || null,
+    clientSignedBy: row.clientSignedBy || row.client_signed_by || null,
+    clientSignedAt: row.clientSignedAt || row.client_signed_at || null,
+    companySignature: row.companySignature || row.company_signature || null,
+    companySignedBy: row.companySignedBy || row.company_signed_by || null,
+    companySignedAt: row.companySignedAt || row.company_signed_at || null,
+    rejectionReason: row.rejectionReason || row.rejection_reason || '',
     _synced: true,
   };
 }
