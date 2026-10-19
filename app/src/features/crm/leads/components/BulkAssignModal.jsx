@@ -65,6 +65,7 @@ export default function BulkAssignModal({ isOpen, onClose, selectedLeads = [], o
       const payload = {
         lead_ids: selectedLeads.map((l) => l.id),
         strategy,
+        assignee_id: strategy === 'single' ? selectedRepId : undefined,
         assignee_ids: targetAssignees,
         transfer_open_tasks: transferTasks,
         reason,
@@ -72,6 +73,7 @@ export default function BulkAssignModal({ isOpen, onClose, selectedLeads = [], o
       };
 
       const res = await bulkAssignLeads(payload);
+      window.dispatchEvent(new Event('crm:data-updated'));
       onSuccess?.(res);
       onClose();
     } catch (err) {

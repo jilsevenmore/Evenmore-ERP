@@ -3,8 +3,8 @@ import {
   ChevronsUpDown,
   Filter,
   Printer,
+  List,
   LayoutGrid,
-  SquareChartGantt,
 } from "lucide-react";
 import { useMemo } from 'react';
 import { useCrmStore, leadTabsFrom } from '../../../stores/crmStore';
@@ -110,11 +110,11 @@ export default function LeadsTabs({
           <ViewButton label="Print Leads" onClick={onPrint}>
             <Printer size={18} />
           </ViewButton>
-          <ViewButton label="Grid View" active={leadView === "grid"} onClick={() => onLeadViewChange("grid")}>
-            <LayoutGrid size={18} />
+          <ViewButton label="List View" active={leadView === "list"} onClick={() => onLeadViewChange("list")}>
+            <List size={18} />
           </ViewButton>
           <ViewButton label="Tile View" active={leadView === "tile"} onClick={() => onLeadViewChange("tile")}>
-            <SquareChartGantt size={18} />
+            <LayoutGrid size={18} />
           </ViewButton>
         </div>
         {/* Replaced: the selection actions sat inline after the view icons; they

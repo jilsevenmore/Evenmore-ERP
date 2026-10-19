@@ -677,21 +677,17 @@ export default function LeadsPage() {
           />
         )}
         <div className="table-col">
-          {leadView === 'list' ? (
+          {leadView === 'tile' ? (
             <>
-              <LeadsTable
+              <LeadCardGridView
                 rows={pagedRows}
                 selected={selected}
                 pinnedLeadIds={pinnedLeadIds}
                 onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
                 onRequestDelete={requestDeleteLead}
-                onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onOpenLead={openLeadDetails}
-                onEditLead={editLeadDetails}
-                onConvertLead={setConvertTarget}
-                onUpdateLead={updateLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
                 <Pagination
@@ -705,47 +701,7 @@ export default function LeadsPage() {
                 />
               </div>
             </>
-          ) : leadView === 'grid' ? (
-            <>
-              <LeadsTable
-                rows={pagedRows}
-                selected={selected}
-                pinnedLeadIds={pinnedLeadIds}
-                onTogglePin={togglePinLead}
-                onToggleOne={toggleOne}
-                onRequestDelete={requestDeleteLead}
-                onToggleAll={toggleAll}
-                onAddNote={openNotes}
-                onOpenLead={openLeadDetails}
-                onEditLead={editLeadDetails}
-                onConvertLead={setConvertTarget}
-                onUpdateLead={updateLead}
-                variant="grid"
-              />
-              <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
-                <Pagination
-                  total={rows.length}
-                  page={page}
-                  pageSize={pageSize}
-                  onChange={setPage}
-                  showTotalRecords
-                  pageSizeOptions={[10, 20, 50]}
-                  onPageSizeChange={handlePageSizeChange}
-                />
-              </div>
-            </>
-          ) : leadView === 'tile' ? (
-            <LeadCardGridView
-              rows={pagedRows}
-              selected={selected}
-              pinnedLeadIds={pinnedLeadIds}
-              onTogglePin={togglePinLead}
-              onToggleOne={toggleOne}
-              onRequestDelete={requestDeleteLead}
-              onAddNote={openNotes}
-              onOpenLead={openLeadDetails}
-            />
-          ) : (
+          ) : leadView === 'map' ? (
             <LeadMapView
               rows={rows}
               selected={selected}
@@ -754,6 +710,34 @@ export default function LeadsPage() {
               onOpenListView={() => setLeadView('list')}
               onOpenLead={openLeadDetails}
             />
+          ) : (
+            <>
+              <LeadsTable
+                rows={pagedRows}
+                selected={selected}
+                pinnedLeadIds={pinnedLeadIds}
+                onTogglePin={togglePinLead}
+                onToggleOne={toggleOne}
+                onRequestDelete={requestDeleteLead}
+                onToggleAll={toggleAll}
+                onAddNote={openNotes}
+                onOpenLead={openLeadDetails}
+                onEditLead={editLeadDetails}
+                onConvertLead={setConvertTarget}
+                onUpdateLead={updateLead}
+              />
+              <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
+                <Pagination
+                  total={rows.length}
+                  page={page}
+                  pageSize={pageSize}
+                  onChange={setPage}
+                  showTotalRecords
+                  pageSizeOptions={[10, 20, 50]}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
