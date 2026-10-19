@@ -14,8 +14,19 @@
 import { createSync, compact, asText, isBackendEnabled, isServerId, describeError } from './resourceSync';
 import { api } from './api';
 import { formatDateDDMMYYYY, toISODate } from '../utils/dateUtils';
+import { scaleForScore } from './performanceScales';
 
 export { isBackendEnabled, isServerId, describeError };
+
+const snapshots = new Map();
+
+function getCachedEmployees() {
+  return snapshots.get('employees') || [];
+}
+
+function getCachedCycles() {
+  return snapshots.get('cycles') || [];
+}
 
 function isoOut(value) {
   if (!value) return undefined;
@@ -756,11 +767,295 @@ export const HRMS_RESOURCES = {
   },
 
   // ── performance ───────────────────────────────────────────────────────────
-  appraisals: dated('/hrms/performance/appraisals/', ['dueDate', 'completedDate']),
-  cycles: dated('/hrms/performance/cycles/', ['startDate', 'endDate']),
-  goals: dated('/hrms/performance/goals/', ['dueDate']),
-  indicators: plain('/hrms/performance/indicators/'),
-  kpis: plain('/hrms/performance/kpis/'),
+  appraisals: {
+    path: '/hrms/performance/appraisals/',
+    toApi: (a) => {
+      let employeeId = isServerId(a.employeeId) ? a.employeeId : undefined;
+      if (!employeeId && a.employee) {
+        const employees = getCachedEmployees();
+        const found = employees.find(
+          (e) => String(e.name || '').toLowerCase() === String(a.employee || '').toLowerCase()
+        );
+        if (found && isServerId(found.id)) employeeId = found.id;
+      }
+
+      let managerId = isServerId(a.managerId) ? a.managerId : undefined;
+      if (!managerId && a.reviewer) {
+        const employees = getCachedEmployees();
+        const found = employees.find(
+          (e) => String(e.name || '').toLowerCase() === String(a.reviewer || '').toLowerCase()
+        );
+        if (found && isServerId(found.id)) managerId = found.id;
+      }
+
+      let cycleId = isServerId(a.cycleId) ? a.cycleId : undefined;
+      if (!cycleId && (a.cycle || a.cycleName)) {
+        const cycles = getCachedCycles();
+        const targetName = String(a.cycle || a.cycleName || '').trim().toLowerCase();
+        const found = cycles.find((c) => String(c.name || '').trim().toLowerCase() === targetName);
+        if (found && isServerId(found.id)) cycleId = found.id;
+      }
+      if (!cycleId) {
+        const cycles = getCachedCycles();
+        const active = cycles.find((c) => c.status === 'Active') || cycles[0];
+        if (active && isServerId(active.id)) cycleId = active.id;
+      }
+
+      const initialRating = a.rating !== undefined ? num(a.rating) : 4.0;
+      const selfR = a.selfReview?.rating !== undefined ? num(a.selfReview.rating) : (a.selfRating !== undefined ? num(a.selfRating) : initialRating);
+      const mgrR = a.managerReview?.rating !== undefined ? num(a.managerReview.rating) : (a.managerRating !== undefined ? num(a.managerRating) : undefined);
+      const finR = a.finalRating !== undefined ? num(a.finalRating) : (a.status === 'Completed' ? num(a.rating) : undefined);
+
+      return compact({
+        employeeId,
+        cycleId,
+        managerId: managerId || null,
+        selfRating: selfR,
+        managerRating: mgrR,
+        finalRating: finR,
+        strengths: a.strengths || a.selfReview?.strengths || a.managerReview?.strengths || undefined,
+        areasForImprovement: a.areasForImprovement || a.selfReview?.areasForImprovement || a.managerReview?.areasForImprovement || undefined,
+        developmentFeedback: a.developmentFeedback || a.managerReview?.developmentFeedback || undefined,
+        selfComments: a.selfComments || a.selfReview?.comments || undefined,
+        hrComments: a.hrComments || a.hrReview?.comments || undefined,
+      });
+    },
+    fromApi: (row) => {
+      const employees = getCachedEmployees();
+      const cycles = getCachedCycles();
+
+      const emp = employees.find((e) => e.id === row.employeeId);
+      const mgr = employees.find((e) => e.id === row.managerId);
+      const cyc = cycles.find((c) => c.id === row.cycleId);
+
+      const employeeName = emp?.name || row.employeeName || 'Unknown Employee';
+      const reviewerName = mgr?.name || 'Assigned Manager';
+      const cycleName = cyc?.name || 'Appraisal Cycle';
+
+      const initialRating = Number(row.finalRating ?? row.managerRating ?? row.selfRating ?? 4.0);
+      const tier = scaleForScore(initialRating) || { label: 'Meets Expectations' };
+
+      const dueDate = row.dueDate
+        ? displayIn(row.dueDate)
+        : (cyc?.periodEnd ? displayIn(cyc.periodEnd) : (cyc?.endDate ? displayIn(cyc.endDate) : '31/12/2026'));
+
+      return {
+        ...row,
+        id: row.id,
+        employeeId: row.employeeId,
+        employee: employeeName,
+        avatar: emp?.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(employeeName)}`,
+        reviewer: reviewerName,
+        managerId: row.managerId || null,
+        cycle: cycleName,
+        cycleId: row.cycleId,
+        department: emp?.department || emp?.dept || '',
+        designation: emp?.designation || emp?.role || '',
+        rating: initialRating,
+        ratingScaleLabel: tier.label,
+        weightedScore: Math.round((initialRating / 5) * 100),
+        stage: row.stage || 'Self Review',
+        status: row.status || 'Draft',
+        due: dueDate,
+        selfReview: {
+          rating: Number(row.selfRating ?? initialRating),
+          comments: row.selfComments || '',
+          strengths: row.strengths || '',
+          areasForImprovement: row.areasForImprovement || '',
+          completedAt: row.stage !== 'Self Review' ? (row.updatedAt ? displayIn(row.updatedAt) : 'Completed') : null,
+          submitted: row.stage !== 'Self Review',
+        },
+        managerReview: {
+          rating: Number(row.managerRating ?? initialRating),
+          comments: row.developmentFeedback || '',
+          strengths: row.strengths || '',
+          areasForImprovement: row.areasForImprovement || '',
+          developmentFeedback: row.developmentFeedback || '',
+          reviewedAt: (row.stage === 'HR Review' || row.stage === 'Finalization') ? (row.updatedAt ? displayIn(row.updatedAt) : 'Completed') : null,
+          submitted: row.stage === 'HR Review' || row.stage === 'Finalization',
+        },
+        hrReview: {
+          comments: row.hrComments || '',
+          approved: row.status === 'Approved' || row.status === 'Completed',
+          approvedAt: (row.status === 'Approved' || row.status === 'Completed') ? (row.updatedAt ? displayIn(row.updatedAt) : 'Completed') : null,
+          status: (row.status === 'Approved' || row.status === 'Completed') ? 'Approved' : 'Pending',
+        },
+        history: (Array.isArray(row.history) && row.history.length > 0)
+          ? row.history.map((h) => ({
+              stage: h.toStage || h.stage || 'Review',
+              action: h.action || 'Stage Update',
+              actor: h.actorName || h.actor || 'System',
+              date: h.createdAt ? displayIn(h.createdAt) : 'Today',
+              note: h.comment || h.note || '',
+            }))
+          : [
+              {
+                stage: 'Draft',
+                action: 'Appraisal Created',
+                actor: 'HR Admin',
+                date: row.createdAt ? displayIn(row.createdAt) : 'Today',
+                note: 'Appraisal initiated',
+              },
+            ],
+        kpiResults: (Array.isArray(row.kpiScores) && row.kpiScores.length > 0)
+          ? row.kpiScores.map((k) => ({
+              name: k.kpiName || 'Indicator',
+              target: k.target != null ? String(k.target) : '100%',
+              actual: k.achieved != null ? String(k.achieved) : '',
+              weight: Number(k.weight) || 10,
+              score: Number(k.score) || initialRating,
+            }))
+          : [],
+        _synced: true,
+      };
+    },
+  },
+
+  cycles: {
+    path: '/hrms/performance/cycles/',
+    toApi: (c) => compact({
+      name: c.name,
+      periodStart: isoOut(c.periodStart || c.startDate),
+      periodEnd: isoOut(c.periodEnd || c.endDate),
+      status: c.status || 'Draft',
+      participantsScope: c.participantsScope || {},
+    }),
+    fromApi: (row) => {
+      const start = displayIn(row.periodStart || row.period_start || row.startDate);
+      const end = displayIn(row.periodEnd || row.period_end || row.endDate);
+      const reviewPeriod = (start && end) ? `${start} - ${end}` : (start || end || '—');
+      return {
+        ...row,
+        id: row.id,
+        name: row.name,
+        periodStart: row.periodStart || row.period_start || '',
+        periodEnd: row.periodEnd || row.period_end || '',
+        startDate: start || '',
+        endDate: end || '',
+        reviewPeriod,
+        status: row.status || 'Draft',
+        appraisalCount: row.appraisalCount || 0,
+        completedCount: row.completedCount || 0,
+        _synced: true,
+      };
+    },
+  },
+
+  goals: {
+    path: '/hrms/performance/goals/',
+    toApi: (g) => {
+      let employeeId = isServerId(g.employeeId) ? g.employeeId : undefined;
+      if (!employeeId && (g.emp || g.employee)) {
+        const employees = getCachedEmployees();
+        const found = employees.find(
+          (e) => String(e.name || '').toLowerCase() === String(g.emp || g.employee || '').toLowerCase()
+        );
+        if (found && isServerId(found.id)) employeeId = found.id;
+      }
+      let cycleId = isServerId(g.cycleId) ? g.cycleId : (isServerId(g.cycle) ? g.cycle : undefined);
+      return compact({
+        employeeId,
+        cycle: cycleId || null,
+        title: g.title,
+        description: g.description || undefined,
+        targetDate: isoOut(g.targetDate || g.dueDate || g.due),
+        progressPct: g.progressPct !== undefined ? num(g.progressPct) : (g.progress !== undefined ? num(g.progress) : 0),
+        status: g.status || 'In Progress',
+      });
+    },
+    fromApi: (row) => {
+      const employees = getCachedEmployees();
+      const emp = employees.find((e) => e.id === row.employeeId);
+      const empName = emp?.name || 'Employee';
+      return {
+        ...row,
+        id: row.id,
+        employeeId: row.employeeId,
+        emp: empName,
+        employee: empName,
+        avatar: emp?.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(empName)}`,
+        title: row.title,
+        description: row.description || '',
+        targetDate: row.targetDate || '',
+        due: row.targetDate ? displayIn(row.targetDate) : '—',
+        progress: row.progressPct || 0,
+        progressPct: row.progressPct || 0,
+        status: row.status || 'In Progress',
+        _synced: true,
+      };
+    },
+  },
+
+  indicators: {
+    path: '/hrms/performance/indicators/',
+    toApi: (ind) => {
+      let departmentId = isServerId(ind.departmentId) ? ind.departmentId : undefined;
+      if (!departmentId && ind.department) {
+        const depts = snapshots.get('departments') || [];
+        const found = depts.find(
+          (d) => String(d.name || '').toLowerCase() === String(ind.department || '').toLowerCase()
+        );
+        if (found && isServerId(found.id)) departmentId = found.id;
+      }
+      return compact({
+        name: ind.name || ind.title,
+        category: ind.category || 'Technical',
+        weight: ind.weight !== undefined ? num(ind.weight) : 10,
+        departmentId: departmentId || null,
+      });
+    },
+    fromApi: (row) => {
+      const depts = snapshots.get('departments') || [];
+      const dept = depts.find((d) => d.id === row.departmentId);
+      return {
+        ...row,
+        id: row.id,
+        name: row.name,
+        title: row.name,
+        category: row.category || 'Technical',
+        weight: Number(row.weight) || 10,
+        departmentId: row.departmentId || null,
+        department: dept?.name || '',
+        rating: 4.0,
+        status: 'Active',
+        createdAt: row.createdAt ? displayIn(row.createdAt) : 'Today',
+        updatedAt: 'Today',
+        _synced: true,
+      };
+    },
+  },
+
+  kpis: {
+    path: '/hrms/performance/kpis/',
+    toApi: (k) => {
+      const rawTarget = String(k.target ?? '');
+      const numTarget = num(rawTarget.replace(/[^0-9.]/g, ''), 100);
+      const unit = k.unit || (rawTarget.includes('%') ? '%' : '');
+      return compact({
+        name: k.name || k.title,
+        indicatorId: isServerId(k.indicatorId) ? k.indicatorId : undefined,
+        target: numTarget,
+        unit: unit || undefined,
+        appliesTo: k.appliesTo || 'All Staff',
+      });
+    },
+    fromApi: (row) => {
+      const targetStr = row.target != null ? `${row.target}${row.unit || ''}` : '100%';
+      return {
+        ...row,
+        id: row.id,
+        name: row.name,
+        target: targetStr,
+        unit: row.unit || '',
+        appliesTo: row.appliesTo || 'All Staff',
+        indicatorId: row.indicatorId || null,
+        weight: 10,
+        status: 'Active',
+        createdAt: row.createdAt ? displayIn(row.createdAt) : 'Today',
+        _synced: true,
+      };
+    },
+  },
 
   // ── training ──────────────────────────────────────────────────────────────
   trainings: {
@@ -1194,7 +1489,6 @@ export const acceptOfferLetter = (offerId) =>
  * they hand over the collection as they now want it and this works out which
  * rows are new, changed or gone.
  */
-const snapshots = new Map();
 
 /** Load a collection and remember it as the baseline for later writes. */
 export async function pullTracked(key, query) {
