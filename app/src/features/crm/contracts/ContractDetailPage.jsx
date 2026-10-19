@@ -4,11 +4,11 @@ import {
   ArrowLeft, Pencil, Download, MoreHorizontal, RefreshCw,
   FileText, Upload, Trash2, X, CheckCircle2, Plus, ChevronDown,
   Handshake, UserRound, FolderOpen, Link2, Phone, Flag, Users, FolderPlus,
-  PenTool, Mail, Check, XCircle, FileCheck,
+  PenTool, Mail, Check, XCircle, FileCheck, Printer, Loader2,
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import './ContractDetailPage.css';
-import { printContract } from '../../../utils/contractPrint';
+import { printContract, downloadContractAsPdf } from '../../../utils/contractPrint';
 import { useAppStore } from '../../../stores/appStore';
 import { loadProjects } from '../../../services/dealProjectService';
 import { describeError, pullDealActivities } from '../../../services/crmSync';
@@ -137,6 +137,7 @@ export default function ContractDetailPage() {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [targetEmail, setTargetEmail] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const startDrawing = (e) => {
     isDrawing.current = true;
@@ -489,8 +490,31 @@ export default function ContractDetailPage() {
             <button type="button" className="btn-outline btn-sm" onClick={() => { setTargetEmail(deal?.email || ''); setEmailModalOpen(true); }}><Mail size={14} /> Email</button>
             <button type="button" className="btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs" onClick={() => { setTargetWorkflowStatus('Accepted'); setWorkflowModalOpen(true); }}><Check size={14} /> Accept</button>
             <button type="button" className="btn-sm bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-medium rounded-lg flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs" onClick={() => { setTargetWorkflowStatus('Declined'); setWorkflowModalOpen(true); }}><XCircle size={14} /> Decline</button>
-            <button type="button" className="btn-outline btn-sm" onClick={openEdit}><Pencil size={14} /> Edit</button>
-            <button type="button" className="btn-outline btn-sm" onClick={() => printContract(contract, deal)}><Download size={14} /> Download PDF</button>
+            <button
+              type="button"
+              className="btn-outline btn-sm disabled:opacity-50"
+              disabled={isDownloadingPdf}
+              onClick={async () => {
+                if (isDownloadingPdf) return;
+                setIsDownloadingPdf(true);
+                try {
+                  await downloadContractAsPdf(contract, deal);
+                } finally {
+                  setIsDownloadingPdf(false);
+                }
+              }}
+              title="Download PDF directly to Downloads folder"
+            >
+              {isDownloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download PDF
+            </button>
+            <button
+              type="button"
+              className="btn-outline btn-sm"
+              onClick={() => printContract(contract, deal)}
+              title="Open print preview"
+            >
+              <Printer size={14} /> Print
+            </button>
             <details className="relative">
               <summary className="btn-outline btn-sm cursor-pointer list-none"><MoreHorizontal size={15} /> More</summary>
               <div className="absolute z-10 top-full right-0 mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 text-xs">

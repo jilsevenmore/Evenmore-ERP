@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
-import { X, Printer, CheckCircle2, AlertCircle, ShieldAlert, Receipt } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Printer, CheckCircle2, AlertCircle, ShieldAlert, Receipt, Download, Loader2 } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { downloadElementAsPdf } from '../../services/exportUtils';
 
 export const PaymentReceiptModal = ({ receipt, onClose }) => {
     const { formatCurrency } = useERP ? useERP() : { formatCurrency: (v) => `₹${Number(v || 0).toLocaleString()}` };
+    const sheetRef = useRef(null);
+    const [downloading, setDownloading] = useState(false);
 
     useEffect(() => {
         if (!receipt) return;
@@ -13,6 +16,16 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
     }, [receipt, onClose]);
 
     if (!receipt) return null;
+
+    const handleDirectDownload = async () => {
+        if (!sheetRef.current || downloading) return;
+        setDownloading(true);
+        try {
+            await downloadElementAsPdf(sheetRef.current, `PaymentReceipt_${receipt.receiptNumber || 'Receipt'}.pdf`);
+        } finally {
+            setDownloading(false);
+        }
+    };
 
     const isWithoutBill = receipt.paymentType === 'WITHOUT_BILL' ||
         receipt.isWithoutBill ||
@@ -55,7 +68,7 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
                 )}
 
                 {/* Receipt Voucher Body */}
-                <div className="py-4 space-y-4">
+                <div ref={sheetRef} className="py-4 space-y-4">
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
                         <div className="flex justify-between items-start border-b border-slate-200 pb-2.5">
                             <div>
@@ -143,10 +156,14 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
                         {isWithoutBill ? 'Internal Cash Voucher Clear' : 'Ledger GL Posted & Invoice Settled'}
                     </span>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => window.print()} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs">
-                            <Printer size={13}/> Print Receipt
+                        <button type="button" onClick={() => window.print()} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer">
+                            <Printer size={13}/> Print
                         </button>
-                        <button onClick={onClose} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
+                        <button type="button" onClick={handleDirectDownload} disabled={downloading} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs">
+                            {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                            {downloading ? 'Downloading...' : 'Download PDF'}
+                        </button>
+                        <button type="button" onClick={onClose} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
                             Done
                         </button>
                     </div>

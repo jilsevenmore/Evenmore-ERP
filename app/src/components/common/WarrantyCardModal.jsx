@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
-import { X, Printer, ShieldCheck, FileCheck, Award, Send, Check } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Printer, ShieldCheck, FileCheck, Award, Send, Check, Download, Loader2 } from 'lucide-react';
 import { formatDisplayDate, getWarrantyStatusStyle, formatWarrantyPeriod } from '../../utils/warrantyUtils';
 import { useERP } from '../../context/ERPContext';
 import { addressLines, companyInitial, joinNonEmpty } from './printLetterhead';
+import { downloadElementAsPdf } from '../../services/exportUtils';
 
 export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null }) => {
     const { companyProfile } = useERP();
@@ -16,6 +17,9 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
         pan && `PAN: ${pan}`,
         (companyProfile?.email || companyProfile?.phone) && `Support: ${joinNonEmpty([companyProfile?.email, companyProfile?.phone], ' | ')}`,
     ]);
+    const sheetRef = useRef(null);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -27,6 +31,16 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleDownloadPdf = async () => {
+        if (!sheetRef.current || isDownloadingPdf) return;
+        setIsDownloadingPdf(true);
+        try {
+            await downloadElementAsPdf(sheetRef.current, `Warranty-Certificate-${warrantyCard.cardNumber || warrantyCard.id || 'doc'}.pdf`);
+        } finally {
+            setIsDownloadingPdf(false);
+        }
     };
 
     const handleSendAction = () => {
@@ -79,7 +93,7 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                 </div>
 
                 {/* Real Printable Certificate Sheet (A4 Proportion) */}
-                <div className="p-8 sm:p-10 text-slate-800 bg-white font-sans text-xs space-y-6 overflow-y-auto flex-1 printable-document">
+                <div ref={sheetRef} className="p-8 sm:p-10 text-slate-800 bg-white font-sans text-xs space-y-6 overflow-y-auto flex-1 printable-document">
                     
                     {/* Header / Letterhead */}
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-5">
@@ -329,12 +343,24 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                             </button>
                         )}
                         <button
-                            onClick={handlePrint}
-                            className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                            type="button"
+                            onClick={handleDownloadPdf}
+                            disabled={isDownloadingPdf}
+                            className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
                         >
-                            <Printer size={13} /> Print / PDF
+                            {isDownloadingPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                            <span>Download PDF</span>
                         </button>
                         <button
+                            type="button"
+                            onClick={handlePrint}
+                            className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                            <Printer size={13} />
+                            <span>Print</span>
+                        </button>
+                        <button
+                            type="button"
                             onClick={onClose}
                             className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-xl transition-colors cursor-pointer"
                         >

@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
-import { X, Printer, FileText, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Printer, FileText, CheckCircle2, Download, Loader2 } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { LetterpadBrand, LetterpadFooter } from './SalesLetterpad';
+import { downloadElementAsPdf } from '../../services/exportUtils';
 
 export const PrintFinancialStatementModal = ({
   isOpen,
@@ -19,6 +20,8 @@ export const PrintFinancialStatementModal = ({
   fyLabel = '',
 }) => {
   const { companyProfile, formatCurrency, formatDateDDMMYYYY } = useERP();
+  const sheetRef = useRef(null);
+  const [downloading, setDownloading] = useState(false);
 
   // Escape key closes preview
   useEffect(() => {
@@ -34,6 +37,17 @@ export const PrintFinancialStatementModal = ({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDirectDownload = async () => {
+    if (!sheetRef.current || downloading) return;
+    setDownloading(true);
+    try {
+      const cleanTitle = (statementTitle || 'Financial_Statement').replace(/[^a-zA-Z0-9_-]/g, '_');
+      await downloadElementAsPdf(sheetRef.current, `${cleanTitle}_${selectedPeriodLabel || 'statement'}.pdf`);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const statementTitle =
@@ -68,10 +82,19 @@ export const PrintFinancialStatementModal = ({
             <button
               onClick={handlePrint}
               type="button"
-              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer"
             >
               <Printer size={14} />
-              Download PDF / Print
+              Print
+            </button>
+            <button
+              onClick={handleDirectDownload}
+              type="button"
+              disabled={downloading}
+              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
+            >
+              {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {downloading ? 'Downloading...' : 'Download PDF'}
             </button>
             <button
               onClick={onClose}
@@ -86,7 +109,7 @@ export const PrintFinancialStatementModal = ({
 
         {/* Printable Statement Sheet (A4 Proportion) */}
         <div className="overflow-x-auto p-4 sm:p-8 lg:p-10 print:p-0 print:overflow-visible bg-slate-50 print:bg-white">
-          <div className="p-8 sm:p-12 min-w-[700px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document shadow-sm print:shadow-none border border-slate-200 print:border-none mx-auto max-w-[800px]">
+          <div ref={sheetRef} className="p-8 sm:p-12 min-w-[700px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document shadow-sm print:shadow-none border border-slate-200 print:border-none mx-auto max-w-[800px]">
             {/* Header / Letterpad */}
             <div className="flex items-start justify-between border-b-2 border-slate-800 pb-5">
               <LetterpadBrand company={companyProfile} />
