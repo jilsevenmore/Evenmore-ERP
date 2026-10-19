@@ -3821,6 +3821,14 @@ export default function HRAdminPage({ defaultTab }) {
                             >
                               <Trash2 size={15} />
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteOffer(o.id, o.candidateName)}
+                              className="p-1.5 hover:bg-red-50 rounded-xl text-muted hover:text-red-600 transition cursor-pointer"
+                              title="Delete Offer Letter"
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -5840,6 +5848,54 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
           </div>
 
+          {/* Search & Priority Filter Toolbar */}
+          <div className="bg-white border border-bdr rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <div className="relative w-full max-w-sm">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search announcements by title or content..."
+                  value={announcementSearch}
+                  onChange={(e) => setAnnouncementSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 h-9 text-xs rounded-xl border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[12px] text-muted font-medium mr-1">Status:</span>
+              {["all", "published", "draft", "archived"].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setAnnouncementStatusFilter(st)}
+                  className={`h-8 px-3 rounded-xl text-xs font-semibold capitalize transition cursor-pointer ${
+                    announcementStatusFilter === st
+                      ? "bg-navy text-white font-semibold"
+                      : "bg-off text-muted hover:text-slate-800"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+              <span className="text-[12px] text-muted font-medium ml-2 mr-1">Priority:</span>
+              {["all", "urgent", "high", "normal", "low"].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setAnnouncementPriorityFilter(p)}
+                  className={`h-8 px-3 rounded-xl text-xs font-semibold capitalize transition cursor-pointer ${
+                    announcementPriorityFilter === p
+                      ? "bg-navy text-white font-semibold"
+                      : "bg-off text-muted hover:text-slate-800"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {announcements
               .filter((ann) => {
@@ -6005,6 +6061,39 @@ export default function HRAdminPage({ defaultTab }) {
               <span className="text-[12px] font-medium text-sky-800 bg-sky-50 px-3 py-1.5 rounded-lg border border-sky-200">
                 {travelRequests.length} Total Requests • {travelRequests.filter((t) => (t.status || "").toLowerCase() === "approved").length} Approved
               </span>
+            </div>
+          </div>
+
+          {/* Search & Status Filter Toolbar */}
+          <div className="bg-white border border-bdr rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <div className="relative w-full max-w-sm">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search by employee, destination, or purpose..."
+                  value={travelSearch}
+                  onChange={(e) => setTravelSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 h-9 text-xs rounded-xl border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[12px] text-muted font-medium mr-1">Status:</span>
+              {["all", "submitted", "approved", "rejected", "settled"].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setTravelStatusFilter(st)}
+                  className={`h-8 px-3 rounded-xl text-xs font-semibold capitalize transition cursor-pointer ${
+                    travelStatusFilter === st
+                      ? "bg-navy text-white font-semibold"
+                      : "bg-off text-muted hover:text-slate-800"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -7730,6 +7819,159 @@ export default function HRAdminPage({ defaultTab }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: View Grievance & Investigation Notes ── */}
+      {viewingComplaint && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-2xl p-5 sm:p-6 max-h-[95vh] overflow-y-auto flex flex-col gap-4">
+            <div className="flex justify-between items-start pb-3 border-b border-bdr">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-mono font-bold text-base text-navy">{viewingComplaint.id}</span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      viewingComplaint.status === "Resolved"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : viewingComplaint.status === "Under Review" || viewingComplaint.status === "Under Investigation"
+                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}
+                  >
+                    {viewingComplaint.status}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                      viewingComplaint.priority === "High"
+                        ? "bg-red-50 text-red-700 border-red-200"
+                        : viewingComplaint.priority === "Medium"
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                    }`}
+                  >
+                    {viewingComplaint.priority} Priority
+                  </span>
+                </div>
+                <h3 className="font-bold text-[15px] text-slate-900">{viewingComplaint.category}</h3>
+                <p className="text-[11.5px] text-muted">Filed on {viewingComplaint.filedOn}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingComplaint(null)}
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Complainant & Target info cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-bdr text-[12.5px]">
+              <div>
+                <span className="text-muted block text-[11px]">Complainant / Source</span>
+                <span className="font-semibold text-slate-800">{viewingComplaint.complainant || "Anonymous"}</span>
+              </div>
+              <div>
+                <span className="text-muted block text-[11px]">Against / Target</span>
+                <span className="font-semibold text-slate-800">{viewingComplaint.against}</span>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="text-muted block text-[11px]">Assigned Investigator</span>
+                <span className="font-medium text-slate-700">{viewingComplaint.assignedInvestigator || "HR Committee"}</span>
+              </div>
+            </div>
+
+            {/* Grievance Statement */}
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Incident Summary & Statement</h4>
+              <p className="text-[13px] text-slate-800 bg-white p-3 rounded-xl border border-bdr leading-relaxed whitespace-pre-wrap">
+                {viewingComplaint.summary || viewingComplaint.description || "No description provided."}
+              </p>
+            </div>
+
+            {/* Resolution Panel */}
+            {viewingComplaint.status === "Resolved" ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-1">
+                <div className="flex items-center gap-1.5 text-emerald-800 font-semibold text-xs">
+                  <CheckCircle2 size={15} /> Case Resolved
+                </div>
+                <p className="text-[12.5px] text-emerald-900 leading-relaxed whitespace-pre-wrap">
+                  {viewingComplaint.resolution || "Resolved with satisfactory outcome for all parties."}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleResolveComplaint} className="bg-amber-50/60 border border-amber-200 rounded-xl p-3.5 space-y-2">
+                <h4 className="text-xs font-semibold text-amber-900">Case Resolution</h4>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="Enter conclusion, actions taken, and closing remarks..."
+                  value={complaintResolutionText}
+                  onChange={(e) => setComplaintResolutionText(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-300 text-[12.5px] bg-white focus:outline-none focus:border-navy"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isResolvingComplaint}
+                    className="px-3.5 py-1.5 bg-emerald-700 text-white rounded-lg text-xs font-semibold hover:bg-emerald-800 disabled:opacity-50 transition cursor-pointer shadow-xs"
+                  >
+                    {isResolvingComplaint ? "Resolving..." : "Mark Case as Resolved"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Investigation Notes / Timeline */}
+            <div className="space-y-2 pt-2 border-t border-bdr">
+              <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                Investigation Notes &amp; Updates ({(viewingComplaint.comments || []).length})
+              </h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {(viewingComplaint.comments || []).length === 0 ? (
+                  <p className="text-[12px] text-muted italic">No investigation notes entered yet.</p>
+                ) : (
+                  viewingComplaint.comments.map((note, idx) => (
+                    <div key={idx} className="bg-off p-2.5 rounded-lg border border-bdr/60 text-[12px]">
+                      <div className="flex items-center justify-between text-muted text-[10.5px] mb-1">
+                        <strong className="text-slate-700">{note.author_name || "Investigator"}</strong>
+                        <span>{note.created_at ? new Date(note.created_at).toLocaleString() : ""}</span>
+                      </div>
+                      <p className="text-slate-800 leading-relaxed">{note.text}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Add Note Form */}
+              <form onSubmit={handleAddComplaintComment} className="flex gap-2 pt-2">
+                <input
+                  type="text"
+                  placeholder="Add confidential investigation note..."
+                  value={complaintCommentText}
+                  onChange={(e) => setComplaintCommentText(e.target.value)}
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-bdr text-[12.5px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmittingComment || !complaintCommentText.trim()}
+                  className="px-3 py-1.5 bg-navy text-white rounded-xl text-xs font-semibold hover:bg-navy/90 disabled:opacity-50 transition cursor-pointer shadow-xs"
+                >
+                  {isSubmittingComment ? "Adding..." : "Add Note"}
+                </button>
+              </form>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-bdr">
+              <button
+                type="button"
+                onClick={() => setViewingComplaint(null)}
+                className="px-4 py-2 border border-bdr rounded-xl text-xs font-semibold hover:bg-off cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

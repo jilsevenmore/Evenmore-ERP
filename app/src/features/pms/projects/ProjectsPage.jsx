@@ -15,6 +15,7 @@ import { ProjectsTable } from './components/ProjectsTable';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ConfigureStagePercentagesModal } from './components/ConfigureStagePercentagesModal';
 import { DeleteProjectModal } from './components/DeleteProjectModal';
+import { PMSNotificationAlerts } from '../components/PMSNotificationAlerts';
 import { PmsToast } from '../components/PmsToast';
 
 /**
@@ -48,6 +49,10 @@ export default function ProjectsPage() {
             Create New Project
           </Button>
         }
+      />
+
+      <PMSNotificationAlerts
+        onFilterDelayed={() => setFilters((prev) => ({ ...prev, delayedOnly: true }))}
       />
 
       <ProjectFilterBar
