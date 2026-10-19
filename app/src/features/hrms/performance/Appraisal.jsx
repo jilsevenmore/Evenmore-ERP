@@ -32,6 +32,7 @@ import {
   Printer,
 } from "lucide-react";
 import PerformanceReportModal from "./PerformanceReportModal";
+import UserInitials from "../../../components/common/UserInitials";
 
 export default function Appraisal() {
   const showToast = useAppStore((s) => s.showToast);
@@ -147,13 +148,23 @@ export default function Appraisal() {
     });
   }, [appraisals, tab, role, employeeViewName, managerViewName, activeCycleName, search, cycleFilter, deptFilter, statusFilter, stageFilter, empFilter]);
 
+  const uniqueEmployeeList = useMemo(() => {
+    const seen = new Set();
+    return (employees || []).filter((e) => {
+      const n = (e.name || "").trim();
+      if (!n || seen.has(n.toLowerCase())) return false;
+      seen.add(n.toLowerCase());
+      return true;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [employees]);
+
   const empOpts = useMemo(() => [
     { value: "All", label: "All Employees" },
-    ...[...new Set([...employees.map((e) => e.name), ...appraisals.map((a) => a.employee)])]
+    ...[...new Set([...uniqueEmployeeList.map((e) => e.name), ...appraisals.map((a) => a.employee)])]
       .filter(Boolean)
       .sort()
       .map((name) => ({ value: name, label: name })),
-  ], [employees, appraisals]);
+  ], [uniqueEmployeeList, appraisals]);
 
   // Sync to Employee Profile
   function handleSyncToProfile(r) {
@@ -274,7 +285,7 @@ export default function Appraisal() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <img src={r.avatar} alt="" className="w-8 h-8 rounded-full object-cover border border-[#e2e8f0]" />
+          <UserInitials name={r.employee} className="w-8 h-8 text-xs" />
           <div>
             <div className="font-semibold text-slate-800 text-[13px]">{r.employee}</div>
             <div className="text-[11px] text-slate-500">{r.designation} • {r.department}</div>
@@ -743,7 +754,7 @@ export default function Appraisal() {
             <select
               value={form.employee}
               onChange={(e) => {
-                const emp = employees.find((x) => x.name === e.target.value);
+                const emp = uniqueEmployeeList.find((x) => x.name === e.target.value);
                 setForm({
                   ...form,
                   employee: e.target.value,
@@ -756,9 +767,9 @@ export default function Appraisal() {
               }`}
             >
               <option value="">Select Employee</option>
-              {employees.map((e) => (
+              {uniqueEmployeeList.map((e) => (
                 <option key={e.id || e.name} value={e.name}>
-                  {e.name} ({e.department || e.designation})
+                  {e.name}{e.department || e.designation ? ` (${e.department || e.designation})` : ""}
                 </option>
               ))}
             </select>
@@ -791,9 +802,9 @@ export default function Appraisal() {
               }`}
             >
               <option value="">Select Reviewer</option>
-              {employees.map((e) => (
+              {uniqueEmployeeList.map((e) => (
                 <option key={e.id || e.name} value={e.name}>
-                  {e.name} ({e.designation})
+                  {e.name}{e.designation ? ` (${e.designation})` : ""}
                 </option>
               ))}
             </select>

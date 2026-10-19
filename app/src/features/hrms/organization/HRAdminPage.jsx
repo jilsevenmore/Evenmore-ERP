@@ -7387,9 +7387,9 @@ export default function HRAdminPage({ defaultTab }) {
                   className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition"
                 >
                   <option value="">{currentUser?.name ? `${currentUser.name} (You)` : "Select investigator"}</option>
-                  {employees.map((e) => (
-                    <option key={e.id || e.name} value={`${e.name} (${e.designation})`}>
-                      {e.name} ({e.designation})
+                  {Array.from(new Map(employees.filter((e) => e.name).map((e) => [e.name.toLowerCase(), e])).values()).map((e) => (
+                    <option key={e.id || e.name} value={`${e.name}${e.designation ? ` (${e.designation})` : ""}`}>
+                      {e.name}{e.designation ? ` (${e.designation})` : ""}
                     </option>
                   ))}
                 </select>

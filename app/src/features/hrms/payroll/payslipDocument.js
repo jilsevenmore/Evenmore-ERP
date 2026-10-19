@@ -429,10 +429,31 @@ export function printPayslip(p, company) {
   <footer><span>This is a computer-generated payslip. Confidential - for the named employee only.</span><span>Generated ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span></footer>
 </div></body></html>`;
 
-  const printWindow = window.open("", "_blank", "width=900,height=1000");
-  if (!printWindow) { window.alert("Please allow pop-ups to print or save the payslip."); return; }
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => printWindow.print(), 400);
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  iframe.contentWindow.focus();
+  setTimeout(() => {
+    iframe.contentWindow.print();
+    setTimeout(() => {
+      try {
+        if (iframe.parentNode) {
+          document.body.removeChild(iframe);
+        }
+      } catch (e) {
+        // cleanup ignore
+      }
+    }, 2000);
+  }, 300);
 }

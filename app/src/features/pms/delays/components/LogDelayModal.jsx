@@ -224,8 +224,8 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
                   onChange={(e) => setResponsibleUser(e.target.value)}
                 >
                   <option value="">Unassigned</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.name}>{emp.name} — {emp.role}</option>
+                  {Array.from(new Map(employees.filter((e) => e.name).map((e) => [e.name.toLowerCase(), e])).values()).map((emp) => (
+                    <option key={emp.id || emp.name} value={emp.name}>{emp.name}{emp.role ? ` — ${emp.role}` : ""}</option>
                   ))}
                 </select>
               </div>

@@ -71,6 +71,15 @@ export default function Jobs() {
   const [workMode, setWorkMode] = useState("All");
 
   const employees = useAppStore((s) => s.employees || []);
+  const uniqueEmployees = useMemo(() => {
+    const seen = new Set();
+    return (employees || []).filter((e) => {
+      const n = (e.name || "").trim();
+      if (!n || seen.has(n.toLowerCase())) return false;
+      seen.add(n.toLowerCase());
+      return true;
+    }).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [employees]);
 
   useEffect(() => {
     if (!employees || employees.length === 0) {
@@ -742,7 +751,7 @@ export default function Jobs() {
                     className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                   >
                     <option value="">Select recruiter (from employees)</option>
-                    {employees.map((emp) => {
+                    {uniqueEmployees.map((emp) => {
                       const label = `${emp.name}${emp.designation ? ` (${emp.designation})` : emp.department ? ` (${emp.department})` : ""}`;
                       return (
                         <option key={emp.id || emp.name} value={emp.name}>
@@ -750,7 +759,7 @@ export default function Jobs() {
                         </option>
                       );
                     })}
-                    {form.recruiter && !employees.some((e) => e.name === form.recruiter) && (
+                    {form.recruiter && !uniqueEmployees.some((e) => e.name === form.recruiter) && (
                       <option value={form.recruiter}>{form.recruiter}</option>
                     )}
                     <option value="__custom__">+ Enter custom recruiter name...</option>
@@ -795,7 +804,7 @@ export default function Jobs() {
                     className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                   >
                     <option value="">Select hiring manager (from employees)</option>
-                    {employees.map((emp) => {
+                    {uniqueEmployees.map((emp) => {
                       const label = `${emp.name}${emp.designation ? ` (${emp.designation})` : emp.department ? ` (${emp.department})` : ""}`;
                       return (
                         <option key={emp.id || emp.name} value={emp.name}>
@@ -803,7 +812,7 @@ export default function Jobs() {
                         </option>
                       );
                     })}
-                    {form.hiringManager && !employees.some((e) => e.name === form.hiringManager) && (
+                    {form.hiringManager && !uniqueEmployees.some((e) => e.name === form.hiringManager) && (
                       <option value={form.hiringManager}>{form.hiringManager}</option>
                     )}
                     <option value="__custom__">+ Enter custom manager name...</option>

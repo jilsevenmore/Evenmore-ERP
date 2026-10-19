@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -35,6 +36,17 @@ const calendarGuide = {
   workflow: ['Schedule Tasks across PMS', 'Aggregate Enterprise Timeline', 'Identify Critical Dependencies', 'Adjust Resource Allocation'],
 };
 
+function getProjectLabel(p) {
+  if (!p) return 'Project';
+  const code = p.code ? `[${p.code}] ` : '';
+  const prod = p.productDetails?.productName || p.product_name || (p.title !== p.customerName ? p.title : '') || (p.name !== p.customerName ? p.name : '');
+  const cust = p.customerName ? (typeof p.customerName === 'object' ? p.customerName.name : p.customerName) : '';
+  if (prod && cust) return `${code}${prod} (${cust})`;
+  if (prod) return `${code}${prod}`;
+  if (cust) return `${code}${cust}`;
+  return p.code || p.id || 'Project';
+}
+
 export const TaskCalendarPage = () => {
   const storeProjects = usePmsStore((s) => s.projects || []);
   const [tasks, setTasks] = useState([]);
@@ -52,10 +64,18 @@ export const TaskCalendarPage = () => {
     setLoading(true);
     try {
       const res = await fetchCrossProjectCalendar().catch(() => null);
-      if (res?.data && Array.isArray(res.data)) {
-        setTasks(res.data);
-      } else if (Array.isArray(res)) {
-        setTasks(res);
+      const rawList = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : null);
+      if (rawList && rawList.length > 0) {
+        setTasks(rawList.map((item) => ({
+          ...item,
+          task_name: item.task_name || item.title || 'Untitled Task',
+          project_id: item.project_id || item.projectId,
+          project_code: item.project_code || item.projectCode || '',
+          project_name: item.project_name || (item.projectCode ? `[${item.projectCode}] ${item.projectName || 'Project'}` : item.projectName || 'Project'),
+          stage_name: item.stage_name || item.stageName || (item.title?.startsWith('Stage:') ? item.title.replace('Stage: ', '') : 'Stage'),
+          assigned_to: item.assigned_to || item.assignedUser || 'Unassigned',
+          due_date: item.due_date || item.end,
+        })));
       } else {
         // Fallback to store tasks across all projects
         const fallback = storeProjects.flatMap((p) =>
@@ -64,7 +84,8 @@ export const TaskCalendarPage = () => {
               id: t.id,
               task_name: t.taskName || t.name,
               project_id: p.id,
-              project_name: p.title || p.name || p.customerName,
+              project_code: p.code || '',
+              project_name: getProjectLabel(p),
               stage_name: s.name,
               assigned_to: t.assignedUser?.name || 'Unassigned',
               status: t.status || 'Not Started',
@@ -92,6 +113,7 @@ export const TaskCalendarPage = () => {
       const q = search.toLowerCase();
       const match = (t.task_name || '').toLowerCase().includes(q) ||
                     (t.project_name || '').toLowerCase().includes(q) ||
+                    (t.project_code || '').toLowerCase().includes(q) ||
                     (t.assigned_to || '').toLowerCase().includes(q);
       if (!match) return false;
     }
@@ -169,7 +191,9 @@ export const TaskCalendarPage = () => {
             >
               <option value="ALL">All Active Projects ({storeProjects.length})</option>
               {storeProjects.map((p) => (
-                <option key={p.id} value={p.id}>{p.title || p.name || p.customerName}</option>
+                <option key={p.id} value={p.id}>
+                  {getProjectLabel(p)}
+                </option>
               ))}
             </select>
           </div>
@@ -206,7 +230,15 @@ export const TaskCalendarPage = () => {
                 filteredTasks.slice((page - 1) * pageSize, page * pageSize).map((t, idx) => (
                   <tr key={t.id || idx} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4 font-bold text-slate-900">{t.task_name}</td>
-                    <td className="py-3 px-4 font-medium text-primary">{t.project_name || 'Project'}</td>
+                    <td className="py-3 px-4 font-medium text-primary">
+                      {t.project_id ? (
+                        <Link to={`/pms/projects/${t.project_id}`} className="hover:underline">
+                          {t.project_name || 'Project'}
+                        </Link>
+                      ) : (
+                        t.project_name || 'Project'
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-slate-600">{t.stage_name || 'Stage'}</td>
                     <td className="py-3 px-4 text-slate-700 flex items-center gap-1.5">
                       <User size={13} className="text-slate-400" />

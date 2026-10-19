@@ -225,9 +225,13 @@ export default function Indicators() {
     },
   ];
 
+  const uniqueEmployeeNames = useMemo(() => {
+    return [...new Set(employees.map((e) => (e.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  }, [employees]);
+
   const empOpts = [
     { value: "All", label: "All Employees" },
-    ...employees.map((e) => ({ value: e.name, label: e.name })),
+    ...uniqueEmployeeNames.map((name) => ({ value: name, label: name })),
   ];
 
   const branchOpts = [
@@ -326,9 +330,9 @@ export default function Indicators() {
             className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
           >
             <option value="All in Designation">All in Designation</option>
-            {employees.map((e) => (
-              <option key={e.id || e.name} value={e.name}>
-                {e.name}
+            {uniqueEmployeeNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
               </option>
             ))}
           </select>

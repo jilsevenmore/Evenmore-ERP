@@ -520,7 +520,7 @@ export function OrgChartPage() {
                 className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] text-slate-800 focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 cursor-pointer"
               >
                 <option value="">Not assigned</option>
-                {employees.map((emp) => (
+                {Array.from(new Map(employees.filter((emp) => emp.name).map((emp) => [emp.name.toLowerCase(), emp])).values()).map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {emp.name}{emp.designation ? ` (${emp.designation})` : ''}
                   </option>

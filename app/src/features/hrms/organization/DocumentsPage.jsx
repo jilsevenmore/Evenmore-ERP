@@ -229,6 +229,15 @@ function inferCategoryFromFilename(filename) {
 export function DocumentsPage() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees);
+  const uniqueEmployees = useMemo(() => {
+    const seen = new Set();
+    return (employees || []).filter((e) => {
+      const n = (e.name || "").trim();
+      if (!n || seen.has(n.toLowerCase())) return false;
+      seen.add(n.toLowerCase());
+      return true;
+    }).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [employees]);
   const currentUser = useAppStore((s) => s.currentUser) || {};
 
   const {
@@ -1111,7 +1120,7 @@ export function DocumentsPage() {
 
             {/* List of employees */}
             <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
-              {employees
+              {uniqueEmployees
                 .filter(
                   (e) =>
                     String(e.name ?? '').toLowerCase().includes(empSearch.toLowerCase()) ||
@@ -1445,7 +1454,7 @@ export function DocumentsPage() {
                   className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold focus:outline-none cursor-pointer"
                 >
                   <option value={currentUser?.name}>{currentUser?.name} (You)</option>
-                  {employees
+                  {uniqueEmployees
                     .filter((e) => e.name !== currentUser?.name)
                     .map((e) => (
                       <option key={e.id} value={e.name}>
@@ -1801,7 +1810,7 @@ export function DocumentsPage() {
                   className="w-full px-3 py-2 rounded-xl border border-bdr text-[12.5px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                 >
                   <option value="All Staff">All Staff</option>
-                  {employees.map((e) => (
+                  {uniqueEmployees.map((e) => (
                     <option key={e.id} value={e.name}>
                       {e.name}
                     </option>

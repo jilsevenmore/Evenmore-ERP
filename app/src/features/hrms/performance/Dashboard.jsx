@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PerformanceReportModal from "./PerformanceReportModal";
+import UserInitials from "../../../components/common/UserInitials";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -185,7 +186,7 @@ export default function Dashboard() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <img src={r.avatar} alt="" className="w-7 h-7 rounded-full object-cover border border-[#e2e8f0]" />
+          <UserInitials name={r.employee} className="w-7 h-7 text-[10px]" />
           <div>
             <div className="font-medium text-slate-800 text-[13px]">{r.employee}</div>
             <div className="text-[11px] text-slate-500">{r.designation} • {r.department}</div>

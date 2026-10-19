@@ -371,8 +371,8 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
             onChange={(e) => setUploaderId(e.target.value)}
           >
             <option value="">Select the designer…</option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>{emp.name} — {emp.role}</option>
+            {Array.from(new Map(employees.filter((e) => e.name).map((e) => [e.name.toLowerCase(), e])).values()).map((emp) => (
+              <option key={emp.id} value={emp.id}>{emp.name}{emp.role ? ` — ${emp.role}` : ""}</option>
             ))}
           </select>
           {errors.uploaderId && (
