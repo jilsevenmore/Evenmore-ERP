@@ -21,6 +21,7 @@ import {
     Sparkles,
     AlertCircle
 } from 'lucide-react';
+import { validateEmail, validatePhone, validatePincode } from '../../utils/validators';
 
 const STEPS = [
     { id: 1, label: 'Basic Info', sublabel: 'Identity & Type', icon: User },
@@ -260,12 +261,62 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                 setErrorMsg('Legal Company / Entity Name is required to proceed.');
                 return false;
             }
+            if (formData.email) {
+                const emailRes = validateEmail(formData.email);
+                if (!emailRes.isValid) {
+                    setErrorMsg(emailRes.message);
+                    return false;
+                }
+            }
+            if (formData.phone) {
+                const phoneRes = validatePhone(formData.phone);
+                if (!phoneRes.isValid) {
+                    setErrorMsg(phoneRes.message);
+                    return false;
+                }
+            }
         }
         if (currentStep === 2) {
             if (formData.gstTreatment === 'Registered Business') {
                 if (!formData.gstin || formData.gstin.trim().length < 5) {
                     setErrorMsg('A valid 15-character GSTIN is required for Registered Business entities.');
                     return false;
+                }
+            }
+        }
+        if (currentStep === 6) {
+            if (formData.billingAddress?.pincode) {
+                const pinRes = validatePincode(formData.billingAddress.pincode);
+                if (!pinRes.isValid) {
+                    setErrorMsg(`Billing Address: ${pinRes.message}`);
+                    return false;
+                }
+            }
+            if (!sameAsBilling && formData.shippingAddress?.pincode) {
+                const pinRes = validatePincode(formData.shippingAddress.pincode);
+                if (!pinRes.isValid) {
+                    setErrorMsg(`Shipping Address: ${pinRes.message}`);
+                    return false;
+                }
+            }
+            if (Array.isArray(formData.contacts)) {
+                for (let i = 0; i < formData.contacts.length; i++) {
+                    const c = formData.contacts[i];
+                    const label = c.name || `POC #${i + 1}`;
+                    if (c.email) {
+                        const emailRes = validateEmail(c.email);
+                        if (!emailRes.isValid) {
+                            setErrorMsg(`Contact (${label}): ${emailRes.message}`);
+                            return false;
+                        }
+                    }
+                    if (c.phone) {
+                        const phoneRes = validatePhone(c.phone);
+                        if (!phoneRes.isValid) {
+                            setErrorMsg(`Contact (${label}): ${phoneRes.message}`);
+                            return false;
+                        }
+                    }
                 }
             }
         }
@@ -285,7 +336,12 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!validateStep(step)) return;
+        for (let s = 1; s <= 6; s++) {
+            if (!validateStep(s)) {
+                setStep(s);
+                return;
+            }
+        }
 
         const payload = {
             ...formData,

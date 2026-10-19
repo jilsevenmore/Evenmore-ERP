@@ -377,7 +377,7 @@ export const PurchaseBillsPage = () => {
         columns={columns}
         data={purchaseBills}
         keyExtractor={(b) => b.id}
-        pageSize={20}
+        pageSize={10}
         pageSizeOptions={[10, 20, 50, 100]}
         searchPlaceholder="Search bill #, PO, or vendor..."
         searchFilter={(b, term) =>

@@ -140,7 +140,7 @@ export const ExpensesPage = () => {
         columns={columns}
         data={expenses}
         keyExtractor={(e) => e.id}
-        pageSize={20}
+        pageSize={10}
         pageSizeOptions={[10, 20, 50, 100]}
         searchPlaceholder="Search payee, voucher #, or category..."
         searchFilter={(e, term) =>

@@ -7,6 +7,7 @@ import { Plus, Users, IndianRupee, ShieldAlert, X, Eye } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Customer360Drawer } from '../../components/common/Customer360Drawer';
 import RecordPartyFundsModal from '../../components/common/RecordPartyFundsModal';
+import { validateEmail, validatePhone } from '../../utils/validators';
 const customerGuide = {
     title: 'Customer Accounts & Statements',
     subtitle: 'Corporate client database, credit risk management, and statement of accounts.',
@@ -28,6 +29,7 @@ export const CustomersPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCust360, setSelectedCust360] = useState(null);
     const [fundsCustomer, setFundsCustomer] = useState(null);
+    const [formError, setFormError] = useState('');
     const [newCust, setNewCust] = useState({
         name: '',
         code: '',
@@ -140,19 +142,37 @@ export const CustomersPage = () => {
     ];
     const handleCreate = (e) => {
         e.preventDefault();
-        if (!newCust.name)
+        setFormError('');
+        if (!newCust.name.trim()) {
+            setFormError('Company Name is required.');
             return;
+        }
+        if (newCust.email) {
+            const emailRes = validateEmail(newCust.email);
+            if (!emailRes.isValid) {
+                setFormError(emailRes.message);
+                return;
+            }
+        }
+        if (newCust.phone) {
+            const phoneRes = validatePhone(newCust.phone);
+            if (!phoneRes.isValid) {
+                setFormError(phoneRes.message);
+                return;
+            }
+        }
         addCustomer({
             code: newCust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
-            name: newCust.name,
+            name: newCust.name.trim(),
             contactPerson: newCust.contactPerson || '',
-            email: newCust.email || '',
-            phone: newCust.phone || '',
+            email: newCust.email ? newCust.email.trim().toLowerCase() : '',
+            phone: newCust.phone ? newCust.phone.trim() : '',
             balance: 0,
             creditLimit: Number(newCust.creditLimit) || 0,
             status: 'Active',
         });
         setIsModalOpen(false);
+        setFormError('');
         setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '', creditLimit: 0 });
     };
     return (<div className="space-y-6">
@@ -191,6 +211,11 @@ export const CustomersPage = () => {
               </button>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4">
+              {formError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-medium">
+                  {formError}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Company Name *</label>

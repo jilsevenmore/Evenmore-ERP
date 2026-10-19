@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -15,6 +15,7 @@ import {
 import { PageHeader } from '../../../components/common/PageHeader';
 import { StatCard } from '../../../components/ui/StatCard';
 import { Button } from '../../../components/ui/Button';
+import { Pagination } from '../../../components/ui/Pagination';
 import { fetchCrossProjectCalendar } from '../../../services/upgradeService';
 import { usePmsStore } from '../../../stores/pmsStore';
 
@@ -40,6 +41,12 @@ export const TaskCalendarPage = () => {
   const [loading, setLoading] = useState(false);
   const [selectedProject, setSelectedProject] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedProject, search]);
 
   const loadCalendarTasks = async () => {
     setLoading(true);
@@ -196,7 +203,7 @@ export const TaskCalendarPage = () => {
                   </td>
                 </tr>
               ) : (
-                filteredTasks.map((t, idx) => (
+                filteredTasks.slice((page - 1) * pageSize, page * pageSize).map((t, idx) => (
                   <tr key={t.id || idx} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4 font-bold text-slate-900">{t.task_name}</td>
                     <td className="py-3 px-4 font-medium text-primary">{t.project_name || 'Project'}</td>
@@ -231,6 +238,21 @@ export const TaskCalendarPage = () => {
             </tbody>
           </table>
         </div>
+        {filteredTasks.length > 0 && (
+          <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+            <Pagination
+              total={filteredTasks.length}
+              page={page}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setPage(1);
+              }}
+              onChange={setPage}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

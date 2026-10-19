@@ -1,6 +1,7 @@
 import DealDetailView from './DealDetailView';
 import CrmKpiCard from '../common/CrmKpiCard';
 import Modal from '../../../components/ui/Modal';
+import { Pagination } from '../../../components/ui/Pagination';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -189,6 +190,8 @@ export default function DealsPage() {
   const [selectedUser, setSelectedUser] = useState('All Users');
   const [dateRange, setDateRange] = useState('All Time');
   const [viewMode, setViewMode] = useState('kanban');
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
 
   const [expandedColumns, setExpandedColumns] = useState({});
   const [openMenuDealId, setOpenMenuDealId] = useState(null);
@@ -243,6 +246,15 @@ export default function DealsPage() {
       return true;
     });
   }, [deals, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
+
+  const pagedDeals = useMemo(() => {
+    const start = (listPage - 1) * listPageSize;
+    return filteredDeals.slice(start, start + listPageSize);
+  }, [filteredDeals, listPage, listPageSize]);
 
   const stats = useMemo(() => {
     const totalDeals = deals.length;
@@ -1181,7 +1193,7 @@ export default function DealsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredDeals.map((deal) => (
+                {pagedDeals.map((deal) => (
                   <tr key={deal.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-900"><Link to={`?deal=${encodeURIComponent(deal.id)}`} className="hover:text-blue-600 hover:underline">{deal.name}</Link></td>
                     <td className="py-3.5 px-4">
@@ -1252,6 +1264,21 @@ export default function DealsPage() {
               </tbody>
             </table>
           </div>
+          {filteredDeals.length > 0 && (
+            <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+              <Pagination
+                total={filteredDeals.length}
+                page={listPage}
+                pageSize={listPageSize}
+                pageSizeOptions={[10, 20, 50, 100]}
+                onPageSizeChange={(newSize) => {
+                  setListPageSize(newSize);
+                  setListPage(1);
+                }}
+                onChange={setListPage}
+              />
+            </div>
+          )}
         </div>
       )}
 

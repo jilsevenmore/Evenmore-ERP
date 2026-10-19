@@ -1079,7 +1079,7 @@ img { display: block; max-width: 100%; }
 
 @media (min-width: 1024px) {
   .app-shell {
-    grid-template-columns: var(--sidebar-width, 280px) minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr);
   }
 }
 
@@ -1142,6 +1142,9 @@ html {
   padding: 16px 12px 14px 14px;
   position: sticky;
   top: 0;
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
   height: 100vh;
   overflow-x: hidden !important;
   overflow-y: hidden;
@@ -1471,29 +1474,8 @@ html {
 }
 
 .sidebar-resize-handle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 6px;
-  height: 100%;
-  padding: 0;
-  cursor: col-resize;
-  z-index: 40;
+  display: none !important;
 }
-
-.resize-thumb {
-  position: absolute;
-  top: 45%;
-  right: 1px;
-  width: 3px;
-  height: 28px;
-  border-radius: 999px;
-  background: var(--primary);
-  opacity: 0.5;
-  transition: opacity 0.15s ease;
-}
-
-.sidebar-resize-handle:hover .resize-thumb { opacity: 1; }
 
 /* ── Mobile Sidebar Drawer (below lg) ───────────────────── */
 .sidebar-backdrop {

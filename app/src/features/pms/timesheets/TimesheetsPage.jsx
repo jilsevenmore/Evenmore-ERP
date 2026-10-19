@@ -26,6 +26,7 @@ import {
 import { PageHeader } from '../../../components/common/PageHeader';
 import { StatCard } from '../../../components/ui/StatCard';
 import { Button } from '../../../components/ui/Button';
+import { Pagination } from '../../../components/ui/Pagination';
 import { 
   fetchTimesheetEntries,
   logTimesheetHours,
@@ -132,6 +133,8 @@ export const TimesheetsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [projectFilter, setProjectFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Rate Helper popup toggle
   const [showRateGuide, setShowRateGuide] = useState(false);
@@ -428,6 +431,15 @@ export const TimesheetsPage = () => {
       return true;
     });
   }, [timesheets, statusFilter, projectFilter, searchQuery]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, projectFilter, searchQuery]);
+
+  const pagedTimesheets = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredTimesheets.slice(start, start + pageSize);
+  }, [filteredTimesheets, page, pageSize]);
 
   const formattedTimer = formatTimerDisplay(timerSeconds);
 
@@ -846,7 +858,7 @@ export const TimesheetsPage = () => {
                   </td>
                 </tr>
               ) : (
-                filteredTimesheets.map((t) => (
+                pagedTimesheets.map((t) => (
                   <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4 font-mono text-slate-700 whitespace-nowrap">
                       {t.work_date 
@@ -938,6 +950,21 @@ export const TimesheetsPage = () => {
             </tbody>
           </table>
         </div>
+        {filteredTimesheets.length > 0 && (
+          <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+            <Pagination
+              total={filteredTimesheets.length}
+              page={page}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setPage(1);
+              }}
+              onChange={setPage}
+            />
+          </div>
+        )}
       </div>
 
       {/* ─── MANUAL TIME LOG MODAL ───────────────────────────────────────── */}

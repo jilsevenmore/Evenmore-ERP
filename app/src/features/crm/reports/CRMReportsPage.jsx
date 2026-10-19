@@ -17,6 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
+import { Pagination } from '../../../components/ui/Pagination';
 import { exportToCSV } from '../../../services/exportUtils';
 import { getLeadStageOrder, DEFAULT_STAGE_ORDER, loadLeadRows } from '../../../services/taskCompletionService';
 import { CRM_EVENT } from '../../../services/leadStageAutomation';
@@ -98,7 +99,19 @@ function DownloadButton({ onClick, label }) {
   );
 }
 
-function ReportBlock({ title, subtitle, actions, columns, rows, empty }) {
+function ReportBlock({ title, subtitle, actions, columns, rows, empty, pageSize: initialPageSize = 10 }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -113,47 +126,64 @@ function ReportBlock({ title, subtitle, actions, columns, rows, empty }) {
           {empty || 'No data available.'}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-left text-xs min-w-[480px]">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wide">
-                {columns.map((col, i) => {
-                  const isRight = i > 0 && isRightAlignedHeader(col);
-                  return (
-                    <th
-                      key={i}
-                      className={`px-3 py-2.5 font-semibold whitespace-nowrap ${
-                        isRight ? 'text-right' : 'text-left'
-                      }`}
-                    >
-                      {col}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  {row.map((cell, j) => {
-                    const isRight = j > 0 && isRightAlignedCell(cell, columns[j]);
+        <div className="overflow-hidden rounded-lg border border-slate-200">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs min-w-[480px]">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wide">
+                  {columns.map((col, i) => {
+                    const isRight = i > 0 && isRightAlignedHeader(col);
                     return (
-                      <td
-                        key={j}
-                        className={
-                          j === 0
-                            ? 'px-3 py-2.5 font-semibold text-slate-700 whitespace-nowrap text-left'
-                            : `px-3 py-2.5 text-slate-600 ${isRight ? 'text-right' : 'text-left'}`
-                        }
+                      <th
+                        key={i}
+                        className={`px-3 py-2.5 font-semibold whitespace-nowrap ${
+                          isRight ? 'text-right' : 'text-left'
+                        }`}
                       >
-                        {cell}
-                      </td>
+                        {col}
+                      </th>
                     );
                   })}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pagedRows.map((row, i) => (
+                  <tr key={i} className="border-t border-slate-100">
+                    {row.map((cell, j) => {
+                      const isRight = j > 0 && isRightAlignedCell(cell, columns[j]);
+                      return (
+                        <td
+                          key={j}
+                          className={
+                            j === 0
+                              ? 'px-3 py-2.5 font-semibold text-slate-700 whitespace-nowrap text-left'
+                              : `px-3 py-2.5 text-slate-600 ${isRight ? 'text-right' : 'text-left'}`
+                          }
+                        >
+                          {cell}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {rows.length > 0 && (
+            <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+              <Pagination
+                total={rows.length}
+                page={page}
+                pageSize={pageSize}
+                pageSizeOptions={[5, 10, 20, 50]}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setPage(1);
+                }}
+                onChange={setPage}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -23,6 +23,7 @@ import {
 } from "../../../services/upgradeService";
 import { dispatchNotification } from "../../../services/crmEventNotifications";
 import PerformanceReportModal from "../performance/PerformanceReportModal";
+import { validateEmail, validatePhone } from "../../../utils/validators";
 
 const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
@@ -293,6 +294,9 @@ export default function Employees() {
 
   async function handleAdd() {
     if (!form.name || !form.email) return setToast("Name and email are required.", "error");
+
+    const emailRes = validateEmail(form.email, true);
+    if (!emailRes.isValid) return setToast(emailRes.message, "error");
 
     const matchedDept = departmentsList.find((d) => d.name?.toLowerCase() === form.dept?.trim().toLowerCase());
     const matchedDesig = designationsList.find((d) => d.name?.toLowerCase() === form.designation?.trim().toLowerCase());

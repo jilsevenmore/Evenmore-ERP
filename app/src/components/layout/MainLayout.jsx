@@ -16,7 +16,6 @@ import { useRealtimeBridge } from '../../hooks/useRealtimeBridge';
 const ERP_PREFIXES = ['/dashboard', '/sales', '/purchase', '/inventory', '/parties', '/accounts', '/reports'];
 
 export default function MainLayout() {
-  const sidebarWidth = useAppStore((s) => s.sidebarWidth) ?? 280;
   const toast = useAppStore((s) => s.toast);
   const clearToast = useAppStore((s) => s.clearToast);
   const commandPaletteOpen = useAppStore((s) => s.commandPaletteOpen);
@@ -81,7 +80,6 @@ export default function MainLayout() {
   return (
     <div
       className={`app-shell${mobileSidebarOpen ? ' mobile-nav-open' : ''}`}
-      style={{ '--sidebar-width': `${sidebarWidth}px` }}
     >
       {/* Mobile navigation backdrop (below lg only) */}
       {mobileSidebarOpen && (
