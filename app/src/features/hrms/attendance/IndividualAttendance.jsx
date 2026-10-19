@@ -59,21 +59,28 @@ export default function IndividualAttendance() {
   const storeRecords = useAttendanceStore((s) => s.records || []);
   const updateStoreRecord = useAttendanceStore((s) => s.updateRecord);
 
-  const employeesList = useMemo(
-    () =>
-      (storeEmployees || []).map((e) => ({
-        id: e.id || e.empId || e.employeeId,
-        empId: e.empId || "",
-        name: e.name,
-        designation: e.designation || e.role || "Employee",
-        dept: e.department || e.dept || "—",
-        manager: e.manager || e.reportingManager || "—",
-        location: e.location || e.workLocation || "—",
-        status: e.status || "Active",
-        avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
-      })),
-    [storeEmployees]
-  );
+  const employeesList = useMemo(() => {
+    const map = new Map();
+    (storeEmployees || []).forEach((e) => {
+      const name = (e.name || "").trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, {
+          id: e.id || e.empId || e.employeeId,
+          empId: e.empId || e.employeeCode || "",
+          name: e.name,
+          designation: e.designation || e.role || "Employee",
+          dept: e.department || e.dept || "—",
+          manager: e.manager || e.reportingManager || "—",
+          location: e.location || e.workLocation || "—",
+          status: e.status || "Active",
+          avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [storeEmployees]);
 
   const now = new Date();
   const [selectedEmpId, setSelectedEmpId] = useState(() => employeesList[0]?.id || "");

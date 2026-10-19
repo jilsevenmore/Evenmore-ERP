@@ -4545,7 +4545,7 @@ export const ERPProvider = ({ children, }) => {
         const po = typeof poId === 'object' ? poId : purchaseOrders.find((p) => p.id === poId || p.poNumber === poId);
         if (!po) return { status: 'Draft', totalOrderedQty: 0, totalBilledQty: 0, totalRemainingQty: 0, lines: [], activeBills: [] };
 
-        const activeBills = purchaseBills.filter((b) => (b.purchaseOrderId === po.id || b.poRef === po.poNumber || b.linkedPo === po.poNumber) && b.status !== 'Cancelled');
+        const activeBills = purchaseBills.filter((b) => (b.purchaseOrderId === po.id || b.purchaseOrder === po.id || b.purchase_order === po.id || (po.poNumber && (b.poRef === po.poNumber || b.linkedPo === po.poNumber))) && b.status !== 'Cancelled');
         const poLines = po.items || po.lineItems || [];
 
         let totalOrderedQty = 0;
@@ -4556,8 +4556,14 @@ export const ERPProvider = ({ children, }) => {
             totalOrderedQty += orderedQty;
             const lineSku = line.sku || line.itemSku;
             const billedQty = activeBills.reduce((sum, bill) => {
-                const match = (bill.items || bill.lineItems || []).find((it) => (line.itemId && it.itemId === line.itemId) || (lineSku && (it.sku === lineSku || it.itemSku === lineSku)));
-                return sum + Number(match?.qty || 0);
+                const bLines = bill.items || bill.lineItems || [];
+                const lineMatches = bLines.filter((it) =>
+                    (line.itemId && (it.itemId === line.itemId || it.item_id === line.itemId)) ||
+                    (lineSku && (it.sku === lineSku || it.itemSku === lineSku)) ||
+                    (it.name && line.name && it.name === line.name) ||
+                    (it.description && line.description && it.description === line.description)
+                );
+                return sum + lineMatches.reduce((s, m) => s + Number(m.qty || 0), 0);
             }, 0);
             totalBilledQty += billedQty;
             const remainingQty = Math.max(0, orderedQty - billedQty);
@@ -4593,7 +4599,7 @@ export const ERPProvider = ({ children, }) => {
         if (!po) return { success: false, message: 'Purchase Order not found.' };
         if (po.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
 
-        const activeBill = purchaseBills.find((b) => (b.purchaseOrderId === poId || b.poRef === po.poNumber || b.linkedPo === po.poNumber) && b.status !== 'Cancelled');
+        const activeBill = purchaseBills.find((b) => (b.purchaseOrderId === poId || b.purchaseOrder === poId || b.purchase_order === poId || (po.poNumber && (b.poRef === po.poNumber || b.linkedPo === po.poNumber))) && b.status !== 'Cancelled');
         if (activeBill) {
             showToast(`Cannot cancel PO: active Bill ${activeBill.billNumber} exists. Cancel the bill first.`);
             return { success: false, message: `Active bill ${activeBill.billNumber} exists.` };
@@ -4638,7 +4644,7 @@ export const ERPProvider = ({ children, }) => {
         persistDelete('purchaseOrders', id);
         showToast(`Draft Purchase Order ${po.poNumber || ''} deleted.`);
     };
-    const convertPurchaseOrderToBill = (poId) => {
+    const convertPurchaseOrderToBill = async (poId) => {
         const po = purchaseOrders.find((p) => p.id === poId);
         if (!po)
             return undefined;
@@ -4668,6 +4674,8 @@ export const ERPProvider = ({ children, }) => {
             id: `pb-${Date.now()}`,
             billNumber: `PB-2026-${String(purchaseBills.length + 16).padStart(3, '0')}`,
             purchaseOrderId: po.id,
+            purchaseOrder: po.id,
+            purchase_order: po.id,
             poRef: po.poNumber,
             linkedPo: po.poNumber,
             vendorId: po.vendorId,
@@ -4694,7 +4702,8 @@ export const ERPProvider = ({ children, }) => {
 
         // Update PO status to Partially Billed or Billed
         const willBeFullyBilled = poStatusInfo.totalRemainingQty <= billLines.reduce((s, it) => s + it.qty, 0);
-        setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: willBeFullyBilled ? 'Billed' : 'Partially Billed' } : p));
+        const targetPoStatus = willBeFullyBilled ? 'Billed' : 'Partially Billed';
+        setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: targetPoStatus } : p));
 
         // Increase vendor AP liability across vendors and parties
         syncVendorBalance(po.vendorId, po.vendor, billAmt);
@@ -4711,35 +4720,20 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        // ── [PHASE-2B] Auto-receive on PO→Bill kept only for pre-received (legacy) bills ──
-        // Old code auto-received inventory from every bill line at conversion time.
-        //   Now handled by GoodsReceiptPage (GRN). The block below still runs when the
-        //   bill was explicitly created as already received (goodsReceived: true).
-        // if (billLines.length > 0) {
-        //     billLines.forEach((line) => {
-        //         const targetSku = line.sku || line.itemSku;
-        //         const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
-        //         if (item && item.trackingMode === 'Serial') {
-        //             const serials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
-        //             if (serials.length > 0) {
-        //                 addSerialNumbers(item.id, serials);
-        //             }
-        //         }
-        //         recordMovement({
-        //             itemId: item?.id || line.itemId || `itm-${Date.now()}`,
-        //             itemSku: item?.sku || targetSku || 'GEN-SKU',
-        //             itemName: item?.name || line.name || line.description,
-        //             type: 'PURCHASE',
-        //             quantity: line.qty || 1,
-        //             unitCost: line.rate || item?.costPrice || 0,
-        //             referenceType: 'PurchaseBill',
-        //             referenceId: newBill.id,
-        //             referenceNumber: newBill.billNumber,
-        //             serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
-        //             notes: `Goods received via ${newBill.billNumber}`,
-        //         });
-        //     });
-        // }
+
+        if (isServerId(po.id)) {
+            persistVia(setPurchaseBills, newBill.id, `Bill from ${po.poNumber}`, async () => {
+                const created = await pushConvert('purchaseOrders', po.id, 'convert-to-bill', 'purchaseBills');
+                if (created) {
+                    setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: targetPoStatus } : p));
+                    return created;
+                }
+                return (await pushCreate('purchaseBills', newBill, setPurchaseBills)) || newBill;
+            });
+        } else {
+            persistCreate('purchaseBills', newBill, setPurchaseBills);
+        }
+
         if (newBill.goodsReceived === true && billLines.length > 0) {
             billLines.forEach((line) => {
                 const targetSku = line.sku || line.itemSku;
@@ -4777,7 +4771,9 @@ export const ERPProvider = ({ children, }) => {
             id: bill.id || `pb-${Date.now()}`,
             billNumber: bill.billNumber ||
                 `PB-2026-${String(purchaseBills.length + 16).padStart(3, '0')}`,
-            purchaseOrderId: bill.purchaseOrderId,
+            purchaseOrderId: bill.purchaseOrderId || bill.purchaseOrder || bill.purchase_order,
+            purchaseOrder: bill.purchaseOrder || bill.purchaseOrderId || bill.purchase_order,
+            purchase_order: bill.purchase_order || bill.purchaseOrderId || bill.purchaseOrder,
             poRef: bill.poRef || '',
             linkedPo: bill.linkedPo || bill.poRef || '',
             vendorId: bill.vendorId,
@@ -4806,12 +4802,14 @@ export const ERPProvider = ({ children, }) => {
 
         // If linked to a PO, update PO status to Partially Billed or Billed
         if (newBill.purchaseOrderId || newBill.poRef || newBill.linkedPo) {
-            const targetPo = purchaseOrders.find((p) => p.id === newBill.purchaseOrderId || p.poNumber === newBill.poRef || p.poNumber === newBill.linkedPo);
+            const targetPo = purchaseOrders.find((p) => p.id === newBill.purchaseOrderId || p.id === newBill.purchaseOrder || p.id === newBill.purchase_order || p.poNumber === newBill.poRef || p.poNumber === newBill.linkedPo);
             if (targetPo && targetPo.status !== 'Cancelled') {
                 const poStatusInfo = getPoBilledStatus(targetPo.id);
                 const currentBilledQty = poStatusInfo.totalBilledQty + billLines.reduce((s, it) => s + Number(it.qty || 0), 0);
                 const isFullyBilled = poStatusInfo.totalOrderedQty > 0 && currentBilledQty >= poStatusInfo.totalOrderedQty;
-                setPurchaseOrders((prev) => prev.map((p) => p.id === targetPo.id ? { ...p, status: isFullyBilled ? 'Billed' : 'Partially Billed' } : p));
+                const nextStatus = isFullyBilled ? 'Billed' : 'Partially Billed';
+                setPurchaseOrders((prev) => prev.map((p) => p.id === targetPo.id ? { ...p, status: nextStatus } : p));
+                persistUpdate('purchaseOrders', targetPo.id, { status: nextStatus }, setPurchaseOrders);
             }
         }
 

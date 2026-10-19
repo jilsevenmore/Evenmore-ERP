@@ -265,6 +265,16 @@ export function CompanyPolicyModule({ forcedSection }) {
       return;
     }
 
+    const trimmedCat = (formFields.category || "").trim();
+    if (trimmedCat && !categories.some((c) => c.name.toLowerCase() === trimmedCat.toLowerCase())) {
+      addCategory({
+        name: trimmedCat,
+        description: `${trimmedCat} operational policies`,
+        color: "blue",
+        icon: "Tag",
+      });
+    }
+
     if (newVersionPolicy) {
       createNewVersion(newVersionPolicy.id, {
         ...formFields,
@@ -308,10 +318,28 @@ export function CompanyPolicyModule({ forcedSection }) {
     return { total, active, pendingApproval, pendingAcks, dueForReview };
   }, [policies, acknowledgements]);
 
-  // Distinct departments for filter
+  // Distinct departments for filter & form autocompletion
   const departments = useMemo(() => {
-    return Array.from(new Set(policies.map((p) => p.ownerDept).filter(Boolean)));
-  }, [policies]);
+    const set = new Set([
+      "Human Resources",
+      "Information Technology",
+      "Finance",
+      "Operations",
+      "Sales & Marketing",
+      "Legal & Compliance",
+      "Facilities & Admin",
+      "Engineering",
+    ]);
+    (employees || []).forEach((e) => {
+      const d = (e.department || e.dept || "").trim();
+      if (d && d !== "—") set.add(d);
+    });
+    (policies || []).forEach((p) => {
+      const d = (p.ownerDept || "").trim();
+      if (d && d !== "—") set.add(d);
+    });
+    return Array.from(set).sort();
+  }, [policies, employees]);
 
   // Current user's pending acknowledgements
   const myPendingAcks = useMemo(() => {
@@ -1709,60 +1737,81 @@ export function CompanyPolicyModule({ forcedSection }) {
             />
           </div>
 
-          {/* Category & Owner Dept */}
+          {/* Category & Owner Dept - Fully Editable */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
-                Category
-              </label>
-              <select
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[12px] font-semibold text-slate-700">
+                  Category *
+                </label>
+                <span className="text-[11px] text-muted">Select or type custom</span>
+              </div>
+              <input
+                type="text"
+                list="form-policy-categories"
+                required
+                placeholder="Select or enter category..."
                 value={formFields.category}
                 onChange={(e) => setFormFields({ ...formFields, category: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
-              >
+                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+              />
+              <datalist id="form-policy-categories">
                 {categories.map((c) => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
+                  <option key={c.id || c.name} value={c.name} />
                 ))}
-              </select>
+              </datalist>
             </div>
 
             <div>
-              <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
-                Owner / Department
-              </label>
-              <select
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[12px] font-semibold text-slate-700">
+                  Owner / Department *
+                </label>
+                <span className="text-[11px] text-muted">Select or type department</span>
+              </div>
+              <input
+                type="text"
+                list="form-policy-departments"
+                required
+                placeholder="Select or enter department..."
                 value={formFields.ownerDept}
                 onChange={(e) => setFormFields({ ...formFields, ownerDept: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
-              >
-                <option value="Human Resources">Human Resources</option>
-                <option value="Information Technology">Information Technology</option>
-                <option value="Finance">Finance</option>
-                <option value="Operations">Operations</option>
-                <option value="Legal & Compliance">Legal & Compliance</option>
-                <option value="Facilities & Admin">Facilities & Admin</option>
-                <option value="Engineering">Engineering</option>
-              </select>
+                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+              />
+              <datalist id="form-policy-departments">
+                {departments.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
             </div>
           </div>
 
-          {/* Applicable Scope & Version */}
+          {/* Applicable Scope & Version - Fully Editable */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
-                Applicable Employees
-              </label>
-              <select
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[12px] font-semibold text-slate-700">
+                  Applicable Employees *
+                </label>
+                <span className="text-[11px] text-muted">Select or type target group</span>
+              </div>
+              <input
+                type="text"
+                list="form-policy-applicable"
+                required
+                placeholder="e.g. All Employees, Information Technology, Full-Time Staff..."
                 value={formFields.applicableTo}
                 onChange={(e) => setFormFields({ ...formFields, applicableTo: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
-              >
-                <option value="All Employees">All Employees</option>
-                <option value="Full-Time Staff">Full-Time Staff</option>
-                <option value="Contractors & Interns">Contractors & Interns</option>
-                <option value="Engineering & Product">Engineering & Product</option>
-                <option value="Management & Sales">Management & Sales</option>
-              </select>
+                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+              />
+              <datalist id="form-policy-applicable">
+                <option value="All Employees" />
+                <option value="Full-Time Staff" />
+                <option value="Contractors & Interns" />
+                {departments.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
             </div>
 
             <div>

@@ -43,6 +43,17 @@ const JOBS_GUIDE = {
   ],
 };
 
+const DEFAULT_DEPARTMENTS = [
+  "Management & Administration",
+  "Production & Fabrication",
+  "Human Resources",
+  "General",
+  "Project Management",
+  "Engineering",
+  "Sales & Marketing",
+  "Finance & Accounts",
+];
+
 function todayLabel() {
   return new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
@@ -60,8 +71,22 @@ export default function Jobs() {
   const [workMode, setWorkMode] = useState("All");
 
   const employees = useAppStore((s) => s.employees || []);
+
+  useEffect(() => {
+    if (!employees || employees.length === 0) {
+      useAppStore.getState().refreshHrms?.("employees")?.catch(console.warn);
+    }
+  }, []);
+
   const departmentOptions = useMemo(
-    () => [...new Set([...employees.map((e) => e.department), ...jobs.map((j) => j.department)].filter(Boolean))],
+    () =>
+      [
+        ...new Set([
+          ...DEFAULT_DEPARTMENTS,
+          ...employees.map((e) => e.department),
+          ...jobs.map((j) => j.department),
+        ].filter(Boolean)),
+      ].sort(),
     [employees, jobs]
   );
   const branchOptions = useMemo(
@@ -72,6 +97,9 @@ export default function Jobs() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+  const [customDept, setCustomDept] = useState(false);
+  const [customRecruiter, setCustomRecruiter] = useState(false);
+  const [customHiringManager, setCustomHiringManager] = useState(false);
 
   useEffect(() => {
     if (location.state?.openCreate) {
@@ -113,6 +141,9 @@ export default function Jobs() {
 
   function openCreate() {
     setEditing(null);
+    setCustomDept(false);
+    setCustomRecruiter(false);
+    setCustomHiringManager(false);
     setForm({
       title: "",
       code: "",
@@ -135,6 +166,9 @@ export default function Jobs() {
 
   function openEdit(j) {
     setEditing(j.id);
+    setCustomDept(false);
+    setCustomRecruiter(false);
+    setCustomHiringManager(false);
     setForm({
       title: j.title,
       code: j.code,
@@ -533,19 +567,53 @@ export default function Jobs() {
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="font-semibold text-text text-xs">Department *</span>
-                <input
-                  list="job-dept-options"
-                  value={form.department}
-                  onChange={(e) => setForm({ ...form, department: e.target.value })}
-                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
-                  placeholder="Enter department"
-                />
-                <datalist id="job-dept-options">
-                  {departmentOptions.map((d) => (
-                    <option key={d} value={d} />
-                  ))}
-                </datalist>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-text text-xs">Department *</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomDept(!customDept);
+                      if (!customDept) setForm({ ...form, department: "" });
+                    }}
+                    className="text-[11px] text-primary hover:underline font-medium cursor-pointer"
+                  >
+                    {customDept ? "Select from list" : "+ Custom"}
+                  </button>
+                </div>
+                {customDept ? (
+                  <input
+                    type="text"
+                    autoFocus
+                    value={form.department}
+                    onChange={(e) => setForm({ ...form, department: e.target.value })}
+                    className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                    placeholder="Enter custom department"
+                  />
+                ) : (
+                  <select
+                    value={form.department}
+                    onChange={(e) => {
+                      if (e.target.value === "__custom__") {
+                        setCustomDept(true);
+                        setForm({ ...form, department: "" });
+                      } else {
+                        setForm({ ...form, department: e.target.value });
+                      }
+                    }}
+                    className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
+                  >
+                    <option value="">Select department</option>
+                    {departmentOptions.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                    {form.department && !departmentOptions.includes(form.department) && (
+                      <option value={form.department}>{form.department}</option>
+                    )}
+                    <option value="__custom__">+ Enter custom department...</option>
+                  </select>
+                )}
               </label>
 
               <label className="flex flex-col gap-1">
@@ -638,20 +706,109 @@ export default function Jobs() {
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="font-semibold text-text text-xs">Recruiter</span>
-                <input
-                  value={form.recruiter}
-                  onChange={(e) => setForm({ ...form, recruiter: e.target.value })}
-                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
-                />
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-text text-xs">Recruiter</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomRecruiter(!customRecruiter);
+                      if (!customRecruiter) setForm({ ...form, recruiter: "" });
+                    }}
+                    className="text-[11px] text-primary hover:underline font-medium cursor-pointer"
+                  >
+                    {customRecruiter ? "Select from list" : "+ Custom"}
+                  </button>
+                </div>
+                {customRecruiter ? (
+                  <input
+                    type="text"
+                    autoFocus
+                    value={form.recruiter}
+                    onChange={(e) => setForm({ ...form, recruiter: e.target.value })}
+                    className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                    placeholder="Enter recruiter name"
+                  />
+                ) : (
+                  <select
+                    value={form.recruiter}
+                    onChange={(e) => {
+                      if (e.target.value === "__custom__") {
+                        setCustomRecruiter(true);
+                        setForm({ ...form, recruiter: "" });
+                      } else {
+                        setForm({ ...form, recruiter: e.target.value });
+                      }
+                    }}
+                    className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
+                  >
+                    <option value="">Select recruiter (from employees)</option>
+                    {employees.map((emp) => {
+                      const label = `${emp.name}${emp.designation ? ` (${emp.designation})` : emp.department ? ` (${emp.department})` : ""}`;
+                      return (
+                        <option key={emp.id || emp.name} value={emp.name}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                    {form.recruiter && !employees.some((e) => e.name === form.recruiter) && (
+                      <option value={form.recruiter}>{form.recruiter}</option>
+                    )}
+                    <option value="__custom__">+ Enter custom recruiter name...</option>
+                  </select>
+                )}
               </label>
+
               <label className="flex flex-col gap-1">
-                <span className="font-semibold text-text text-xs">Hiring Manager</span>
-                <input
-                  value={form.hiringManager}
-                  onChange={(e) => setForm({ ...form, hiringManager: e.target.value })}
-                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
-                />
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-text text-xs">Hiring Manager</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomHiringManager(!customHiringManager);
+                      if (!customHiringManager) setForm({ ...form, hiringManager: "" });
+                    }}
+                    className="text-[11px] text-primary hover:underline font-medium cursor-pointer"
+                  >
+                    {customHiringManager ? "Select from list" : "+ Custom"}
+                  </button>
+                </div>
+                {customHiringManager ? (
+                  <input
+                    type="text"
+                    autoFocus
+                    value={form.hiringManager}
+                    onChange={(e) => setForm({ ...form, hiringManager: e.target.value })}
+                    className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                    placeholder="Enter hiring manager name"
+                  />
+                ) : (
+                  <select
+                    value={form.hiringManager}
+                    onChange={(e) => {
+                      if (e.target.value === "__custom__") {
+                        setCustomHiringManager(true);
+                        setForm({ ...form, hiringManager: "" });
+                      } else {
+                        setForm({ ...form, hiringManager: e.target.value });
+                      }
+                    }}
+                    className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
+                  >
+                    <option value="">Select hiring manager (from employees)</option>
+                    {employees.map((emp) => {
+                      const label = `${emp.name}${emp.designation ? ` (${emp.designation})` : emp.department ? ` (${emp.department})` : ""}`;
+                      return (
+                        <option key={emp.id || emp.name} value={emp.name}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                    {form.hiringManager && !employees.some((e) => e.name === form.hiringManager) && (
+                      <option value={form.hiringManager}>{form.hiringManager}</option>
+                    )}
+                    <option value="__custom__">+ Enter custom manager name...</option>
+                  </select>
+                )}
               </label>
             </div>
           </div>

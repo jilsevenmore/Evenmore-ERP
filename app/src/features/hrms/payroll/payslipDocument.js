@@ -16,12 +16,25 @@ export function payslipFigures(p, company = {}) {
   const perDay = p.perDaySalary !== undefined ? Number(p.perDaySalary) : (totalDays > 0 ? Math.round(std / totalDays) : 0);
   const lop = p.attendanceDeduction !== undefined ? Number(p.attendanceDeduction) : Math.round(perDay * absent);
   const additional = Number(p.additionalEarnings || 0);
+  const awardBonus = Number(p.awardBonus || 0);
+  const overtimeBonus = Math.max(0, additional - awardBonus);
   const statutory = Number(p.deductions || 0);
   const advance = Number(p.advance || 0);
   const gross = std + additional;
   const totalDeductions = lop + statutory + advance;
   const net = Math.max(0, gross - totalDeductions);
   const paid = p.status === "Paid";
+
+  const earningsList = [
+    ["Standard Monthly Salary", std],
+  ];
+  if (awardBonus > 0) {
+    earningsList.push(["Performance Award / Cash Reward", awardBonus]);
+  }
+  if (overtimeBonus > 0 || awardBonus === 0) {
+    earningsList.push(["Overtime / Bonus", overtimeBonus]);
+  }
+
   return {
     company: {
       name: company.legalName || company.name || "",
@@ -40,10 +53,8 @@ export function payslipFigures(p, company = {}) {
     paidAmount: paid ? Number(p.paidAmount ?? net) : null,
     paymentDate: paid ? p.paymentDate || "" : "",
     totalDays, attended, absent, dailyHours, perDay,
-    earnings: [
-      ["Standard Monthly Salary", std],
-      ["Overtime / Bonus", additional],
-    ],
+    awardBonus,
+    earnings: earningsList,
     deductions: [
       [`Loss of Pay (${absent} day${absent === 1 ? "" : "s"})`, lop],
       ["Statutory Deductions", statutory],

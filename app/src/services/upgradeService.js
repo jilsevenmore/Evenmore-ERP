@@ -193,78 +193,230 @@ export async function fetchBudgetVarianceSummary() {
 }
 
 // ── 4. HRMS (§2.5) ────────────────────────────────────────────────────────
+const LIFECYCLE_STORAGE_KEYS = {
+  transfers: 'evenmore_hrms_transfers',
+  promotions: 'evenmore_hrms_promotions',
+  warnings: 'evenmore_hrms_warnings',
+  awards: 'evenmore_hrms_awards',
+};
+
+function readLocalLifecycle(key) {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalLifecycle(key, list) {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(key, JSON.stringify(list || []));
+    }
+  } catch {}
+}
+
+function saveLocalLifecycleItem(key, item) {
+  const current = readLocalLifecycle(key);
+  const existsIndex = current.findIndex((x) => String(x.id) === String(item.id));
+  let updated;
+  if (existsIndex >= 0) {
+    updated = [...current];
+    updated[existsIndex] = { ...updated[existsIndex], ...item };
+  } else {
+    updated = [item, ...current];
+  }
+  writeLocalLifecycle(key, updated);
+  return item;
+}
+
+function matchesEmp(record, employeeId) {
+  if (!employeeId) return true;
+  const target = String(employeeId).trim().toLowerCase();
+  const idStr = String(record.employeeId || record.employee || '').trim().toLowerCase();
+  const nameStr = String(record.employeeName || '').trim().toLowerCase();
+  const codeStr = String(record.employeeCode || '').trim().toLowerCase();
+  return idStr === target || nameStr === target || codeStr === target;
+}
+
 export async function fetchEmployeeTransfers(employeeId) {
-  const query = employeeId ? { employeeId } : {};
-  return apiClient('/hrms/transfers/', { query });
+  const localItems = readLocalLifecycle(LIFECYCLE_STORAGE_KEYS.transfers).filter((item) => matchesEmp(item, employeeId));
+  try {
+    const query = employeeId ? { employeeId } : {};
+    const res = await apiClient('/hrms/transfers/', { query });
+    const serverRows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    if (serverRows.length > 0) {
+      const serverIds = new Set(serverRows.map((r) => String(r.id)));
+      const extraLocal = localItems.filter((l) => !serverIds.has(String(l.id)));
+      return [...serverRows, ...extraLocal];
+    }
+    return localItems;
+  } catch {
+    return localItems;
+  }
 }
 
 export async function createEmployeeTransfer(data) {
   const payload = {
+    id: data.id || `transfer-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     employeeId: data.employeeId || data.employee,
+    employeeName: data.employeeName || '',
     fromDepartmentId: data.fromDepartmentId || data.from_department,
+    from_department: data.from_department || data.fromDepartmentId,
     toDepartmentId: data.toDepartmentId || data.to_department,
     to_department: data.to_department || data.toDepartmentId,
     fromLocationId: data.fromLocationId || data.from_location,
     toLocationId: data.toLocationId || data.to_location,
     effective_date: data.effective_date || data.effectiveDate,
+    effectiveDate: data.effective_date || data.effectiveDate,
     reason: data.reason || '',
     status: data.status || 'Completed',
+    createdAt: new Date().toISOString(),
   };
-  return apiClient('/hrms/transfers/', { method: 'POST', data: payload });
+  saveLocalLifecycleItem(LIFECYCLE_STORAGE_KEYS.transfers, payload);
+  try {
+    const res = await apiClient('/hrms/transfers/', { method: 'POST', data: payload });
+    const saved = res?.data || res || payload;
+    saveLocalLifecycleItem(LIFECYCLE_STORAGE_KEYS.transfers, saved);
+    return saved;
+  } catch {
+    return payload;
+  }
 }
 
 export async function fetchEmployeePromotions(employeeId) {
-  const query = employeeId ? { employeeId } : {};
-  return apiClient('/hrms/promotions/', { query });
+  const localItems = readLocalLifecycle(LIFECYCLE_STORAGE_KEYS.promotions).filter((item) => matchesEmp(item, employeeId));
+  try {
+    const query = employeeId ? { employeeId } : {};
+    const res = await apiClient('/hrms/promotions/', { query });
+    const serverRows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    if (serverRows.length > 0) {
+      const serverIds = new Set(serverRows.map((r) => String(r.id)));
+      const extraLocal = localItems.filter((l) => !serverIds.has(String(l.id)));
+      return [...serverRows, ...extraLocal];
+    }
+    return localItems;
+  } catch {
+    return localItems;
+  }
 }
 
 export async function createEmployeePromotion(data) {
   const payload = {
+    id: data.id || `promotion-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     employeeId: data.employeeId || data.employee,
+    employeeName: data.employeeName || '',
     fromDesignationId: data.fromDesignationId || data.previous_designation,
+    previous_designation: data.previous_designation || data.fromDesignationId,
     toDesignationId: data.toDesignationId || data.new_designation,
     new_designation: data.new_designation || data.toDesignationId,
-    previous_salary: data.previous_salary !== undefined ? data.previous_salary : data.previousSalary,
-    new_salary: data.new_salary !== undefined ? data.new_salary : data.newSalary,
+    previous_salary: data.previous_salary !== undefined ? Number(data.previous_salary) : Number(data.previousSalary || 0),
+    new_salary: data.new_salary !== undefined ? Number(data.new_salary) : Number(data.newSalary || 0),
     effective_date: data.effective_date || data.effectiveDate,
+    effectiveDate: data.effective_date || data.effectiveDate,
     justification: data.justification || data.notes || '',
+    notes: data.notes || data.justification || '',
     status: data.status || 'Effective',
+    createdAt: new Date().toISOString(),
   };
-  return apiClient('/hrms/promotions/', { method: 'POST', data: payload });
+  saveLocalLifecycleItem(LIFECYCLE_STORAGE_KEYS.promotions, payload);
+  try {
+    const res = await apiClient('/hrms/promotions/', { method: 'POST', data: payload });
+    const saved = res?.data || res || payload;
+    saveLocalLifecycleItem(LIFECYCLE_STORAGE_KEYS.promotions, saved);
+    return saved;
+  } catch {
+    return payload;
+  }
 }
 
 export async function fetchEmployeeWarnings(employeeId) {
-  const query = employeeId ? { employeeId } : {};
-  return apiClient('/hrms/warnings/', { query });
+  const localItems = readLocalLifecycle(LIFECYCLE_STORAGE_KEYS.warnings).filter((item) => matchesEmp(item, employeeId));
+  try {
+    const query = employeeId ? { employeeId } : {};
+    const res = await apiClient('/hrms/warnings/', { query });
+    const serverRows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    if (serverRows.length > 0) {
+      const serverIds = new Set(serverRows.map((r) => String(r.id)));
+      const extraLocal = localItems.filter((l) => !serverIds.has(String(l.id)));
+      return [...serverRows, ...extraLocal];
+    }
+    return localItems;
+  } catch {
+    return localItems;
+  }
 }
 
 export async function createEmployeeWarning(data) {
   const payload = {
+    id: data.id || `warning-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     employeeId: data.employeeId || data.employee,
+    employeeName: data.employeeName || '',
     subject: data.subject || data.title,
+    title: data.title || data.subject,
     severity: data.severity || data.warning_level || 'First Written',
+    warning_level: data.warning_level || data.severity || 'First Written',
     issue_date: data.issue_date || data.warning_date || data.date,
+    warning_date: data.warning_date || data.issue_date || data.date,
     description: data.description || data.explanation || '',
+    explanation: data.explanation || data.description || '',
     status: data.status || 'Issued',
+    createdAt: new Date().toISOString(),
   };
-  return apiClient('/hrms/warnings/', { method: 'POST', data: payload });
+  saveLocalLifecycleItem(LIFECYCLE_STORAGE_KEYS.warnings, payload);
+  try {
+    const res = await apiClient('/hrms/warnings/', { method: 'POST', data: payload });
+    const saved = res?.data || res || payload;
+    saveLocalLifecycleItem(LIFECYCLE_STORAGE_KEYS.warnings, saved);
+    return saved;
+  } catch {
+    return payload;
+  }
 }
 
 export async function fetchEmployeeAwards(employeeId) {
-  const query = employeeId ? { employeeId } : {};
-  return apiClient('/hrms/awards/', { query });
+  const localItems = readLocalLifecycle(LIFECYCLE_STORAGE_KEYS.awards).filter((item) => matchesEmp(item, employeeId));
+  try {
+    const query = employeeId ? { employeeId } : {};
+    const res = await apiClient('/hrms/awards/', { query });
+    const serverRows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    if (serverRows.length > 0) {
+      const serverIds = new Set(serverRows.map((r) => String(r.id)));
+      const extraLocal = localItems.filter((l) => !serverIds.has(String(l.id)));
+      return [...serverRows, ...extraLocal];
+    }
+    return localItems;
+  } catch {
+    return localItems;
+  }
 }
 
 export async function createEmployeeAward(data) {
   const payload = {
+    id: data.id || `award-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     employeeId: data.employeeId || data.employee,
+    employeeName: data.employeeName || '',
     award_name: data.award_name || data.title,
+    title: data.title || data.award_name,
     category: data.category || 'Excellence',
     award_date: data.award_date || data.presentation_date || data.date,
-    gift_amount: data.gift_amount !== undefined ? data.gift_amount : (data.cash_reward || 0),
+    presentation_date: data.presentation_date || data.award_date || data.date,
+    gift_amount: data.gift_amount !== undefined ? Number(data.gift_amount) : Number(data.cash_reward || 0),
+    cash_reward: data.cash_reward !== undefined ? Number(data.cash_reward) : Number(data.gift_amount || 0),
     citation: data.citation || '',
+    createdAt: new Date().toISOString(),
   };
-  return apiClient('/hrms/awards/', { method: 'POST', data: payload });
+  saveLocalLifecycleItem(LIFECYCLE_STORAGE_KEYS.awards, payload);
+  try {
+    const res = await apiClient('/hrms/awards/', { method: 'POST', data: payload });
+    const saved = res?.data || res || payload;
+    saveLocalLifecycleItem(LIFECYCLE_STORAGE_KEYS.awards, saved);
+    return saved;
+  } catch {
+    return payload;
+  }
 }
 
 export async function confirmEmployeeProbation(employeeId, data = {}) {

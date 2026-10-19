@@ -1,10 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
 import { useNavigate, useLocation } from "react-router-dom";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { FilterBar } from "../../../components/hrms/FilterBar";
 import { sendOfferLetter, acceptOfferLetter } from "../../../services/hrmsSync";
+import { uploadFileToBackend } from "../../../services/fileUploadService";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/ui/Button";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -23,6 +24,9 @@ import {
   Award,
   LayoutGrid,
   List,
+  X,
+  Loader2,
+  Download,
 } from "lucide-react";
 import OfferLetterModal from "../organization/OfferLetterModal";
 import { CandidatePipeline } from "../../../components/hrms/CandidatePipeline";
@@ -74,6 +78,9 @@ export default function Candidates() {
 
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
   const [activeOffer, setActiveOffer] = useState(null);
+  const fileInputRef = useRef(null);
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -86,7 +93,58 @@ export default function Candidates() {
     jobId: "",
     stage: "Applied",
     recruiter: "",
+    resumeFile: null,
+    resumeFileName: "",
+    resumeFileSize: "",
+    resumeFileUrl: "",
+    resumeFileId: null,
   });
+
+  async function handleFileSelected(file) {
+    if (!file) return;
+    const allowed = [".pdf", ".doc", ".docx"];
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+    if (!allowed.includes(ext)) {
+      showToast("Please select a PDF or Word document (.pdf, .doc, .docx)");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      showToast("File size exceeds 15 MB limit");
+      return;
+    }
+
+    const localUrl = URL.createObjectURL(file);
+    const sizeStr =
+      file.size > 1024 * 1024
+        ? (file.size / (1024 * 1024)).toFixed(1) + " MB"
+        : Math.round(file.size / 1024) + " KB";
+
+    setForm((prev) => ({
+      ...prev,
+      resumeFile: file,
+      resumeFileName: file.name,
+      resumeFileSize: sizeStr,
+      resumeFileUrl: localUrl,
+    }));
+
+    try {
+      setUploadingResume(true);
+      const fileId = await uploadFileToBackend(file, file.name, "resume");
+      if (fileId) {
+        setForm((prev) => ({
+          ...prev,
+          resumeFileId: fileId,
+          resumeFileUrl: `/api/v1/files/${fileId}/download/`,
+        }));
+        showToast(`Resume attached: ${file.name}`);
+      }
+    } catch (err) {
+      console.warn("Backend file upload skipped or deferred:", err);
+      showToast(`Resume attached locally: ${file.name}`);
+    } finally {
+      setUploadingResume(false);
+    }
+  }
 
   useEffect(() => {
     if (location.state?.openAdd) {
@@ -136,15 +194,38 @@ export default function Candidates() {
       jobId: "",
       stage: "Applied",
       recruiter: "",
+      resumeFile: null,
+      resumeFileName: "",
+      resumeFileSize: "",
+      resumeFileUrl: "",
+      resumeFileId: null,
     });
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setDrawerOpen(true);
   }
 
-  function save() {
+  async function save() {
     if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
       showToast("Name, Email, Phone required");
       return;
     }
+
+    let fileId = form.resumeFileId;
+    if (!fileId && form.resumeFile) {
+      try {
+        fileId = await uploadFileToBackend(form.resumeFile, form.resumeFileName, "resume");
+      } catch (err) {
+        console.warn("Deferred resume upload:", err);
+      }
+    }
+
+    const resumePayload = {
+      resumeFileId: fileId || form.resumeFileId || undefined,
+      resumeFileName: form.resumeFileName || "",
+      resumeFileSize: form.resumeFileSize || "",
+      resumeFileUrl: fileId ? `/api/v1/files/${fileId}/download/` : form.resumeFileUrl || "",
+    };
+
     if (editing) {
       updateCandidate(editing, {
         name: form.name,
@@ -157,6 +238,7 @@ export default function Candidates() {
         jobId: form.jobId,
         stage: form.stage,
         recruiter: form.recruiter,
+        ...resumePayload,
       });
       if (form.stage === "Hired") {
         showToast("Candidate updated and added to Employee Directory");
@@ -181,6 +263,7 @@ export default function Candidates() {
         source: "Career Portal",
         skills: form.skills,
         interviewStatus: "Not Scheduled",
+        ...resumePayload,
       });
       if (form.stage === "Hired") {
         showToast("Candidate registered and added to Employee Directory");
@@ -343,6 +426,17 @@ export default function Candidates() {
               <span>Employee</span>
             </button>
           )}
+          {(r.resumeFileUrl || r.resumeFileName || r.resumeFileId) && (
+            <a
+              href={r.resumeFileUrl || (r.resumeFileId ? `/api/v1/files/${r.resumeFileId}/download/` : "#")}
+              target="_blank"
+              rel="noreferrer"
+              title={`View / Download Resume: ${r.resumeFileName || "CV"}`}
+              className="p-1.5 rounded-xl hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 transition cursor-pointer"
+            >
+              <FileText size={15} />
+            </a>
+          )}
           <button
             type="button"
             title="Edit Candidate"
@@ -358,6 +452,11 @@ export default function Candidates() {
                 jobId: r.jobId,
                 stage: r.stage,
                 recruiter: r.recruiter,
+                resumeFile: null,
+                resumeFileName: r.resumeFileName || "",
+                resumeFileSize: r.resumeFileSize || "",
+                resumeFileUrl: r.resumeFileUrl || "",
+                resumeFileId: r.resumeFileId || null,
               });
               setEditing(r.id);
               setDrawerOpen(true);
@@ -653,12 +752,107 @@ export default function Candidates() {
           </div>
 
           {/* Resume Upload Dropzone */}
-          <div className="border border-dashed border-border rounded-2xl p-5 bg-card text-center flex flex-col items-center justify-center gap-1.5 text-muted hover:border-primary transition cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center">
-              <UploadCloud size={20} />
-            </div>
-            <span className="font-bold text-xs text-text mt-1">Upload Resume or CV (PDF, DOCX)</span>
-            <span className="text-[11px] text-muted">Drag & drop files or click to browse</span>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) handleFileSelected(file);
+            }}
+            className={`border border-dashed rounded-2xl p-5 bg-card text-center flex flex-col items-center justify-center gap-2 transition ${
+              isDragging
+                ? "border-primary bg-primary/5"
+                : form.resumeFileName
+                ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-950/20"
+                : "border-border hover:border-primary cursor-pointer"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileSelected(file);
+              }}
+            />
+
+            {uploadingResume ? (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <Loader2 className="animate-spin text-primary" size={24} />
+                <span className="text-xs font-semibold text-text">Uploading {form.resumeFileName}...</span>
+              </div>
+            ) : form.resumeFileName ? (
+              <div className="flex flex-wrap items-center justify-between w-full max-w-md gap-3 bg-white dark:bg-card border border-emerald-200 dark:border-emerald-800/60 rounded-xl p-3 shadow-2xs">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <FileText size={18} />
+                  </div>
+                  <div className="text-left truncate">
+                    <span className="text-xs font-bold text-text block truncate" title={form.resumeFileName}>
+                      {form.resumeFileName}
+                    </span>
+                    <span className="text-[11px] text-muted block">
+                      {form.resumeFileSize || "Document"} • Attached
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {form.resumeFileUrl && (
+                    <a
+                      href={form.resumeFileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] font-semibold text-emerald-600 hover:underline px-1.5 py-1 rounded"
+                    >
+                      View
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-[11px] font-semibold text-primary hover:underline px-1.5 py-1 rounded cursor-pointer"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((prev) => ({
+                        ...prev,
+                        resumeFile: null,
+                        resumeFileName: "",
+                        resumeFileSize: "",
+                        resumeFileUrl: "",
+                        resumeFileId: null,
+                      }));
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    className="p-1 rounded-lg hover:bg-rose-50 text-rose-500 transition cursor-pointer"
+                    title="Remove Resume"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex flex-col items-center cursor-pointer py-1"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center mb-1">
+                  <UploadCloud size={20} />
+                </div>
+                <span className="font-bold text-xs text-text">Upload Resume or CV (PDF, DOCX)</span>
+                <span className="text-[11px] text-muted">Drag & drop files or click to browse</span>
+              </div>
+            )}
           </div>
         </div>
       </Modal>

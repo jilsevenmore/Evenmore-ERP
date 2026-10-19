@@ -45,6 +45,8 @@ import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { useERP } from "../../../context/ERPContext";
 import { downloadPayslipPdf as renderPayslipPdf, printPayslip as renderPrintPayslip } from "./payslipDocument";
+import { fetchEmployeeAwards } from "../../../services/upgradeService";
+import { NOTIFICATION_EVENT } from "../../../services/crmEventNotifications";
 
 function recentPeriods(count = 6) {
   const now = new Date();
@@ -141,6 +143,25 @@ export default function Payroll() {
   // Switcher for Own Salary perspective
   const [activeOwnUser, setActiveOwnUser] = useState(currentUser?.name || "");
 
+  // Employee Awards Integration for Payslips
+  const [employeeAwards, setEmployeeAwards] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    const loadAwards = () => {
+      fetchEmployeeAwards().then((res) => {
+        if (cancelled) return;
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setEmployeeAwards(list);
+      }).catch(() => {});
+    };
+    loadAwards();
+    window.addEventListener(NOTIFICATION_EVENT, loadAwards);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NOTIFICATION_EVENT, loadAwards);
+    };
+  }, []);
+
   const periodOptions = useMemo(() => {
     const list = recentPeriods(6);
     return currentPeriod && !list.includes(currentPeriod) ? [currentPeriod, ...list] : list;
@@ -170,12 +191,27 @@ export default function Payroll() {
       const totalHours = Number(p.totalHours) || (totalDays * dailyHours);
       const hourlyRate = Number(p.hourlyRate) || (totalHours > 0 ? Math.round(Number(p.standardSalary || 0) / totalHours) : 0);
 
+      const empAwards = employeeAwards.filter((a) => {
+        const empIdTarget = String(p.id ?? p.empId ?? '').toLowerCase();
+        const empCodeTarget = String(p.empId ?? p.employeeCode ?? '').toLowerCase();
+        const empNameTarget = String(p.name ?? '').toLowerCase();
+        const aId = String(a.employeeId ?? a.employee ?? '').toLowerCase();
+        const aCode = String(a.employeeCode ?? '').toLowerCase();
+        const aName = String(a.employeeName ?? '').toLowerCase();
+        return (
+          (aId && (aId === empIdTarget || aId === empCodeTarget)) ||
+          (aCode && (aCode === empCodeTarget || aCode === empIdTarget)) ||
+          (aName && aName === empNameTarget)
+        );
+      });
+      const awardBonus = empAwards.reduce((sum, a) => sum + (Number(a.gift_amount || a.cash_reward || 0)), 0);
+
       const empApprovedEncashments = storeEncashments.filter(
         (enc) => enc.employee?.toLowerCase() === p.name?.toLowerCase() && enc.status === "Approved"
       );
       const encashmentBonus = empApprovedEncashments.reduce((sum, enc) => sum + (Number(enc.amount) || 0), 0);
       const baseEarnings = p.additionalEarnings !== undefined ? p.additionalEarnings : (p.overtime || 0);
-      const effectiveEarnings = baseEarnings + encashmentBonus;
+      const effectiveEarnings = baseEarnings + encashmentBonus + awardBonus;
 
       // Calculation matrix from reusable engine
       const calc = calculateSalaryComponents({
@@ -199,9 +235,10 @@ export default function Payroll() {
         totalHours,
         hourlyRate,
         encashmentBonus,
+        awardBonus,
       };
     });
-  }, [payrollEmployees, storeLeaves, storeEncashments, defaultWorkingDays, departmentWorkingHours]);
+  }, [payrollEmployees, storeLeaves, storeEncashments, employeeAwards, defaultWorkingDays, departmentWorkingHours]);
 
   // Selected employee for generate payslip modal
   const slipSelectedEmp = useMemo(() => {
@@ -1477,9 +1514,15 @@ export default function Payroll() {
                     </span>
                     <span className="font-semibold text-blue-900">{formatINR(ownRecord.earnedSalary)}</span>
                   </div>
+                  {ownRecord.awardBonus > 0 && (
+                    <div className="flex justify-between py-1 border-b border-slate-50 bg-amber-50/60 px-2 rounded-lg">
+                      <span className="text-amber-800 font-medium">Performance Award / Cash Reward (+)</span>
+                      <span className="font-bold text-amber-700">+{formatINR(ownRecord.awardBonus)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between py-1 border-b border-slate-50">
                     <span className="text-slate-500">Overtime &amp; Incentives</span>
-                    <span className="font-semibold text-emerald-700">+{formatINR(ownRecord.additionalEarnings)}</span>
+                    <span className="font-semibold text-emerald-700">+{formatINR(ownRecord.additionalEarnings - (ownRecord.awardBonus || 0))}</span>
                   </div>
                 </div>
               </div>
@@ -1697,6 +1740,14 @@ export default function Payroll() {
                   {formatINR(selectedPayslip.earnedSalary)}
                 </span>
               </div>
+              {selectedPayslip.awardBonus > 0 && (
+                <div className="flex justify-between py-1 border-b border-slate-100 bg-amber-50/60 px-2 rounded-lg">
+                  <span className="text-amber-800 font-medium">Performance Award / Cash Reward (+)</span>
+                  <span className="font-bold text-amber-700">
+                    +{formatINR(selectedPayslip.awardBonus)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Additional Earnings (+)</span>
                 <span className="font-medium text-emerald-700">

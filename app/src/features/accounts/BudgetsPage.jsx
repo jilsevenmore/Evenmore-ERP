@@ -487,21 +487,6 @@ export const BudgetsPage = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Early Alert Threshold (%) *</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="50"
-                    max="100"
-                    required
-                    value={form.alert_threshold_pct}
-                    onChange={(e) => setForm({ ...form, alert_threshold_pct: e.target.value })}
-                    className="w-28 p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
-                  />
-                  <span className="text-slate-500 text-xs">% of budget spent before amber alert flag</span>
-                </div>
-              </div>
 
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Budget Purpose & Guidelines</label>

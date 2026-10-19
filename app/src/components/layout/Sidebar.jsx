@@ -326,7 +326,6 @@ const NAV = [
     children: [
       { label: 'Users', to: '/administration/users' },
       { label: 'Roles', to: '/administration/roles' },
-      { label: 'Clients', to: '/administration/clients' },
       { label: 'System Settings', to: '/administration/settings' },
     ],
   },

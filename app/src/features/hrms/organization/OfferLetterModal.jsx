@@ -26,10 +26,12 @@ export default function OfferLetterModal({
   onUpdateOffer,
   onConfirmOffer,
   onAcceptOffer,
+  initialEdit = false,
+  autoPrint = false,
 }) {
   const currentUser = useAppStore((s) => s.currentUser);
   const { companyProfile } = useERP();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEdit);
   const [formData, setFormData] = useState(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -74,10 +76,19 @@ export default function OfferLetterModal({
         companyName: companyProfile?.name || "",
         companyAddress: [companyProfile?.address, companyProfile?.email].filter(Boolean).join(" • "),
       });
-      setIsEditing(false);
+      setIsEditing(initialEdit);
       setSavedSuccess(false);
     }
-  }, [offer, currentUser?.name, companyProfile?.name, companyProfile?.address, companyProfile?.email]);
+  }, [offer, initialEdit, currentUser?.name, companyProfile?.name, companyProfile?.address, companyProfile?.email]);
+
+  useEffect(() => {
+    if (isOpen && autoPrint && formData && !isEditing) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoPrint, formData, isEditing]);
 
   if (!isOpen || !offer || !formData) return null;
 
@@ -162,8 +173,8 @@ export default function OfferLetterModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
-      <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-3xl w-full my-auto overflow-hidden flex flex-col print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none print:overflow-visible">
+      <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-3xl w-full my-auto overflow-hidden flex flex-col print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none print:overflow-visible">
         
         {/* Top Control Bar (Hidden during Print) */}
         <div className="bg-[#1F2E4A] text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 no-print shrink-0">
@@ -270,7 +281,7 @@ export default function OfferLetterModal({
         )}
 
         {/* Modal Body */}
-        <div className="max-h-[calc(88vh-55px)] overflow-y-auto">
+        <div className="max-h-[calc(88vh-55px)] overflow-y-auto print:max-h-none print:overflow-visible">
           {isEditing ? (
             /* ── EDIT MODE FORM ── */
             <div className="p-4 sm:p-6 bg-slate-50 space-y-4 no-print text-xs">

@@ -347,15 +347,26 @@ export default function CandidateDetails() {
                   <FileText size={20} />
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-text block">{c.name.replace(/\s+/g, "_")}_Resume.pdf</span>
-                  <span className="text-[11px] text-muted">2.4 MB • Verified candidate CV document</span>
+                  <span className="text-xs font-bold text-text block">
+                    {c.resumeFileName || `${c.name.replace(/\s+/g, "_")}_Resume.pdf`}
+                  </span>
+                  <span className="text-[11px] text-muted">
+                    {c.resumeFileSize || "Verified candidate CV document"}
+                  </span>
                 </div>
               </div>
               <Button
                 size="sm"
                 variant="outline"
                 icon={Download}
-                onClick={() => showToast("Downloading resume file...")}
+                onClick={() => {
+                  const url = c.resumeFileUrl || (c.resumeFileId ? `/api/v1/files/${c.resumeFileId}/download/` : null);
+                  if (url) {
+                    window.open(url, "_blank");
+                  } else {
+                    showToast("Downloading resume file...");
+                  }
+                }}
               >
                 Download
               </Button>

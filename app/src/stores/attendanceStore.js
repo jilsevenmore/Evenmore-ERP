@@ -227,9 +227,34 @@ const useAttendanceStoreBase = create((set, get) => ({
   role: "HR",
 
   saveDailyAttendance: (date, updatedRecords) => set((s) => {
-    // Merge or replace records matching this date or employee ID
-    const otherRecords = s.records.filter((r) => r.date !== date);
-    const combined = [...updatedRecords, ...otherRecords];
+    const norm = (d) => {
+      if (!d) return "";
+      const str = String(d).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+      if (/^\d{2}-\d{2}-\d{4}/.test(str)) return str.slice(0, 10).split("-").reverse().join("-");
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str.slice(0, 10).split("/").reverse().join("-");
+      return str;
+    };
+    const targetDateNorm = norm(date);
+    const otherRecords = s.records.filter((r) => {
+      const rDateNorm = norm(r.rawDate || r.work_date || r.workDate || r.date);
+      return rDateNorm !== targetDateNorm && r.date !== date;
+    });
+
+    // Deduplicate incoming updated records by employee
+    const seenEmp = new Set();
+    const cleanUpdated = [];
+    (updatedRecords || []).forEach((r) => {
+      const empKey = String(r.employeeId || r.empId || r.name || r.id || "").toLowerCase().trim();
+      if (empKey && !seenEmp.has(empKey)) {
+        seenEmp.add(empKey);
+        cleanUpdated.push(r);
+      } else if (!empKey) {
+        cleanUpdated.push(r);
+      }
+    });
+
+    const combined = [...cleanUpdated, ...otherRecords];
     writeThrough("attendance", combined);
     return { records: combined };
   }),

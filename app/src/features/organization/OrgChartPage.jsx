@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
 import {
@@ -17,7 +17,10 @@ import {
   FileSpreadsheet,
   Printer,
   AlertTriangle,
+  Image,
+  Maximize2,
 } from 'lucide-react';
+import { toPng, toSvg } from 'html-to-image';
 import Modal from '../../components/ui/Modal';
 import PageInfoButton from '../../components/common/PageInfoButton';
 import { hrmsGuides } from '../../data/hrms/hrmsGuides';
@@ -74,8 +77,10 @@ export function OrgChartPage() {
   }, [reloadChart]);
 
   // View Controls
+  const treeViewRef = useRef(null);
   const [zoom, setZoom] = useState(100);
   const [q, setQ] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
 
   // Feature Integrations
   const departmentCount = tree.departmentCount;
@@ -157,6 +162,89 @@ export function OrgChartPage() {
     }
   }
 
+  // Handle Full Chart PNG Export
+  async function exportFullChartPng() {
+    setIsExportOpen(false);
+    const element = treeViewRef.current?.getTreeElement();
+    if (!element) {
+      showToast('Chart canvas not ready for export');
+      return;
+    }
+    setIsExporting(true);
+    showToast('Generating full org chart image (PNG)…');
+    try {
+      const unscaledWidth = element.offsetWidth;
+      const unscaledHeight = element.offsetHeight;
+      const dataUrl = await toPng(element, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        style: {
+          transform: 'none',
+          transformOrigin: 'top left',
+          position: 'static',
+          width: `${unscaledWidth}px`,
+          height: `${unscaledHeight}px`,
+        },
+        width: unscaledWidth,
+        height: unscaledHeight,
+      });
+
+      const link = document.createElement('a');
+      link.download = `Evenmore_Org_Chart_${new Date().toISOString().slice(0, 10)}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Full Org Chart downloaded successfully (PNG)');
+    } catch (err) {
+      console.error('Failed to export full chart PNG:', err);
+      showToast('Failed to download full chart image');
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  // Handle Full Chart SVG Export
+  async function exportFullChartSvg() {
+    setIsExportOpen(false);
+    const element = treeViewRef.current?.getTreeElement();
+    if (!element) {
+      showToast('Chart canvas not ready for export');
+      return;
+    }
+    setIsExporting(true);
+    showToast('Generating full org chart vector (SVG)…');
+    try {
+      const unscaledWidth = element.offsetWidth;
+      const unscaledHeight = element.offsetHeight;
+      const dataUrl = await toSvg(element, {
+        backgroundColor: '#ffffff',
+        style: {
+          transform: 'none',
+          transformOrigin: 'top left',
+          position: 'static',
+          width: `${unscaledWidth}px`,
+          height: `${unscaledHeight}px`,
+        },
+        width: unscaledWidth,
+        height: unscaledHeight,
+      });
+
+      const link = document.createElement('a');
+      link.download = `Evenmore_Org_Chart_${new Date().toISOString().slice(0, 10)}.svg`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Full Org Chart downloaded successfully (SVG)');
+    } catch (err) {
+      console.error('Failed to export full chart SVG:', err);
+      showToast('Failed to download full chart SVG');
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   // Handle CSV Export
   function exportCSV() {
     setIsExportOpen(false);
@@ -183,11 +271,15 @@ export function OrgChartPage() {
     }, 250);
   }
 
+  function handleFitToScreen() {
+    treeViewRef.current?.fitToScreen();
+  }
+
   const noMatches = Boolean(q.trim()) && search.root.children.length === 0;
   const managerOptions = employees.filter((emp) => String(emp.id) !== String(selectedEmployee?.id));
 
   return (
-    <div className="flex flex-col gap-6 p-2 sm:p-6 max-w-[1600px] mx-auto w-full printable-document">
+    <div className="flex flex-col gap-6 p-2 sm:p-6 max-w-[1800px] mx-auto w-full printable-document">
       {/* ── Page Header ─────────────────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
@@ -215,7 +307,26 @@ export function OrgChartPage() {
             </button>
 
             {isExportOpen && (
-              <div className="absolute left-0 lg:left-auto lg:right-0 mt-2 w-48 bg-white border border-bdr rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute left-0 lg:left-auto lg:right-0 mt-2 w-56 bg-white border border-bdr rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
+                <button
+                  type="button"
+                  onClick={exportFullChartPng}
+                  disabled={isExporting}
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Image size={16} className="text-primary" />
+                  <span>Download Full Chart (PNG)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={exportFullChartSvg}
+                  disabled={isExporting}
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Download size={16} className="text-violet-600" />
+                  <span>Download Full Chart (SVG)</span>
+                </button>
+                <div className="border-t border-slate-100 my-1" />
                 <button
                   type="button"
                   onClick={exportCSV}
@@ -289,12 +400,12 @@ export function OrgChartPage() {
         </div>
 
         {/* Zoom Controls */}
-        <div className="flex items-center gap-2 text-[12px]">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[12px]">
           <span className="text-muted font-medium">Zoom</span>
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.max(60, z - 10))}
-            disabled={zoom <= 60}
+            onClick={() => setZoom((z) => Math.max(20, z - 10))}
+            disabled={zoom <= 20}
             className="w-8 h-8 border border-bdr rounded-xl grid place-items-center bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
             title="Zoom out"
           >
@@ -303,19 +414,28 @@ export function OrgChartPage() {
           <button
             type="button"
             onClick={() => setZoom(100)}
-            className="w-10 text-center font-medium hover:text-navy cursor-pointer"
+            className="px-2.5 h-8 border border-bdr rounded-xl text-center font-medium hover:text-navy hover:bg-slate-50 cursor-pointer shadow-xs transition-colors"
             title="Reset to 100%"
           >
             {zoom}%
           </button>
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.min(140, z + 10))}
-            disabled={zoom >= 140}
+            onClick={() => setZoom((z) => Math.min(200, z + 10))}
+            disabled={zoom >= 200}
             className="w-8 h-8 border border-bdr rounded-xl grid place-items-center bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
             title="Zoom in"
           >
             <Plus size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={handleFitToScreen}
+            className="px-2.5 h-8 border border-bdr rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer ml-0.5"
+            title="Fit entire chart to view"
+          >
+            <Maximize2 size={13} />
+            <span className="hidden sm:inline">Fit</span>
           </button>
         </div>
       </div>
@@ -350,10 +470,12 @@ export function OrgChartPage() {
           </div>
         ) : (
           <OrgTreeView
+            ref={treeViewRef}
             root={search.root}
             expanded={visibleExpanded}
             matched={search.matched}
             zoom={zoom}
+            setZoom={setZoom}
             onToggle={toggleBranch}
             onSelect={selectEmployee}
             centerSignal={centerSignal}

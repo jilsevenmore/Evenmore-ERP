@@ -98,6 +98,11 @@ export const HRMS_RESOURCES = {
         confirmationRemarks: e.confirmationRemarks || undefined,
         noticePeriod: e.noticePeriod || undefined,
         noticePeriodDays: e.noticePeriodDays !== undefined ? num(e.noticePeriodDays) : undefined,
+        standardSalary: e.standardSalary !== undefined ? num(e.standardSalary) : (e.salary !== undefined ? num(e.salary) : undefined),
+        basicSalary: e.basicSalary !== undefined ? num(e.basicSalary) : undefined,
+        salary: e.salary !== undefined ? num(e.salary) : (e.standardSalary !== undefined ? num(e.standardSalary) : undefined),
+        ctc: e.ctc !== undefined ? num(e.ctc) : (e.standardSalary !== undefined ? num(e.standardSalary) : undefined),
+        position: e.position || e.designation || undefined,
       });
     },
     fromApi: (row) => {
@@ -106,13 +111,18 @@ export const HRMS_RESOURCES = {
         ...row,
         ...asText(row, [
           'name', 'email', 'phone', 'department', 'designation',
-          'employmentType', 'gender', 'location', 'status',
+          'employmentType', 'gender', 'location', 'status', 'position',
         ]),
         // Tables read `empId` and `role`; the API calls them `employeeCode` and
         // `designation`.
         empId: row.employeeCode || row.empId || '',
         employeeCode: row.employeeCode || row.empId || '',
         role: row.designation || row.role || '',
+        position: row.position || row.designation || row.role || '',
+        standardSalary: row.standardSalary !== undefined ? num(row.standardSalary) : (row.salary !== undefined ? num(row.salary) : 0),
+        salary: row.salary !== undefined ? num(row.salary) : (row.standardSalary !== undefined ? num(row.standardSalary) : 0),
+        basicSalary: row.basicSalary !== undefined ? num(row.basicSalary) : 0,
+        ctc: row.ctc !== undefined ? num(row.ctc) : (row.standardSalary !== undefined ? num(row.standardSalary) : 0),
         joining: joinDisplay,
         doj: joinDisplay,
         joiningDate: joinDisplay,
@@ -545,6 +555,10 @@ export const HRMS_RESOURCES = {
       isOnboarded: Boolean(c.isOnboarded),
       documentsVerified: Boolean(c.documentsVerified),
       appliedDate: isoOut(c.appliedDate),
+      resumeFileId: c.resumeFileId || undefined,
+      resumeFileName: c.resumeFileName || undefined,
+      resumeFileSize: c.resumeFileSize || undefined,
+      resumeFileUrl: c.resumeFileUrl || undefined,
     }),
     fromApi: (row) => ({
       ...row,
@@ -567,6 +581,10 @@ export const HRMS_RESOURCES = {
       documentsVerified: Boolean(row.documentsVerified),
       appliedDate: displayIn(row.appliedDate || row.created_at),
       createdAt: displayIn(row.created_at),
+      resumeFileId: row.resumeFileId || null,
+      resumeFileName: row.resumeFileName || '',
+      resumeFileSize: row.resumeFileSize || '',
+      resumeFileUrl: row.resumeFileUrl || '',
       _synced: true,
     }),
   },

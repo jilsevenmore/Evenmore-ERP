@@ -372,9 +372,22 @@ function TeamMarkAttendance() {
   // Everyone on the payroll of people, with the day's row where there is one.
   const rows = useMemo(() => {
     const byEmployee = new Map(serverRows.map((r) => [String(r.employeeId), r]));
-    const people = employees?.length
+    const peopleRaw = employees?.length
       ? employees.filter((e) => !["Resigned", "Terminated"].includes(e.status))
       : serverRows.map((r) => ({ id: r.employeeId, name: r.name, department: r.dept, empId: r.empId }));
+
+    const peopleMap = new Map();
+    peopleRaw.forEach((p) => {
+      const name = (p.name || "").trim().toLowerCase();
+      const id = String(p.id || p.employeeId || "").trim().toLowerCase();
+      const key = id || name;
+      if (key && !peopleMap.has(key) && (!name || !peopleMap.has(name))) {
+        peopleMap.set(key, p);
+        if (name) peopleMap.set(name, p);
+      }
+    });
+    const people = Array.from(new Set(peopleMap.values()));
+
     return people.map((e) => {
       const att = byEmployee.get(String(e.id));
       const base = {

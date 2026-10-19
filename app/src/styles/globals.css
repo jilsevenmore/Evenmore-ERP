@@ -756,7 +756,7 @@ button.btn-sm {
 
 /* Modal and form cancel / outline buttons */
 .modal-footer button[type="button"]:not(.btn-danger):not(.icon-ghost),
-.modal-card button[type="button"]:not(.btn-danger):not(.icon-ghost):not(.tab-btn):not(.p-1):not(.p-1\.5):not(.p-2) {
+.modal-card button[type="button"]:not(.btn-danger):not(.icon-ghost):not(.tab-btn):not(.p-1):not(.p-1\.5):not(.p-2):not(.modal-close):not(.drawer-close) {
   border-radius: var(--radius-lg, 12px) !important;
   font-size: 0.8125rem !important;
   font-weight: 600 !important;
@@ -2298,19 +2298,37 @@ html {
 .modal-header h2 { margin: 0; font-size: 1.05rem; color: var(--text); font-weight: 700; }
 
 .modal-close {
-  width: 32px;
-  height: 32px;
-  border: 0;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 8px !important;
   color: var(--text-secondary);
-  display: grid;
-  place-items: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
   transition: all 0.15s ease;
   cursor: pointer;
 }
 
-.modal-close:hover { background: var(--soft); color: var(--text); }
+.modal-close:hover {
+  background: var(--soft) !important;
+  color: var(--text) !important;
+}
+
+.modal-close svg {
+  margin: 0 !important;
+  display: block !important;
+  flex-shrink: 0 !important;
+}
 
 .lead-create-modal {
   width: min(960px, 100%);

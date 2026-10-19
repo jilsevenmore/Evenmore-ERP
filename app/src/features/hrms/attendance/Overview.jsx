@@ -164,20 +164,44 @@ export default function AttendanceOverview() {
     return [];
   }, [storeRecords]);
 
-  const DEPARTMENTS = useMemo(
-    () => ["All", ...new Set(combinedAttendance.map((r) => r.dept).filter(Boolean))],
-    [combinedAttendance]
-  );
+  const DEPARTMENTS = useMemo(() => {
+    const set = new Set();
+    (combinedAttendance || []).forEach((r) => {
+      const d = (r.dept || "").trim();
+      if (d && d !== "—" && d !== "All") set.add(d);
+    });
+    (storeEmployees || []).forEach((e) => {
+      const d = (e.department || e.dept || "").trim();
+      if (d && d !== "—" && d !== "All") set.add(d);
+    });
+    return ["All", ...Array.from(set).sort()];
+  }, [combinedAttendance, storeEmployees]);
 
+  // Unique list of employees for the regularization modal and employee selectors
   const regEmployees = useMemo(() => {
-    if (storeEmployees.length > 0) {
-      return storeEmployees.map((e) => ({ id: e.empId || e.id, name: e.name }));
-    }
-    return combinedAttendance.map((r) => ({ id: r.empId || r.id, name: r.name }));
+    const map = new Map();
+    const sources = [...(storeEmployees || []), ...(combinedAttendance || [])];
+    sources.forEach((e) => {
+      const name = (e.name || e.employeeName || e.employee || "").trim();
+      if (!name || name === "Employee") return;
+      const empId = String(
+        e.employeeCode || e.empId || e.employeeId || (e.id && !String(e.id).includes("-") ? e.id : "")
+      ).trim();
+      const normKey = name.toLowerCase();
+      if (!map.has(normKey)) {
+        map.set(normKey, {
+          id: empId || `EMP-${map.size + 1}`,
+          name,
+        });
+      } else if (empId && (!map.get(normKey).id || map.get(normKey).id.startsWith("EMP-"))) {
+        map.get(normKey).id = empId;
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [storeEmployees, combinedAttendance]);
 
   const filtered = useMemo(() => {
-    return combinedAttendance.filter((item) => {
+    const list = combinedAttendance.filter((item) => {
       const itemIso = toISODate(item.rawDate || item.date);
       const matchDate = !dateVal || itemIso === dateVal || item.date === dateVal;
       const matchSearch =
@@ -191,19 +215,107 @@ export default function AttendanceOverview() {
       const matchRole = roleFilter === "All" || item.role === roleFilter;
       return matchDate && matchSearch && matchDept && matchStatus && matchShift && matchLoc && matchRole;
     });
+
+    // Deduplicate table rows for the same employee on the same date
+    const map = new Map();
+    list.forEach((item) => {
+      const itemDate = toISODate(item.rawDate || item.date) || item.date;
+      const empKey = String(item.employeeId || item.empId || item.name || "").trim().toLowerCase();
+      const uniqueKey = `${itemDate}_${empKey}`;
+
+      if (!map.has(uniqueKey)) {
+        map.set(uniqueKey, item);
+      } else {
+        const prev = map.get(uniqueKey);
+        const hasPunch = item.firstPunchDisplay && item.firstPunchDisplay !== "—";
+        const prevHasPunch = prev.firstPunchDisplay && prev.firstPunchDisplay !== "—";
+
+        map.set(uniqueKey, {
+          ...prev,
+          ...item,
+          status: item.status !== "Absent" && item.status ? item.status : prev.status,
+          firstPunchDisplay: prevHasPunch ? prev.firstPunchDisplay : item.firstPunchDisplay,
+          lastPunchDisplay:
+            item.lastPunchDisplay && item.lastPunchDisplay !== "—"
+              ? item.lastPunchDisplay
+              : prev.lastPunchDisplay,
+          checkIn: prev.checkIn && prev.checkIn !== "—" ? prev.checkIn : item.checkIn,
+          checkOut: item.checkOut && item.checkOut !== "—" ? item.checkOut : prev.checkOut,
+          workHours: prev.workHours && prev.workHours !== "—" ? prev.workHours : item.workHours,
+        });
+      }
+    });
+
+    return Array.from(map.values());
   }, [combinedAttendance, search, dateVal, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter]);
 
-  // Dynamic live STATS
+  // Dynamic live STATS strictly for the selected date (dateVal) based on actual employees in the system
   const statsData = useMemo(() => {
-    const total = combinedAttendance.length || 1;
-    const presentCount = combinedAttendance.filter((r) => r.status === "Present").length;
-    const absentCount = combinedAttendance.filter((r) => r.status === "Absent").length;
-    const lateCount = combinedAttendance.filter(
+    const targetDate = dateVal || todayISO();
+
+    // 1. Records for selected target date
+    const dayRecords = combinedAttendance.filter((r) => {
+      const itemIso = toISODate(r.rawDate || r.date || r.workDate || r.work_date);
+      return itemIso === targetDate || r.date === targetDate;
+    });
+
+    // 2. Deduplicate records for this day by employee
+    const dayByEmp = new Map();
+    dayRecords.forEach((r) => {
+      const nameKey = (r.name || "").trim().toLowerCase();
+      const idKey = String(r.employeeId || r.empId || r.id || "").trim().toLowerCase();
+      const key = idKey || nameKey;
+      if (!key) return;
+
+      if (!dayByEmp.has(key) && !dayByEmp.has(nameKey)) {
+        dayByEmp.set(key, r);
+        if (nameKey) dayByEmp.set(nameKey, r);
+      } else {
+        const existing = dayByEmp.get(key) || dayByEmp.get(nameKey);
+        const isMoreActive =
+          r.status === "Present" || r.status === "Late" || r.status === "WFH";
+        if (isMoreActive) {
+          dayByEmp.set(key, { ...existing, ...r });
+          if (nameKey) dayByEmp.set(nameKey, { ...existing, ...r });
+        }
+      }
+    });
+    const uniqueDayRecords = Array.from(new Set(dayByEmp.values()));
+
+    // 3. Count unique active employees registered in system
+    const activeStaffMap = new Map();
+    (storeEmployees || []).forEach((e) => {
+      const name = (e.name || e.employeeName || "").trim();
+      if (!name) return;
+      if (["Terminated", "Resigned", "Inactive"].includes(e.status)) return;
+      const key = (e.id || e.empId || name).toString().toLowerCase();
+      if (!activeStaffMap.has(key)) {
+        activeStaffMap.set(key, e);
+      }
+    });
+    const totalStaff =
+      activeStaffMap.size > 0
+        ? activeStaffMap.size
+        : Math.max(uniqueDayRecords.length, regEmployees.length, 1);
+
+    // 4. Calculate real-time counts for this date
+    const presentCount = uniqueDayRecords.filter((r) => r.status === "Present").length;
+    const lateCount = uniqueDayRecords.filter(
       (r) => r.status === "Late" || (r.lateMins && r.lateMins > 0)
     ).length;
-    const leaveCount = combinedAttendance.filter((r) => r.status === "On Leave").length;
-    const wfhCount = combinedAttendance.filter((r) => r.status === "WFH").length;
-    const percent = Math.round((presentCount / total) * 100);
+    const leaveCount = uniqueDayRecords.filter((r) => r.status === "On Leave").length;
+    const wfhCount = uniqueDayRecords.filter((r) => r.status === "WFH").length;
+
+    // Explicitly marked absent
+    const explicitAbsent = uniqueDayRecords.filter((r) => r.status === "Absent").length;
+    const isPastDate = Boolean(targetDate && targetDate < todayISO());
+    const absentCount = isPastDate
+      ? Math.max(explicitAbsent, Math.max(0, totalStaff - (presentCount + lateCount + leaveCount + wfhCount)))
+      : explicitAbsent;
+
+    // Attendance percentage based on active staff
+    const attendingTotal = presentCount + lateCount + wfhCount;
+    const percent = Math.min(100, Math.round((attendingTotal / totalStaff) * 100));
 
     return [
       { label: "PRESENT", val: String(presentCount), sub: `${percent}% of staff`, dotColor: "#22c55e" },
@@ -212,7 +324,7 @@ export default function AttendanceOverview() {
       { label: "ON LEAVE", val: String(leaveCount), sub: "Approved leave", dotColor: "#3b82f6" },
       { label: "WFH", val: String(wfhCount), sub: "Remote active", dotColor: null },
     ];
-  }, [combinedAttendance]);
+  }, [combinedAttendance, dateVal, storeEmployees, regEmployees]);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -640,7 +752,7 @@ export default function AttendanceOverview() {
             >
               <option value="">Select employee</option>
               {regEmployees.map((e) => (
-                <option key={e.id} value={e.name}>
+                <option key={`${e.id}-${e.name}`} value={e.name}>
                   {e.name} ({e.id})
                 </option>
               ))}

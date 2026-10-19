@@ -8,6 +8,7 @@ import {
   removeTeamMember,
 } from '../../../services/hrmsSync';
 import { api } from '../../../services/api';
+import { dispatchNotification } from '../../../services/crmEventNotifications';
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ShieldCheck,
@@ -58,6 +59,7 @@ import {
   Sun,
   Moon,
   RotateCw,
+  RefreshCw,
   ToggleLeft,
   ToggleRight,
   Info,
@@ -413,8 +415,20 @@ export default function HRAdminPage({ defaultTab }) {
         await updateAnnouncement(editingAnnouncement.id, newAnnouncement);
         showToast("Announcement updated successfully", "success");
       } else {
-        await createAnnouncement(newAnnouncement);
+        const created = await createAnnouncement(newAnnouncement);
         showToast("Announcement published successfully", "success");
+        try {
+          dispatchNotification({
+            id: `announcement-${created?.id || Date.now()}`,
+            title: `New Announcement: ${newAnnouncement.title}`,
+            message: newAnnouncement.content,
+            category: "hrms",
+            entityType: "ANNOUNCEMENT",
+            createdAt: new Date().toISOString(),
+            status: "unread",
+            path: "/hrms/hr-admin?tab=announcements",
+          });
+        } catch {}
       }
       setIsAnnouncementModalOpen(false);
       setEditingAnnouncement(null);
@@ -460,11 +474,35 @@ export default function HRAdminPage({ defaultTab }) {
     try {
       await publishAnnouncement(ann.id);
       showToast(`Announcement "${ann.title}" published`, "success");
+      try {
+        dispatchNotification({
+          id: `announcement-${ann.id || Date.now()}`,
+          title: `Announcement: ${ann.title}`,
+          message: ann.content,
+          category: "hrms",
+          entityType: "ANNOUNCEMENT",
+          createdAt: new Date().toISOString(),
+          status: "unread",
+          path: "/hrms/hr-admin?tab=announcements",
+        });
+      } catch {}
       loadAnnouncementsAndTravel();
     } catch (err) {
       try {
         await updateAnnouncement(ann.id, { status: "Published" });
         showToast(`Announcement "${ann.title}" published`, "success");
+        try {
+          dispatchNotification({
+            id: `announcement-${ann.id || Date.now()}`,
+            title: `Announcement: ${ann.title}`,
+            message: ann.content,
+            category: "hrms",
+            entityType: "ANNOUNCEMENT",
+            createdAt: new Date().toISOString(),
+            status: "unread",
+            path: "/hrms/hr-admin?tab=announcements",
+          });
+        } catch {}
         loadAnnouncementsAndTravel();
       } catch (err2) {
         showToast(err?.message || err2?.message || "Failed to publish announcement", "error");
@@ -668,6 +706,8 @@ export default function HRAdminPage({ defaultTab }) {
   // Search & Filters for each tab
   const [search, setSearch] = useState("");
   const [teamDeptFilter, setTeamDeptFilter] = useState("all");
+  const [teamViewMode, setTeamViewMode] = useState("table"); // 'table' | 'by-dept'
+  const [showDeptStaffRoster, setShowDeptStaffRoster] = useState(true);
   const [chainStatusFilter, setChainStatusFilter] = useState("all");
   const [offerStatusFilter, setOfferStatusFilter] = useState("all");
   const [terminationFilter, setTerminationFilter] = useState("all");
@@ -678,11 +718,15 @@ export default function HRAdminPage({ defaultTab }) {
   // Quick Action Dropdown State
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const quickActionRef = useRef(null);
+  const terminationEmpDropdownRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(e) {
       if (quickActionRef.current && !quickActionRef.current.contains(e.target)) {
         setIsQuickActionOpen(false);
+      }
+      if (terminationEmpDropdownRef.current && !terminationEmpDropdownRef.current.contains(e.target)) {
+        setIsTerminationEmpDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -692,9 +736,21 @@ export default function HRAdminPage({ defaultTab }) {
   // Letter & Offer Modals State
   const [activeTerminationLetter, setActiveTerminationLetter] = useState(null);
   const [isTerminationLetterModalOpen, setIsTerminationLetterModalOpen] = useState(false);
+  const [terminationInitialEdit, setTerminationInitialEdit] = useState(false);
+  const [terminationAutoPrint, setTerminationAutoPrint] = useState(false);
+  const [terminationEmpSearch, setTerminationEmpSearch] = useState("");
+  const [isTerminationEmpDropdownOpen, setIsTerminationEmpDropdownOpen] = useState(false);
   const [activeOfferLetter, setActiveOfferLetter] = useState(null);
   const [isOfferLetterModalOpen, setIsOfferLetterModalOpen] = useState(false);
+  const [offerLetterInitialEdit, setOfferLetterInitialEdit] = useState(false);
+  const [offerLetterAutoPrint, setOfferLetterAutoPrint] = useState(false);
   const [isGenerateOfferModalOpen, setIsGenerateOfferModalOpen] = useState(false);
+
+  // Grievance Status Change State
+  const [statusChangeComplaint, setStatusChangeComplaint] = useState(null);
+  const [newComplaintStatus, setNewComplaintStatus] = useState("Under Review");
+  const [statusChangeNote, setStatusChangeNote] = useState("");
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Modals (Add / Edit)
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -779,7 +835,218 @@ export default function HRAdminPage({ defaultTab }) {
     noticePeriod: "60 Days (2 Months)",
     allowEmployeeDelegation: true,
     requireTwoFactorForAdmin: true,
+    sandwichRuleEnabled: true,
+    gracePeriodEnabled: true,
+    maxCarryForwardDays: 15,
   });
+
+  const [ruleSearchQuery, setRuleSearchQuery] = useState("");
+  const [ruleFilterStatus, setRuleFilterStatus] = useState("all");
+  const [ruleFilterCategory, setRuleFilterCategory] = useState("all");
+
+  const handleToggleGovernanceRule = (toggleKey, currentValue) => {
+    const nextVal = !currentValue;
+    setOrgSettings((prev) => ({ ...prev, [toggleKey]: nextVal }));
+    if (toggleKey === "sandwichRuleEnabled" && typeof toggleSandwichRule === "function") {
+      toggleSandwichRule(nextVal);
+    }
+    showToast(`Governance rule updated: ${nextVal ? "Running / Active" : "Paused / Inactive"}`);
+  };
+
+  const scrollToRuleField = (fieldName) => {
+    const el = document.getElementById(`org-input-${fieldName}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.focus();
+      el.classList.add("ring-2", "ring-navy");
+      setTimeout(() => el.classList.remove("ring-2", "ring-navy"), 2000);
+    }
+  };
+
+  const allGovernanceRules = useMemo(() => {
+    return [
+      {
+        id: "sandwich-rule",
+        name: "Sandwich Leave Deduction Rule",
+        category: "Attendance & Leaves",
+        description: "Treats weekends and public holidays falling between two approved leave dates as consumed paid leaves.",
+        scope: "All Regular & Contract Staff",
+        parameter: (orgSettings.sandwichRuleEnabled ?? true) ? "Enforced: Intervening holidays/weekends deducted as leave" : "Disabled: Only requested working days deducted",
+        isActive: orgSettings.sandwichRuleEnabled ?? true,
+        isToggleable: true,
+        toggleKey: "sandwichRuleEnabled",
+        icon: CalendarCheck,
+        badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      },
+      {
+        id: "2fa-rule",
+        name: "Mandatory 2FA for Admin Accounts",
+        category: "Security & Access",
+        description: "Enforces Two-Factor Authentication (TOTP / OTP) for HR and Operations Admin accounts before granting access.",
+        scope: "HR Admins & Operations Admins",
+        parameter: (orgSettings.requireTwoFactorForAdmin ?? true) ? "Enforced: Multi-factor verification required on login" : "Optional: Standard single-factor password sign-in",
+        isActive: orgSettings.requireTwoFactorForAdmin ?? true,
+        isToggleable: true,
+        toggleKey: "requireTwoFactorForAdmin",
+        icon: ShieldCheck,
+        badgeBg: "bg-blue-50 text-blue-700 border-blue-200",
+      },
+      {
+        id: "peer-delegation",
+        name: "Peer Handover & Leave Delegation",
+        category: "Workflow & Delegation",
+        description: "Allows employees submitting leave requests to nominate an active peer delegate within the department to handle responsibilities.",
+        scope: "All Department Employees",
+        parameter: (orgSettings.allowEmployeeDelegation ?? true) ? "Enabled: Peer handover required during leave requests" : "Disabled: Direct escalation to reporting manager only",
+        isActive: orgSettings.allowEmployeeDelegation ?? true,
+        isToggleable: true,
+        toggleKey: "allowEmployeeDelegation",
+        icon: Users,
+        badgeBg: "bg-indigo-50 text-indigo-700 border-indigo-200",
+      },
+      {
+        id: "shift-grace-rule",
+        name: "Shift Grace Period & Lateness Tolerance",
+        category: "Attendance & Leaves",
+        description: "Provides a 15-minute grace tolerance for employee punch-ins against designated shift start time before marking late entry.",
+        scope: "All Shift-Assigned Staff",
+        parameter: (orgSettings.gracePeriodEnabled ?? true) ? "Active: 15-min tolerance window before deduction" : "Strict: Zero-tolerance, punches past shift start marked late",
+        isActive: orgSettings.gracePeriodEnabled ?? true,
+        isToggleable: true,
+        toggleKey: "gracePeriodEnabled",
+        icon: Clock,
+        badgeBg: "bg-amber-50 text-amber-700 border-amber-200",
+      },
+      {
+        id: "carry-forward",
+        name: "Annual Leave Carry-Forward Limit",
+        category: "Attendance & Leaves",
+        description: "Restricts the maximum number of unused earned leaves that roll over into the subsequent fiscal cycle.",
+        scope: "Confirmed Employees",
+        parameter: `Capped at ${orgSettings.maxCarryForwardDays ?? 15} Days / Year (excess lapsed or encashed)`,
+        isActive: (orgSettings.maxCarryForwardDays ?? 15) > 0,
+        isToggleable: false,
+        configTarget: "maxCarryForwardDays",
+        icon: RotateCw,
+        badgeBg: "bg-teal-50 text-teal-700 border-teal-200",
+      },
+      {
+        id: "probation-period",
+        name: "Standard Probation & Assessment Window",
+        category: "Hiring & Onboarding",
+        description: "Mandatory trial evaluation period for newly onboarded staff before formal employment confirmation.",
+        scope: "New Joiners & Trainees",
+        parameter: `${orgSettings.probationPeriod || "90 Days"} evaluation cycle before confirmation review`,
+        isActive: Boolean(orgSettings.probationPeriod),
+        isToggleable: false,
+        configTarget: "probationPeriod",
+        icon: Briefcase,
+        badgeBg: "bg-purple-50 text-purple-700 border-purple-200",
+      },
+      {
+        id: "notice-period",
+        name: "Standard Notice Period & Clearance",
+        category: "Separations & Exits",
+        description: "Enforces mandatory advance service notice period for resignation and standard exit clearance.",
+        scope: "Confirmed Employees",
+        parameter: `${orgSettings.noticePeriod || "60 Days"} formal notice window required`,
+        isActive: Boolean(orgSettings.noticePeriod),
+        isToggleable: false,
+        configTarget: "noticePeriod",
+        icon: UserMinus,
+        badgeBg: "bg-rose-50 text-rose-700 border-rose-200",
+      },
+      {
+        id: "work-week",
+        name: "Standard Work Week & Weekend Off Policy",
+        category: "Operations & Schedule",
+        description: "Defines enterprise regular operational days and weekly offs driving attendance schedules and overtime.",
+        scope: "Organization-Wide",
+        parameter: `${orgSettings.workWeek || "Monday - Friday (5 Days)"}`,
+        isActive: Boolean(orgSettings.workWeek),
+        isToggleable: false,
+        configTarget: "workWeek",
+        icon: Calendar,
+        badgeBg: "bg-sky-50 text-sky-700 border-sky-200",
+      },
+      {
+        id: "dept-working-days",
+        name: "Department Working Days & Payroll Rate Policy",
+        category: "Operations & Schedule",
+        description: "Custom monthly working days and daily operational hours configured per department, governing payroll rate calculation.",
+        scope: `${departmentsConfig.length} Configured Departments`,
+        parameter: `${departmentsConfig.length} Departments active with operational schedules`,
+        isActive: departmentsConfig.length > 0,
+        isToggleable: false,
+        actionTab: "working-days",
+        actionLabel: "View Schedule",
+        icon: Building2,
+        badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      },
+      {
+        id: "approval-workflows",
+        name: "Multi-Tier Approval Hierarchy & Escalations",
+        category: "Workflow & Delegation",
+        description: "Hierarchical approval workflows with multi-level reviewers for Leaves, Reimbursements, and Travel requests.",
+        scope: `${approvalChains.length} Active Workflows`,
+        parameter: `${approvalChains.length} Workflows running with automatic escalation rules`,
+        isActive: approvalChains.length > 0,
+        isToggleable: false,
+        actionTab: "approvals",
+        actionLabel: "View Workflows",
+        icon: Shield,
+        badgeBg: "bg-blue-50 text-blue-700 border-blue-200",
+      },
+      {
+        id: "fiscal-year",
+        name: "Fiscal Year Cycle & Financial Alignment",
+        category: "Compliance & Payroll",
+        description: "Standard financial calendar boundary for payroll tax computations and annual leave balance reset.",
+        scope: "Statutory Compliance",
+        parameter: `Cycle begins ${orgSettings.fiscalYearStart || "April 01"}`,
+        isActive: Boolean(orgSettings.fiscalYearStart),
+        isToggleable: false,
+        configTarget: "fiscalYearStart",
+        icon: Sliders,
+        badgeBg: "bg-amber-50 text-amber-700 border-amber-200",
+      },
+      {
+        id: "timezone-alignment",
+        name: "Enterprise Timezone & Punch Synchronization",
+        category: "Operations & Schedule",
+        description: "Canonical timezone reference for attendance punch timestamps, shift windows, and audit records.",
+        scope: "All System Logs & Punches",
+        parameter: `${orgSettings.timezone || "IST (UTC +05:30) — Asia/Kolkata"}`,
+        isActive: Boolean(orgSettings.timezone),
+        isToggleable: false,
+        configTarget: "timezone",
+        icon: Clock,
+        badgeBg: "bg-slate-100 text-slate-700 border-slate-300",
+      },
+    ];
+  }, [orgSettings, departmentsConfig, approvalChains]);
+
+  const activeRulesCount = allGovernanceRules.filter((r) => r.isActive).length;
+  const totalRulesCount = allGovernanceRules.length;
+  const inactiveRulesCount = totalRulesCount - activeRulesCount;
+
+  const filteredGovernanceRules = useMemo(() => {
+    return allGovernanceRules.filter((rule) => {
+      if (ruleFilterStatus === "active" && !rule.isActive) return false;
+      if (ruleFilterStatus === "inactive" && rule.isActive) return false;
+      if (ruleFilterCategory !== "all" && rule.category !== ruleFilterCategory) return false;
+      if (ruleSearchQuery.trim()) {
+        const q = ruleSearchQuery.toLowerCase();
+        const matchesName = rule.name.toLowerCase().includes(q);
+        const matchesDesc = rule.description.toLowerCase().includes(q);
+        const matchesScope = rule.scope.toLowerCase().includes(q);
+        const matchesParam = rule.parameter.toLowerCase().includes(q);
+        const matchesCat = rule.category.toLowerCase().includes(q);
+        return matchesName || matchesDesc || matchesScope || matchesParam || matchesCat;
+      }
+      return true;
+    });
+  }, [allGovernanceRules, ruleFilterStatus, ruleFilterCategory, ruleSearchQuery]);
 
   useEffect(() => {
     if (!isBackendEnabled()) return;
@@ -797,7 +1064,7 @@ export default function HRAdminPage({ defaultTab }) {
   }, []);
 
   // ── Team Handlers ──────────────────────────────────────────
-  const handleOpenAddTeam = () => {
+  const handleOpenAddTeam = (prefillDept) => {
     if (!canEditOrg) {
       showToast("You do not have permission to create teams (edit_staff required)", "error");
       return;
@@ -805,12 +1072,18 @@ export default function HRAdminPage({ defaultTab }) {
     setEditingTeam(null);
     setTeamFormError("");
     setTeamMemberSearch("");
-    const firstDept = departmentsConfig[0] || null;
+    const targetDept =
+      (typeof prefillDept === "string" && prefillDept !== "all" && prefillDept) ||
+      (teamDeptFilter !== "all" ? teamDeptFilter : (departmentsConfig[0]?.name || hrDeptOptions[0] || ""));
+    const matchedDept = departmentsConfig.find(
+      (d) => d.name === targetDept || d.id === targetDept
+    );
     setNewTeam({
       code: "",
       name: "",
-      dept: firstDept?.name || hrDeptOptions[0] || "",
-      departmentId: firstDept?.id || "",
+      dept: matchedDept?.name || targetDept || "",
+      departmentId: matchedDept?.id || "",
+      secondaryDept: "",
       lead: "",
       leadId: "",
       approver: "",
@@ -842,6 +1115,7 @@ export default function HRAdminPage({ defaultTab }) {
       name: team.name || "",
       dept: team.dept || team.department || matchedDept?.name || "",
       departmentId: team.departmentId || matchedDept?.id || "",
+      secondaryDept: team.secondaryDept || "",
       lead: team.lead || team.leadName || "",
       leadId: team.leadId || "",
       approver: team.approver || team.approverName || "",
@@ -891,23 +1165,35 @@ export default function HRAdminPage({ defaultTab }) {
     );
 
     const memberIds = Array.isArray(newTeam.memberIds) ? newTeam.memberIds : [];
+    const teamDeptName = matchedDept?.name || newTeam.dept;
     const membersDetail = eligibleEmployees
       .filter((emp) => memberIds.includes(emp.id))
-      .map((emp) => ({
-        id: emp.id,
-        name: emp.name,
-        employeeCode: emp.employeeCode || emp.empId || "",
-        department: emp.department || "",
-        designation: emp.designation || emp.role || "",
-        status: emp.status || "Active",
-      }));
+      .map((emp) => {
+        const empDepts = new Set([
+          emp.department,
+          emp.dept,
+          teamDeptName,
+          newTeam.secondaryDept,
+        ].filter(Boolean));
+        return {
+          id: emp.id,
+          name: emp.name,
+          employeeCode: emp.employeeCode || emp.empId || "",
+          department: emp.department || teamDeptName || "",
+          departments: Array.from(empDepts),
+          isMultiDept: empDepts.size > 1,
+          designation: emp.designation || emp.role || "",
+          status: emp.status || "Active",
+        };
+      });
 
     const payload = {
       code: trimmedCode || undefined,
       name: trimmedName,
-      dept: matchedDept?.name || newTeam.dept,
-      department: matchedDept?.name || newTeam.dept,
+      dept: teamDeptName,
+      department: teamDeptName,
       departmentId: matchedDept?.id || newTeam.departmentId || undefined,
+      secondaryDept: (newTeam.secondaryDept || "").trim() || undefined,
       lead: leadEmployee?.name || newTeam.lead,
       leadId: leadEmployee?.id || newTeam.leadId || undefined,
       leadName: leadEmployee?.name || newTeam.lead,
@@ -1027,11 +1313,20 @@ export default function HRAdminPage({ defaultTab }) {
           setTeams((prev) => prev.map((t) => (t.id === activeTeamDetails.id ? { ...t, ...normalized } : t)));
         } else {
           const currentDetail = activeTeamDetails.membersDetail || [];
+          const teamDept = activeTeamDetails.dept || activeTeamDetails.department;
+          const empDepts = new Set([
+            emp.department,
+            emp.dept,
+            teamDept,
+            activeTeamDetails.secondaryDept,
+          ].filter(Boolean));
           const newMember = {
             id: emp.id,
             name: emp.name,
             employeeCode: emp.employeeCode || emp.empId || "",
-            department: emp.department || "",
+            department: emp.department || teamDept || "",
+            departments: Array.from(empDepts),
+            isMultiDept: empDepts.size > 1,
             designation: emp.designation || emp.role || "",
             status: emp.status || "Active",
           };
@@ -1047,11 +1342,20 @@ export default function HRAdminPage({ defaultTab }) {
         }
       } else {
         const currentDetail = activeTeamDetails.membersDetail || [];
+        const teamDept = activeTeamDetails.dept || activeTeamDetails.department;
+        const empDepts = new Set([
+          emp.department,
+          emp.dept,
+          teamDept,
+          activeTeamDetails.secondaryDept,
+        ].filter(Boolean));
         const newMember = {
           id: emp.id,
           name: emp.name,
           employeeCode: emp.employeeCode || emp.empId || "",
-          department: emp.department || "",
+          department: emp.department || teamDept || "",
+          departments: Array.from(empDepts),
+          isMultiDept: empDepts.size > 1,
           designation: emp.designation || emp.role || "",
           status: emp.status || "Active",
         };
@@ -1292,6 +1596,32 @@ export default function HRAdminPage({ defaultTab }) {
     showToast(`Termination letter & record updated`);
   };
 
+  const handleEditTermination = (t) => {
+    setActiveTerminationLetter(t);
+    setTerminationInitialEdit(true);
+    setTerminationAutoPrint(false);
+    setIsTerminationLetterModalOpen(true);
+  };
+
+  const handlePrintTermination = (t) => {
+    setActiveTerminationLetter(t);
+    setTerminationInitialEdit(false);
+    setTerminationAutoPrint(true);
+    setIsTerminationLetterModalOpen(true);
+  };
+
+  const filteredTerminationEmployees = useMemo(() => {
+    if (!terminationEmpSearch.trim()) return employees;
+    const q = terminationEmpSearch.toLowerCase();
+    return employees.filter(
+      (emp) =>
+        emp.name?.toLowerCase().includes(q) ||
+        (emp.employeeCode || emp.empId || emp.employee_code || "").toLowerCase().includes(q) ||
+        (emp.designation || "").toLowerCase().includes(q) ||
+        (emp.department || "").toLowerCase().includes(q)
+    );
+  }, [employees, terminationEmpSearch]);
+
   const handleDeleteTermination = (id, name) => {
     if (window.confirm(`Are you sure you want to remove termination record for "${name}"?`)) {
       setTerminations((prev) => prev.filter((t) => t.id !== id));
@@ -1337,6 +1667,20 @@ export default function HRAdminPage({ defaultTab }) {
     updateOffer?.(updated.id, updated);
     setActiveOfferLetter(updated);
     showToast(`Offer letter updated`);
+  };
+
+  const handleEditOfferLetter = (offer) => {
+    setActiveOfferLetter(offer);
+    setOfferLetterInitialEdit(true);
+    setOfferLetterAutoPrint(false);
+    setIsOfferLetterModalOpen(true);
+  };
+
+  const handlePrintOfferLetter = (offer) => {
+    setActiveOfferLetter(offer);
+    setOfferLetterInitialEdit(false);
+    setOfferLetterAutoPrint(true);
+    setIsOfferLetterModalOpen(true);
   };
 
   const handleDeleteOffer = (id, name) => {
@@ -1548,23 +1892,68 @@ export default function HRAdminPage({ defaultTab }) {
     }
   };
 
-  const toggleComplaintStatus = (id) => {
-    setComplaints((prev) =>
-      prev.map((c) => {
-        if (c.id !== id) return c;
-        const next =
-          c.status === "Open"
-            ? "Under Review"
-            : c.status === "Under Review"
-            ? "Resolved"
-            : "Open";
-        if (isBackendEnabled()) {
-          hrmsSync.update('complaints', id, { status: next }).catch(console.warn);
-        }
-        showToast(`Grievance ${c.id} marked as ${next}`);
-        return { ...c, status: next };
-      })
+  const handleOpenStatusModal = (complaint) => {
+    setStatusChangeComplaint(complaint);
+    setNewComplaintStatus(
+      complaint.status === "Open"
+        ? "Under Review"
+        : complaint.status === "Under Review"
+        ? "Resolved"
+        : "Open"
     );
+    setStatusChangeNote(complaint.resolution || "");
+  };
+
+  const toggleComplaintStatus = (id) => {
+    const c = complaints.find((x) => x.id === id);
+    if (c) {
+      handleOpenStatusModal(c);
+    }
+  };
+
+  const handleSaveStatusChange = async (e) => {
+    e?.preventDefault();
+    if (!statusChangeComplaint) return;
+    setIsUpdatingStatus(true);
+    const id = statusChangeComplaint.id;
+    const nextStatus = newComplaintStatus;
+    const note = statusChangeNote.trim();
+
+    try {
+      if (nextStatus === "Resolved") {
+        await resolveComplaint(id, note || "Resolved following internal review.").catch(() => {});
+      } else if (isBackendEnabled()) {
+        await hrmsSync.update('complaints', id, { status: nextStatus, resolution: note || undefined }).catch(console.warn);
+      }
+      setComplaints((prev) =>
+        prev.map((c) => {
+          if (c.id !== id) return c;
+          const updatedComments = note
+            ? [
+                ...(c.comments || []),
+                {
+                  author_name: currentUser?.name || "HR Admin",
+                  comment: `Status updated to ${nextStatus}: ${note}`,
+                  created_at: new Date().toISOString(),
+                },
+              ]
+            : c.comments;
+          return {
+            ...c,
+            status: nextStatus,
+            resolution: nextStatus === "Resolved" ? (note || c.resolution || "Resolved") : c.resolution,
+            comments: updatedComments,
+          };
+        })
+      );
+      showToast(`Grievance ${id} marked as "${nextStatus}"`, "success");
+      setStatusChangeComplaint(null);
+      setStatusChangeNote("");
+    } catch (err) {
+      showToast(err?.message || "Failed to update grievance status", "error");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   // ── Holiday Handlers ───────────────────────────────────────
@@ -1918,13 +2307,74 @@ export default function HRAdminPage({ defaultTab }) {
     }
   };
 
-  // Unique departments for filter
-  const departmentsList = Array.from(
-    new Set([
-      ...departmentsConfig.map((d) => d.name),
-      ...teams.map((t) => t.dept || t.department),
-    ])
-  ).filter(Boolean);
+  // Unique departments for filter and team assignment (merges configured depts, team depts, and employee depts)
+  const departmentsList = useMemo(() => {
+    const set = new Set();
+    departmentsConfig.forEach((d) => d?.name && set.add(d.name));
+    teams.forEach((t) => {
+      if (t.dept) set.add(t.dept);
+      if (t.department) set.add(t.department);
+      if (t.secondaryDept) set.add(t.secondaryDept);
+    });
+    allEmployees.forEach((e) => {
+      if (e.department) set.add(e.department);
+      if (e.dept) set.add(e.dept);
+      if (e.secondaryDepartment) set.add(e.secondaryDepartment);
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [departmentsConfig, teams, allEmployees]);
+
+  // Map each employee ID to all departments they are active in (primary + assigned squads + cross-department)
+  const employeeDepartmentMap = useMemo(() => {
+    const map = new Map();
+    eligibleEmployees.forEach((emp) => {
+      const set = new Set();
+      if (emp.department) set.add(emp.department);
+      if (emp.dept) set.add(emp.dept);
+      if (emp.secondaryDepartment) set.add(emp.secondaryDepartment);
+      if (Array.isArray(emp.departments)) {
+        emp.departments.forEach((d) => d && set.add(d));
+      } else if (typeof emp.departments === "string" && emp.departments.includes(",")) {
+        emp.departments.split(",").forEach((d) => d.trim() && set.add(d.trim()));
+      }
+      map.set(emp.id, set);
+    });
+
+    teams.forEach((t) => {
+      const teamDepts = [t.dept, t.department, t.secondaryDept].filter(Boolean);
+      if (teamDepts.length === 0) return;
+
+      const memberIds = [
+        ...(Array.isArray(t.memberIds) ? t.memberIds : []),
+        ...(Array.isArray(t.membersDetail) ? t.membersDetail.map((m) => m.id) : []),
+        t.leadId,
+        t.approverId,
+      ].filter(Boolean);
+
+      memberIds.forEach((id) => {
+        let set = map.get(id);
+        if (!set) {
+          set = new Set();
+          map.set(id, set);
+        }
+        teamDepts.forEach((d) => set.add(d));
+      });
+    });
+
+    const result = new Map();
+    map.forEach((set, id) => {
+      result.set(id, Array.from(set));
+    });
+    return result;
+  }, [eligibleEmployees, teams]);
+
+  // Dual-department staff list (employees who work in 2 or more departments)
+  const multiDeptEmployees = useMemo(() => {
+    return eligibleEmployees.filter((emp) => {
+      const depts = employeeDepartmentMap.get(emp.id) || [];
+      return depts.length > 1;
+    });
+  }, [eligibleEmployees, employeeDepartmentMap]);
   const totalTeamMembers = teams.reduce(
     (acc, t) =>
       acc +
@@ -2031,8 +2481,8 @@ export default function HRAdminPage({ defaultTab }) {
     {
       id: "settings",
       label: "Org Settings",
-      count: "8 Rules",
-      subtext: "Governance active",
+      count: `${activeRulesCount} Active`,
+      subtext: `${totalRulesCount} configured rules`,
       icon: Settings,
       iconColor: "text-slate-700",
       accentBg: "bg-slate-50 text-slate-700 border-slate-200",
@@ -2155,10 +2605,10 @@ export default function HRAdminPage({ defaultTab }) {
           {activeTab === "teams" && (
             <button
               type="button"
-              onClick={handleOpenAddTeam}
+              onClick={() => handleOpenAddTeam(teamDeptFilter !== "all" ? teamDeptFilter : undefined)}
               className="inline-flex items-center gap-1.5 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
-              <Plus size={15} /> Create Team
+              <Plus size={15} /> Create Team {teamDeptFilter !== "all" ? `(${teamDeptFilter})` : ""}
             </button>
           )}
           {activeTab === "working-days" && (
@@ -2249,7 +2699,7 @@ export default function HRAdminPage({ defaultTab }) {
           {activeTab === "announcements" && (
             <button
               type="button"
-              onClick={() => setIsAnnouncementModalOpen(true)}
+              onClick={handleOpenAddAnnouncement}
               className="inline-flex items-center gap-1.5 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Megaphone size={15} /> Publish Announcement
@@ -2350,7 +2800,7 @@ export default function HRAdminPage({ defaultTab }) {
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                 <input
                   type="text"
-                  placeholder="Search teams by name, ID, lead, approver, department..."
+                  placeholder="Search squads, employees, department, leader..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-9 pr-3 h-9 text-xs rounded-xl border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
@@ -2358,8 +2808,36 @@ export default function HRAdminPage({ defaultTab }) {
               </div>
             </div>
 
+            {/* View Switcher: Table View vs Department-wise View */}
+            <div className="flex items-center bg-off p-1 rounded-xl border border-bdr gap-1">
+              <button
+                type="button"
+                onClick={() => setTeamViewMode("table")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  teamViewMode === "table"
+                    ? "bg-white text-navy shadow-xs"
+                    : "text-muted hover:text-slate-800"
+                }`}
+              >
+                <Layers size={13} />
+                <span>Squads Table</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTeamViewMode("by-dept")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  teamViewMode === "by-dept"
+                    ? "bg-white text-navy shadow-xs"
+                    : "text-muted hover:text-slate-800"
+                }`}
+              >
+                <Building2 size={13} />
+                <span>Department-wise View</span>
+              </button>
+            </div>
+
             {/* Department Pills */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap w-full lg:w-auto pt-2 lg:pt-0 border-t lg:border-t-0 border-bdr/50">
               <span className="text-[12px] text-muted font-medium mr-1">Dept:</span>
               <button
                 type="button"
@@ -2368,31 +2846,233 @@ export default function HRAdminPage({ defaultTab }) {
                   teamDeptFilter === "all" ? "bg-navy text-white font-semibold" : "bg-off text-muted hover:text-slate-800"
                 }`}
               >
-                All
+                All ({teams.length})
               </button>
-              {departmentsList.map((d) => (
+              {departmentsList.map((d) => {
+                const count = teams.filter((t) => (t.dept || t.department) === d || t.secondaryDept === d).length;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setTeamDeptFilter(d)}
+                    className={`h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer inline-flex items-center gap-1.5 ${
+                      teamDeptFilter === d ? "bg-navy text-white font-semibold" : "bg-off text-muted hover:text-slate-800"
+                    }`}
+                  >
+                    <span>{d}</span>
+                    <span className="opacity-70 text-[11px]">({count})</span>
+                  </button>
+                );
+              })}
+              {multiDeptEmployees.length > 0 && (
                 <button
-                  key={d}
                   type="button"
-                  onClick={() => setTeamDeptFilter(d)}
-                  className={`h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                    teamDeptFilter === d ? "bg-navy text-white font-semibold" : "bg-off text-muted hover:text-slate-800"
+                  onClick={() => setTeamDeptFilter("dual-dept")}
+                  className={`h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer inline-flex items-center gap-1.5 ${
+                    teamDeptFilter === "dual-dept"
+                      ? "bg-purple-700 text-white font-semibold"
+                      : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100"
                   }`}
+                  title="Filter to view employees active in multiple departments"
                 >
-                  {d}
+                  <Users size={12} />
+                  <span>Dual-Dept Staff ({multiDeptEmployees.length})</span>
                 </button>
-              ))}
+              )}
             </div>
           </div>
 
-          {/* Teams Table Container */}
-          <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
-            <div className="p-3.5 border-b border-bdr flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 bg-off/50">
-              <span className="text-[12.5px] font-bold text-slate-800">Departmental Squad List</span>
-              <span className="text-[11.5px] text-muted">
-                Showing{" "}
-                {
-                  teams.filter((t) => {
+          {/* VIEW MODE 1: SQUADS TABLE */}
+          {teamViewMode === "table" && (
+            <div className="flex flex-col gap-4">
+              <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
+                <div className="p-3.5 border-b border-bdr flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 bg-off/50">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12.5px] font-bold text-slate-800">Departmental Squad List</span>
+                    {teamDeptFilter !== "all" && teamDeptFilter !== "dual-dept" && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                        {teamDeptFilter}
+                      </span>
+                    )}
+                    {teamDeptFilter === "dual-dept" && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                        Cross-Department Units
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11.5px] text-muted">
+                    Showing{" "}
+                    {
+                      teams.filter((t) => {
+                        const q = search.trim().toLowerCase();
+                        const matchSearch =
+                          !q ||
+                          String(t.name ?? "").toLowerCase().includes(q) ||
+                          String(t.code ?? "").toLowerCase().includes(q) ||
+                          String(t.id ?? "").toLowerCase().includes(q) ||
+                          String(t.lead ?? "").toLowerCase().includes(q) ||
+                          String(t.leadName ?? "").toLowerCase().includes(q) ||
+                          String(t.approver ?? "").toLowerCase().includes(q) ||
+                          String(t.approverName ?? "").toLowerCase().includes(q) ||
+                          String(t.dept ?? t.department ?? "").toLowerCase().includes(q) ||
+                          String(t.secondaryDept ?? "").toLowerCase().includes(q);
+                        const matchDept =
+                          teamDeptFilter === "all"
+                            ? true
+                            : teamDeptFilter === "dual-dept"
+                            ? ((t.memberIds || []).some((id) => (employeeDepartmentMap.get(id) || []).length > 1) || !!t.secondaryDept)
+                            : (t.dept || t.department) === teamDeptFilter || t.secondaryDept === teamDeptFilter;
+                        return matchSearch && matchDept;
+                      }).length
+                    }{" "}
+                    of {teams.length} teams
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
+                    <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
+                      <tr>
+                        <th className="py-3 px-5">Squad Name</th>
+                        <th className="py-3 px-5">Team ID</th>
+                        <th className="py-3 px-5">Department</th>
+                        <th className="py-3 px-5">Team Leader</th>
+                        <th className="py-3 px-5">Headcount</th>
+                        <th className="py-3 px-5">Default Approver</th>
+                        <th className="py-3 px-5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-bdr/40">
+                      {teams
+                        .filter((t) => {
+                          const q = search.trim().toLowerCase();
+                          const matchSearch =
+                            !q ||
+                            String(t.name ?? "").toLowerCase().includes(q) ||
+                            String(t.code ?? "").toLowerCase().includes(q) ||
+                            String(t.id ?? "").toLowerCase().includes(q) ||
+                            String(t.lead ?? "").toLowerCase().includes(q) ||
+                            String(t.leadName ?? "").toLowerCase().includes(q) ||
+                            String(t.approver ?? "").toLowerCase().includes(q) ||
+                            String(t.approverName ?? "").toLowerCase().includes(q) ||
+                            String(t.dept ?? t.department ?? "").toLowerCase().includes(q) ||
+                            String(t.secondaryDept ?? "").toLowerCase().includes(q);
+                          const matchDept =
+                            teamDeptFilter === "all"
+                              ? true
+                              : teamDeptFilter === "dual-dept"
+                              ? ((t.memberIds || []).some((id) => (employeeDepartmentMap.get(id) || []).length > 1) || !!t.secondaryDept)
+                              : (t.dept || t.department) === teamDeptFilter || t.secondaryDept === teamDeptFilter;
+                          return matchSearch && matchDept;
+                        })
+                        .map((t) => {
+                          const squadId = t.code || t.teamCode || t.id;
+                          const count = Number(t.memberCount ?? t.headcount ?? (Array.isArray(t.membersDetail) ? t.membersDetail.length : t.members)) || 0;
+                          const hasMultiDeptMember = (t.memberIds || []).some((id) => (employeeDepartmentMap.get(id) || []).length > 1);
+                          return (
+                            <tr key={t.id} className="hover:bg-off/60 transition">
+                              <td className="py-4 px-5">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-center font-bold text-[12px] shrink-0">
+                                    {(t.name || "SQ").substring(0, 2).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-slate-900">{t.name}</div>
+                                    <div className="text-[11px] text-muted">
+                                      {t.description ? t.description.slice(0, 40) + (t.description.length > 40 ? "..." : "") : "Designated Operational Squad"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-4 px-5">
+                                <span className="font-mono text-[12px] text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                  {squadId}
+                                </span>
+                              </td>
+                              <td className="py-4 px-5">
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-800 rounded-full text-[11.5px] font-medium">
+                                    {t.dept || t.department || "—"}
+                                  </span>
+                                  {t.secondaryDept && (
+                                    <span className="px-2 py-0.5 bg-purple-50 border border-purple-200 text-purple-700 rounded-full text-[10.5px] font-medium" title="Cross-department squad">
+                                      + {t.secondaryDept}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-4 px-5 text-slate-800 font-medium">
+                                {t.lead || t.leadName || <span className="text-muted font-normal">Unassigned</span>}
+                              </td>
+                              <td className="py-4 px-5 text-slate-700">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenViewTeamDetails(t)}
+                                  className="inline-flex items-center gap-1.5 font-semibold text-slate-800 hover:text-navy cursor-pointer group"
+                                  title="Click to view squad roster"
+                                >
+                                  <Users size={14} className="text-muted group-hover:text-navy" />
+                                  <span className="underline decoration-dotted decoration-slate-300 underline-offset-2">
+                                    {count} members
+                                  </span>
+                                  {hasMultiDeptMember && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                      Dual-Dept
+                                    </span>
+                                  )}
+                                </button>
+                              </td>
+                              <td className="py-4 px-5 text-slate-700">
+                                {t.approver || t.approverName ? (
+                                  <span className="inline-flex items-center gap-1.5 font-medium text-slate-800">
+                                    <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                                    {t.approver || t.approverName}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted text-[12px]">Unassigned</span>
+                                )}
+                              </td>
+                              <td className="py-4 px-5 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenViewTeamDetails(t)}
+                                    className="p-1.5 hover:bg-blue-50 rounded-xl text-muted hover:text-blue-700 transition cursor-pointer"
+                                    title="View Squad Roster & Details"
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canEditOrg}
+                                    onClick={() => handleOpenEditTeam(t)}
+                                    className={`p-1.5 hover:bg-slate-100 rounded-xl text-muted hover:text-slate-900 transition cursor-pointer ${
+                                      !canEditOrg ? "opacity-40 cursor-not-allowed" : ""
+                                    }`}
+                                    title={canEditOrg ? "Edit Team Details" : "Requires edit_staff permission"}
+                                  >
+                                    <Edit size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canEditOrg}
+                                    onClick={() => handleDeleteTeam(t.id, t.name)}
+                                    className={`p-1.5 hover:bg-red-50 rounded-xl text-muted hover:text-red-600 transition cursor-pointer ${
+                                      !canEditOrg ? "opacity-40 cursor-not-allowed" : ""
+                                    }`}
+                                    title={canEditOrg ? "Remove Team" : "Requires edit_staff permission"}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+
+                  {teams.filter((t) => {
                     const q = search.trim().toLowerCase();
                     const matchSearch =
                       !q ||
@@ -2403,189 +3083,340 @@ export default function HRAdminPage({ defaultTab }) {
                       String(t.leadName ?? "").toLowerCase().includes(q) ||
                       String(t.approver ?? "").toLowerCase().includes(q) ||
                       String(t.approverName ?? "").toLowerCase().includes(q) ||
-                      String(t.dept ?? t.department ?? "").toLowerCase().includes(q);
-                    const matchDept = teamDeptFilter === "all" || (t.dept || t.department) === teamDeptFilter;
+                      String(t.dept ?? t.department ?? "").toLowerCase().includes(q) ||
+                      String(t.secondaryDept ?? "").toLowerCase().includes(q);
+                    const matchDept =
+                      teamDeptFilter === "all"
+                        ? true
+                        : teamDeptFilter === "dual-dept"
+                        ? ((t.memberIds || []).some((id) => (employeeDepartmentMap.get(id) || []).length > 1) || !!t.secondaryDept)
+                        : (t.dept || t.department) === teamDeptFilter || t.secondaryDept === teamDeptFilter;
                     return matchSearch && matchDept;
-                  }).length
-                }{" "}
-                of {teams.length} teams
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
-                <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
-                  <tr>
-                    <th className="py-3 px-5">Squad Name</th>
-                    <th className="py-3 px-5">Team ID</th>
-                    <th className="py-3 px-5">Department</th>
-                    <th className="py-3 px-5">Team Leader</th>
-                    <th className="py-3 px-5">Headcount</th>
-                    <th className="py-3 px-5">Default Approver</th>
-                    <th className="py-3 px-5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-bdr/40">
-                  {teams
-                    .filter((t) => {
-                      const q = search.trim().toLowerCase();
-                      const matchSearch =
-                        !q ||
-                        String(t.name ?? "").toLowerCase().includes(q) ||
-                        String(t.code ?? "").toLowerCase().includes(q) ||
-                        String(t.id ?? "").toLowerCase().includes(q) ||
-                        String(t.lead ?? "").toLowerCase().includes(q) ||
-                        String(t.leadName ?? "").toLowerCase().includes(q) ||
-                        String(t.approver ?? "").toLowerCase().includes(q) ||
-                        String(t.approverName ?? "").toLowerCase().includes(q) ||
-                        String(t.dept ?? t.department ?? "").toLowerCase().includes(q);
-                      const matchDept = teamDeptFilter === "all" || (t.dept || t.department) === teamDeptFilter;
-                      return matchSearch && matchDept;
-                    })
-                    .map((t) => {
-                      const squadId = t.code || t.teamCode || t.id;
-                      const count = Number(t.memberCount ?? t.headcount ?? (Array.isArray(t.membersDetail) ? t.membersDetail.length : t.members)) || 0;
-                      return (
-                        <tr key={t.id} className="hover:bg-off/60 transition">
-                          <td className="py-4 px-5">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-center font-bold text-[12px] shrink-0">
-                                {(t.name || "SQ").substring(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900">{t.name}</div>
-                                <div className="text-[11px] text-muted">
-                                  {t.description ? t.description.slice(0, 40) + (t.description.length > 40 ? "..." : "") : "Designated Operational Squad"}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 px-5">
-                            <span className="font-mono text-[12px] text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                              {squadId}
-                            </span>
-                          </td>
-                          <td className="py-4 px-5">
-                            <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-800 rounded-full text-[11.5px] font-medium">
-                              {t.dept || t.department || "—"}
-                            </span>
-                          </td>
-                          <td className="py-4 px-5 text-slate-800 font-medium">
-                            {t.lead || t.leadName || <span className="text-muted font-normal">Unassigned</span>}
-                          </td>
-                          <td className="py-4 px-5 text-slate-700">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenViewTeamDetails(t)}
-                              className="inline-flex items-center gap-1.5 font-semibold text-slate-800 hover:text-navy cursor-pointer group"
-                              title="Click to view squad roster"
-                            >
-                              <Users size={14} className="text-muted group-hover:text-navy" />
-                              <span className="underline decoration-dotted decoration-slate-300 underline-offset-2">
-                                {count} members
-                              </span>
-                            </button>
-                          </td>
-                          <td className="py-4 px-5 text-slate-700">
-                            {t.approver || t.approverName ? (
-                              <span className="inline-flex items-center gap-1.5 font-medium text-slate-800">
-                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                                {t.approver || t.approverName}
-                              </span>
-                            ) : (
-                              <span className="text-muted text-[12px]">Unassigned</span>
-                            )}
-                          </td>
-                          <td className="py-4 px-5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenViewTeamDetails(t)}
-                                className="p-1.5 hover:bg-blue-50 rounded-xl text-muted hover:text-blue-700 transition cursor-pointer"
-                                title="View Squad Roster & Details"
-                              >
-                                <Eye size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!canEditOrg}
-                                onClick={() => handleOpenEditTeam(t)}
-                                className={`p-1.5 hover:bg-slate-100 rounded-xl text-muted hover:text-slate-900 transition cursor-pointer ${
-                                  !canEditOrg ? "opacity-40 cursor-not-allowed" : ""
-                                }`}
-                                title={canEditOrg ? "Edit Team Details" : "Requires edit_staff permission"}
-                              >
-                                <Edit size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!canEditOrg}
-                                onClick={() => handleDeleteTeam(t.id, t.name)}
-                                className={`p-1.5 hover:bg-red-50 rounded-xl text-muted hover:text-red-600 transition cursor-pointer ${
-                                  !canEditOrg ? "opacity-40 cursor-not-allowed" : ""
-                                }`}
-                                title={canEditOrg ? "Remove Team" : "Requires edit_staff permission"}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-
-              {teams.filter((t) => {
-                const q = search.trim().toLowerCase();
-                const matchSearch =
-                  !q ||
-                  String(t.name ?? "").toLowerCase().includes(q) ||
-                  String(t.code ?? "").toLowerCase().includes(q) ||
-                  String(t.id ?? "").toLowerCase().includes(q) ||
-                  String(t.lead ?? "").toLowerCase().includes(q) ||
-                  String(t.leadName ?? "").toLowerCase().includes(q) ||
-                  String(t.approver ?? "").toLowerCase().includes(q) ||
-                  String(t.approverName ?? "").toLowerCase().includes(q) ||
-                  String(t.dept ?? t.department ?? "").toLowerCase().includes(q);
-                const matchDept = teamDeptFilter === "all" || (t.dept || t.department) === teamDeptFilter;
-                return matchSearch && matchDept;
-              }).length === 0 && (
-                <div className="py-12 text-center text-muted">
-                  <Users size={32} className="mx-auto mb-2 opacity-40 text-navy" />
-                  <p className="font-semibold text-slate-800 text-[14px]">
-                    {teams.length === 0 ? "No squads created yet" : "No teams matching criteria"}
-                  </p>
-                  <p className="text-[12px] mt-0.5 text-muted">
-                    {teams.length === 0
-                      ? "Create operational teams to structure employees, department workflows, and leave approvers."
-                      : "Try adjusting your search query or department filter"}
-                  </p>
-                  {teams.length === 0 ? (
-                    <button
-                      type="button"
-                      disabled={!canEditOrg}
-                      onClick={handleOpenAddTeam}
-                      className="mt-3.5 inline-flex items-center gap-2 px-4 py-2 bg-navy text-white text-xs font-semibold rounded-xl hover:bg-navy/90 transition shadow-xs cursor-pointer"
-                    >
-                      <Plus size={14} /> Create First Squad
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearch("");
-                        setTeamDeptFilter("all");
-                      }}
-                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium cursor-pointer"
-                    >
-                      Clear Filters
-                    </button>
+                  }).length === 0 && (
+                    <div className="py-12 text-center text-muted">
+                      <Users size={32} className="mx-auto mb-2 opacity-40 text-navy" />
+                      <p className="font-semibold text-slate-800 text-[14px]">
+                        {teams.length === 0 ? "No squads created yet" : "No teams matching criteria"}
+                      </p>
+                      <p className="text-[12px] mt-0.5 text-muted">
+                        {teams.length === 0
+                          ? "Create operational teams to structure employees, department workflows, and leave approvers."
+                          : "Try adjusting your search query or department filter"}
+                      </p>
+                      {teams.length === 0 ? (
+                        <button
+                          type="button"
+                          disabled={!canEditOrg}
+                          onClick={() => handleOpenAddTeam(teamDeptFilter !== "all" ? teamDeptFilter : undefined)}
+                          className="mt-3.5 inline-flex items-center gap-2 px-4 py-2 bg-navy text-white text-xs font-semibold rounded-xl hover:bg-navy/90 transition shadow-xs cursor-pointer"
+                        >
+                          <Plus size={14} /> Create First Squad
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearch("");
+                            setTeamDeptFilter("all");
+                          }}
+                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium cursor-pointer"
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+              </div>
+
+              {/* Department Staff Roster: Shows active employees in the filtered department (including multi-dept employees) */}
+              {teamDeptFilter !== "all" && teamDeptFilter !== "dual-dept" && (() => {
+                const deptStaff = eligibleEmployees.filter((emp) => {
+                  const depts = employeeDepartmentMap.get(emp.id) || [emp.department].filter(Boolean);
+                  return depts.includes(teamDeptFilter);
+                });
+                return (
+                  <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
+                    <div className="p-3.5 border-b border-bdr flex flex-wrap items-center justify-between gap-2 bg-off/50">
+                      <div className="flex items-center gap-2">
+                        <Users size={16} className="text-blue-700" />
+                        <span className="text-[13px] font-bold text-slate-800">
+                          Active Workforce in {teamDeptFilter} ({deptStaff.length} Staff)
+                        </span>
+                        <span className="text-[11px] text-muted">
+                          (Staff assigned to {teamDeptFilter} squads or primary department appear here)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!canEditOrg}
+                        onClick={() => handleOpenAddTeam(teamDeptFilter)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-navy text-white text-xs font-semibold rounded-lg hover:bg-navy/90 transition cursor-pointer shadow-xs"
+                      >
+                        <Plus size={13} /> Add Squad for {teamDeptFilter}
+                      </button>
+                    </div>
+                    {deptStaff.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-[12.5px]">
+                          <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
+                            <tr>
+                              <th className="py-2.5 px-4">Employee</th>
+                              <th className="py-2.5 px-4">Code</th>
+                              <th className="py-2.5 px-4">Designation</th>
+                              <th className="py-2.5 px-4">All Active Departments</th>
+                              <th className="py-2.5 px-4">Assigned Squad(s)</th>
+                              <th className="py-2.5 px-4">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-bdr/40">
+                            {deptStaff.map((emp) => {
+                              const depts = employeeDepartmentMap.get(emp.id) || [emp.department].filter(Boolean);
+                              const isDual = depts.length > 1;
+                              const otherDepts = depts.filter((d) => d !== teamDeptFilter);
+                              const empTeams = teams.filter(
+                                (t) =>
+                                  (t.memberIds || []).includes(emp.id) ||
+                                  (t.membersDetail || []).some((m) => m.id === emp.id)
+                              );
+                              return (
+                                <tr key={emp.id} className="hover:bg-off/50 transition">
+                                  <td className="py-3 px-4 font-semibold text-slate-900">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-[11px]">
+                                        {(emp.name || "?").substring(0, 2).toUpperCase()}
+                                      </div>
+                                      <span>{emp.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 font-mono text-muted text-xs">{emp.employeeCode || emp.empId || "—"}</td>
+                                  <td className="py-3 px-4 text-slate-600">{emp.designation || emp.role || "Staff"}</td>
+                                  <td className="py-3 px-4">
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      {depts.map((d) => (
+                                        <span
+                                          key={d}
+                                          className={`px-2 py-0.5 rounded-full text-[10.5px] font-medium ${
+                                            d === teamDeptFilter
+                                              ? "bg-blue-50 text-blue-700 border border-blue-200 font-semibold"
+                                              : "bg-slate-100 text-slate-600"
+                                          }`}
+                                        >
+                                          {d}
+                                        </span>
+                                      ))}
+                                      {isDual && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800" title={`Also active in ${otherDepts.join(", ")}`}>
+                                          Dual Dept (also in {otherDepts.join(", ")})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    {empTeams.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {empTeams.map((t) => (
+                                          <span key={t.id} className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[11px] text-slate-700">
+                                            {t.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted text-xs italic">No squad assigned</span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      {emp.status || "Active"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center text-xs text-muted">
+                        No employees currently assigned to {teamDeptFilter}. Create a squad or assign employees to register them in this department.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
-          </div>
+          )}
+
+          {/* VIEW MODE 2: DEPARTMENT-WISE VIEW */}
+          {teamViewMode === "by-dept" && (
+            <div className="flex flex-col gap-5">
+              {departmentsList
+                .filter((d) => teamDeptFilter === "all" || teamDeptFilter === "dual-dept" || d === teamDeptFilter)
+                .map((deptName) => {
+                  const deptSquads = teams.filter(
+                    (t) => (t.dept || t.department) === deptName || t.secondaryDept === deptName
+                  );
+                  const deptStaff = eligibleEmployees.filter((emp) => {
+                    const depts = employeeDepartmentMap.get(emp.id) || [emp.department].filter(Boolean);
+                    return depts.includes(deptName);
+                  });
+                  const deptDualStaff = deptStaff.filter(
+                    (emp) => (employeeDepartmentMap.get(emp.id) || []).length > 1
+                  );
+
+                  if (teamDeptFilter === "dual-dept" && deptDualStaff.length === 0) return null;
+
+                  return (
+                    <div key={deptName} className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
+                      {/* Department Section Header */}
+                      <div className="p-4 bg-off/60 border-b border-bdr flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 border border-blue-200 flex items-center justify-center font-bold">
+                            <Building2 size={18} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-bold text-[15px] text-slate-900">{deptName}</h3>
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                {deptSquads.length} {deptSquads.length === 1 ? "Squad" : "Squads"}
+                              </span>
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                {deptStaff.length} Staff Members
+                              </span>
+                              {deptDualStaff.length > 0 && (
+                                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {deptDualStaff.length} Dual-Dept Staff
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11.5px] text-muted mt-0.5">
+                              Operational squads &amp; workforce for {deptName}. Employees active in multiple departments have entries present here and in their co-departments.
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={!canEditOrg}
+                          onClick={() => handleOpenAddTeam(deptName)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-navy text-white text-xs font-semibold rounded-xl hover:bg-navy/90 transition shadow-xs cursor-pointer"
+                        >
+                          <Plus size={14} /> Create Squad for {deptName}
+                        </button>
+                      </div>
+
+                      {/* Department Squads Grid */}
+                      <div className="p-4 border-b border-bdr/60">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                            <Layers size={13} className="text-blue-700" />
+                            <span>{deptName} Squads ({deptSquads.length})</span>
+                          </h4>
+                          <span className="text-[11px] text-muted">
+                            {deptSquads.length > 0 ? "Active teams under this department" : "No squads created yet"}
+                          </span>
+                        </div>
+                        {deptSquads.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {deptSquads.map((squad) => {
+                              const count = Number(squad.memberCount ?? squad.headcount ?? (Array.isArray(squad.membersDetail) ? squad.membersDetail.length : squad.members)) || 0;
+                              return (
+                                <div key={squad.id} className="p-3.5 rounded-xl border border-bdr bg-white hover:border-slate-300 transition shadow-2xs">
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div>
+                                      <div className="font-bold text-[13.5px] text-slate-900">{squad.name}</div>
+                                      <span className="font-mono text-[11px] text-muted">{squad.code || squad.id}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenViewTeamDetails(squad)}
+                                      className="text-xs text-blue-700 hover:underline font-semibold cursor-pointer"
+                                    >
+                                      View Roster
+                                    </button>
+                                  </div>
+                                  <div className="text-xs text-slate-600 flex flex-col gap-1 mt-2 pt-2 border-t border-bdr/50">
+                                    <div className="flex justify-between">
+                                      <span className="text-muted">Lead:</span>
+                                      <span className="font-medium text-slate-800">{squad.lead || squad.leadName || "Unassigned"}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-muted">Approver:</span>
+                                      <span className="font-medium text-slate-800">{squad.approver || squad.approverName || "Unassigned"}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-muted">Headcount:</span>
+                                      <span className="font-semibold text-slate-800">{count} members</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-xl border border-dashed border-bdr text-center text-xs text-muted">
+                            No squads created for {deptName} yet. Click &quot;Create Squad for {deptName}&quot; above to organize this department.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Department Workforce List */}
+                      <div className="p-4 bg-off/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                            <Users size={13} className="text-blue-700" />
+                            <span>Active Workforce in {deptName} ({deptStaff.length})</span>
+                          </h4>
+                          <span className="text-[11px] text-muted">
+                            Staff with multiple departments are listed in both department sections
+                          </span>
+                        </div>
+                        {deptStaff.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            {deptStaff.map((emp) => {
+                              const depts = employeeDepartmentMap.get(emp.id) || [emp.department].filter(Boolean);
+                              const isDual = depts.length > 1;
+                              const otherDepts = depts.filter((d) => d !== deptName);
+                              return (
+                                <div key={emp.id} className="p-2.5 rounded-xl border border-bdr bg-white flex items-center justify-between gap-2 shadow-2xs">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs shrink-0">
+                                      {(emp.name || "?").substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-slate-900 text-[12.5px] truncate">{emp.name}</div>
+                                      <div className="text-[11px] text-muted truncate">
+                                        {emp.designation || emp.role || "Staff"} • {emp.employeeCode || emp.empId || ""}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="shrink-0 text-right">
+                                    {isDual ? (
+                                      <span
+                                        className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 block"
+                                        title={`Active in ${deptName} and ${otherDepts.join(", ")}`}
+                                      >
+                                        Also in {otherDepts[0]}
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 block">
+                                        {deptName}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted italic">No employees assigned to this department.</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
 
@@ -2966,27 +3797,21 @@ export default function HRAdminPage({ defaultTab }) {
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
-                              onClick={() => {
-                                setActiveOfferLetter(o);
-                                setIsOfferLetterModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1 btn-primary h-8 px-3 rounded-xl text-xs font-semibold border border-emerald-200 transition cursor-pointer"
-                              title="View / Edit Offer Letter & Print PDF"
+                              onClick={() => handleEditOfferLetter(o)}
+                              className="inline-flex items-center gap-1 btn-primary h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs"
+                              title="Edit Offer Letter Details"
                             >
-                              <FileCheck2 size={13} />
-                              <span>Letter &amp; PDF</span>
+                              <Edit size={13} />
+                              <span>Edit</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => {
-                                setActiveOfferLetter(o);
-                                setIsOfferLetterModalOpen(true);
-                                setTimeout(() => window.print(), 350);
-                              }}
-                              className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900 cursor-pointer"
-                              title="Direct Print / Save PDF"
+                              onClick={() => handlePrintOfferLetter(o)}
+                              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer shadow-2xs"
+                              title="Print Official Offer Letter"
                             >
-                              <Printer size={15} />
+                              <Printer size={13} />
+                              <span>Print</span>
                             </button>
                             <button
                               type="button"
@@ -3155,27 +3980,21 @@ export default function HRAdminPage({ defaultTab }) {
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
-                              onClick={() => {
-                                setActiveTerminationLetter(t);
-                                setIsTerminationLetterModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1 btn-danger h-8 px-3 rounded-xl text-xs font-semibold border border-red-200 transition cursor-pointer"
-                              title="View / Edit Termination Letter & Print PDF"
+                              onClick={() => handleEditTermination(t)}
+                              className="inline-flex items-center gap-1 btn-danger h-8 px-3 rounded-xl text-xs font-semibold border border-red-200 transition cursor-pointer shadow-2xs"
+                              title="Edit Separation Details"
                             >
-                              <FileText size={13} />
-                              <span>Letter &amp; PDF</span>
+                              <Edit size={13} />
+                              <span>Edit</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => {
-                                setActiveTerminationLetter(t);
-                                setIsTerminationLetterModalOpen(true);
-                                setTimeout(() => window.print(), 350);
-                              }}
-                              className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900 cursor-pointer"
-                              title="Direct Print / Save PDF"
+                              onClick={() => handlePrintTermination(t)}
+                              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer shadow-2xs"
+                              title="Print Official Termination Letter / Save as PDF"
                             >
-                              <Printer size={15} />
+                              <Printer size={13} />
+                              <span>Print</span>
                             </button>
                             <button
                               type="button"
@@ -3597,7 +4416,15 @@ export default function HRAdminPage({ defaultTab }) {
                           <div className="text-slate-900 font-medium">By: {c.complainant}</div>
                           <div className="text-[11px] text-muted">Target: {c.against}</div>
                         </td>
-                        <td className="py-4 px-5 text-slate-800 font-medium">{c.category}</td>
+                        <td className="py-4 px-5">
+                          <div className="text-slate-800 font-semibold">{c.category}</div>
+                          <div
+                            className="text-[11.5px] text-slate-500 line-clamp-1 max-w-[220px] mt-0.5"
+                            title={c.summary || c.description || c.reason || ""}
+                          >
+                            {c.summary || c.description || c.reason || "No complaint details"}
+                          </div>
+                        </td>
                         <td className="py-4 px-5">
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${
@@ -3615,16 +4442,18 @@ export default function HRAdminPage({ defaultTab }) {
                         <td className="py-4 px-5">
                           <button
                             type="button"
-                            onClick={() => toggleComplaintStatus(c.id)}
-                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border cursor-pointer ${
+                            onClick={() => handleOpenStatusModal(c)}
+                            title="Click to view complaint reason & change status"
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition cursor-pointer shadow-2xs ${
                               c.status === "Resolved"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : c.status === "Under Investigation"
-                                ? "bg-purple-50 text-purple-700 border-purple-200"
-                                : "bg-amber-50 text-amber-700 border-amber-200"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                : c.status === "Under Review" || c.status === "Under Investigation"
+                                ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                                : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
                             }`}
                           >
-                            {c.status}
+                            <span>{c.status || "Open"}</span>
+                            <ChevronDown size={11} className="opacity-70" />
                           </button>
                         </td>
                         <td className="py-4 px-5 text-right">
@@ -3905,32 +4734,349 @@ export default function HRAdminPage({ defaultTab }) {
           VIEW 8: GENERAL ORGANIZATION SETTINGS
          ════════════════════════════════════════════════════════════════ */}
       {activeTab === "settings" && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6">
           {/* Dedicated View Header */}
-          <div className="bg-white border border-bdr rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 border border-slate-200 flex items-center justify-center font-bold">
-                <Settings size={20} />
+          <div className="bg-white border border-bdr rounded-xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-800 border border-slate-200 flex items-center justify-center font-bold shadow-2xs">
+                <Settings size={22} />
               </div>
               <div>
-                <h2 className="text-[15px] font-bold text-slate-900">Enterprise Organization Settings &amp; Governance</h2>
-                <p className="text-[12px] text-muted">
-                  Configure legal profile, standard work week, timezones, fiscal year cycles, sandwich rules, and leave carry-forward limits.
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-[17px] font-bold text-slate-900">Enterprise Organization Settings &amp; Governance</h2>
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Governance Active
+                  </span>
+                </div>
+                <p className="text-[12.5px] text-muted mt-0.5">
+                  Inspect and manage all operational policies, security controls, leave deduction rules, and enterprise parameters running across the organization.
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[12px] font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                8 Active Governance Rules
+            <div className="flex items-center gap-2.5">
+              <span className="text-[12px] font-semibold text-emerald-800 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200 inline-flex items-center gap-2 shadow-2xs">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>{activeRulesCount} of {totalRulesCount} Rules Running</span>
               </span>
+              <button
+                type="button"
+                onClick={() => scrollToRuleField("companyName")}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold border border-slate-300 transition cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+              >
+                <span>Edit Parameters</span>
+                <ArrowRight size={13} />
+              </button>
             </div>
           </div>
 
-          <form onSubmit={handleSaveOrgSettings} className="bg-white border border-bdr rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col gap-6">
+          {/* Quick Metrics Bar: 4 Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex items-center justify-between">
+              <div>
+                <div className="text-[11.5px] font-medium text-muted">Total Governance Rules</div>
+                <div className="text-[20px] font-bold text-slate-900 mt-0.5">{totalRulesCount} Policies</div>
+                <div className="text-[11px] text-muted mt-0.5">Defined enterprise rules</div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200">
+                <Sliders size={20} />
+              </div>
+            </div>
+
+            <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex items-center justify-between">
+              <div>
+                <div className="text-[11.5px] font-medium text-emerald-700">Currently Running / Active</div>
+                <div className="text-[20px] font-bold text-emerald-700 mt-0.5">{activeRulesCount} Active</div>
+                <div className="text-[11px] text-emerald-600 mt-0.5">Enforcing real-time policies</div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
+                <CheckCircle2 size={20} />
+              </div>
+            </div>
+
+            <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex items-center justify-between">
+              <div>
+                <div className="text-[11.5px] font-medium text-amber-700">Paused / Inactive</div>
+                <div className="text-[20px] font-bold text-amber-700 mt-0.5">{inactiveRulesCount} Inactive</div>
+                <div className="text-[11px] text-muted mt-0.5">Disabled or custom</div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200">
+                <AlertCircle size={20} />
+              </div>
+            </div>
+
+            <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex items-center justify-between">
+              <div>
+                <div className="text-[11.5px] font-medium text-blue-700">Department Schedules</div>
+                <div className="text-[20px] font-bold text-slate-900 mt-0.5">{departmentsConfig.length} Depts</div>
+                <div className="text-[11px] text-muted mt-0.5">Custom work days &amp; hours</div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200">
+                <Building2 size={20} />
+              </div>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════
+              INTERACTIVE GOVERNANCE RULES DIRECTORY (RUNNING & CONFIGURED)
+             ══════════════════════════════════════════════════════════════ */}
+          <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col gap-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-bdr">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-[16px] font-bold text-slate-900">All Organization Rules &amp; Governance Engine</h3>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    {filteredGovernanceRules.length} Rules Shown
+                  </span>
+                </div>
+                <p className="text-[12px] text-muted mt-0.5">
+                  View all active rules running across attendance, security, leave deductions, approval workflows, and operational schedules.
+                </p>
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setRuleFilterStatus("all")}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                    ruleFilterStatus === "all" ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All Rules ({totalRulesCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRuleFilterStatus("active")}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                    ruleFilterStatus === "active" ? "bg-white text-emerald-800 shadow-2xs font-semibold" : "text-slate-600 hover:text-emerald-700"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  Running ({activeRulesCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRuleFilterStatus("inactive")}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                    ruleFilterStatus === "inactive" ? "bg-white text-amber-800 shadow-2xs font-semibold" : "text-slate-600 hover:text-amber-700"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  Paused ({inactiveRulesCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Search and Category Filter Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[260px]">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search rules by name, scope, or keywords..."
+                  value={ruleSearchQuery}
+                  onChange={(e) => setRuleSearchQuery(e.target.value)}
+                  className="w-full h-10 pl-9 pr-8 rounded-xl border border-bdr text-[12.5px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                />
+                {ruleSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setRuleSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-slate-700 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-700 hidden sm:inline">Category:</span>
+                <select
+                  value={ruleFilterCategory}
+                  onChange={(e) => setRuleFilterCategory(e.target.value)}
+                  className="h-10 px-3 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition font-medium"
+                >
+                  <option value="all">All Categories ({totalRulesCount})</option>
+                  <option value="Attendance & Leaves">Attendance &amp; Leaves</option>
+                  <option value="Security & Access">Security &amp; Access</option>
+                  <option value="Workflow & Delegation">Workflow &amp; Delegation</option>
+                  <option value="Operations & Schedule">Operations &amp; Schedule</option>
+                  <option value="Hiring & Onboarding">Hiring &amp; Onboarding</option>
+                  <option value="Separations & Exits">Separations &amp; Exits</option>
+                  <option value="Compliance & Payroll">Compliance &amp; Payroll</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Rules Cards Grid */}
+            {filteredGovernanceRules.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center justify-center gap-2">
+                <Sliders size={28} className="text-muted" />
+                <h4 className="text-[14px] font-bold text-slate-800">No Governance Rules Match Filter</h4>
+                <p className="text-xs text-muted max-w-md">
+                  No rules matched your current search &quot;{ruleSearchQuery}&quot; or selected category.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRuleSearchQuery("");
+                    setRuleFilterStatus("all");
+                    setRuleFilterCategory("all");
+                  }}
+                  className="mt-2 text-xs font-semibold text-navy hover:underline cursor-pointer"
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredGovernanceRules.map((rule) => {
+                  const RuleIcon = rule.icon || Sliders;
+                  return (
+                    <div
+                      key={rule.id}
+                      className={`rounded-xl border p-4.5 flex flex-col justify-between gap-3.5 transition-all shadow-xs ${
+                        rule.isActive
+                          ? "bg-white border-slate-200 hover:border-slate-300"
+                          : "bg-slate-50/70 border-slate-200 opacity-80"
+                      }`}
+                    >
+                      {/* Top Row: Icon + Title + Status */}
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold shrink-0 ${rule.badgeBg || "bg-slate-100 text-slate-700 border-slate-200"}`}>
+                              <RuleIcon size={18} />
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                                {rule.category}
+                              </span>
+                              <h4 className="font-bold text-[13.5px] text-slate-900 leading-snug">
+                                {rule.name}
+                              </h4>
+                            </div>
+                          </div>
+                          {rule.isActive ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Running
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-300 shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                              Paused
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Description */}
+                        <p className="text-[12px] text-slate-600 leading-relaxed min-h-[36px]">
+                          {rule.description}
+                        </p>
+                      </div>
+
+                      {/* Enforced Scope & Parameter Box */}
+                      <div className="flex flex-col gap-1.5 bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 text-xs">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-muted">Target Scope:</span>
+                          <span className="font-semibold text-slate-800 text-right">{rule.scope}</span>
+                        </div>
+                        <div className="flex items-start justify-between text-[11px] pt-1 border-t border-slate-200/60">
+                          <span className="text-muted shrink-0">Enforced Value:</span>
+                          <span className="font-medium text-slate-900 text-right pl-2 leading-tight">
+                            {rule.parameter}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        {rule.isToggleable ? (
+                          <>
+                            <span className="text-[11px] font-medium text-muted">Live Execution</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleGovernanceRule(rule.toggleKey, rule.isActive)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11.5px] font-semibold transition cursor-pointer border shadow-2xs ${
+                                rule.isActive
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                                  : "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200"
+                              }`}
+                              title={rule.isActive ? "Click to deactivate rule" : "Click to activate rule"}
+                            >
+                              {rule.isActive ? (
+                                <>
+                                  <ToggleRight size={17} className="text-emerald-600" />
+                                  <span>Active (Click to Pause)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ToggleLeft size={17} className="text-slate-400" />
+                                  <span>Paused (Click to Enable)</span>
+                                </>
+                              )}
+                            </button>
+                          </>
+                        ) : rule.actionTab ? (
+                          <>
+                            <span className="text-[11px] font-medium text-muted">Dedicated Hub</span>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab(rule.actionTab)}
+                              className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-navy hover:text-navy/80 hover:underline cursor-pointer"
+                            >
+                              <span>{rule.actionLabel || "Manage"}</span>
+                              <ArrowRight size={13} />
+                            </button>
+                          </>
+                        ) : rule.configTarget ? (
+                          <>
+                            <span className="text-[11px] font-medium text-muted">Enterprise Parameter</span>
+                            <button
+                              type="button"
+                              onClick={() => scrollToRuleField(rule.configTarget)}
+                              className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-slate-700 hover:text-navy hover:underline cursor-pointer"
+                            >
+                              <span>Configure Value</span>
+                              <Edit size={11} />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════
+              ENTERPRISE PARAMETERS & CONFIGURATION FORM
+             ══════════════════════════════════════════════════════════════ */}
+          <form onSubmit={handleSaveOrgSettings} className="bg-white border border-bdr rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col gap-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-bdr">
+              <div>
+                <h3 className="text-[16px] font-bold text-slate-900">Legal Profile &amp; Enterprise Parameters</h3>
+                <p className="text-[12px] text-muted">
+                  Update primary corporate parameters. Changes are immediately reflected across governance rules and employee workflows.
+                </p>
+              </div>
+              <button
+                type="submit"
+                className="h-9 px-5 bg-navy text-white rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer inline-flex items-center gap-2"
+              >
+                <CheckCircle2 size={15} />
+                <span>Save Organization Settings</span>
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Legal Company Name</label>
                 <input
+                  id="org-input-companyName"
                   type="text"
                   value={orgSettings.companyName}
                   onChange={(e) => setOrgSettings({ ...orgSettings, companyName: e.target.value })}
@@ -3940,6 +5086,7 @@ export default function HRAdminPage({ defaultTab }) {
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Default Work Week</label>
                 <select
+                  id="org-input-workWeek"
                   value={orgSettings.workWeek}
                   onChange={(e) => setOrgSettings({ ...orgSettings, workWeek: e.target.value })}
                   className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition"
@@ -3952,6 +5099,7 @@ export default function HRAdminPage({ defaultTab }) {
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Primary Office Timezone</label>
                 <select
+                  id="org-input-timezone"
                   value={orgSettings.timezone}
                   onChange={(e) => setOrgSettings({ ...orgSettings, timezone: e.target.value })}
                   className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition"
@@ -3965,6 +5113,7 @@ export default function HRAdminPage({ defaultTab }) {
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Fiscal Year Start</label>
                 <select
+                  id="org-input-fiscalYearStart"
                   value={orgSettings.fiscalYearStart}
                   onChange={(e) => setOrgSettings({ ...orgSettings, fiscalYearStart: e.target.value })}
                   className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition"
@@ -3978,6 +5127,7 @@ export default function HRAdminPage({ defaultTab }) {
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Standard Probation Period</label>
                 <input
+                  id="org-input-probationPeriod"
                   type="text"
                   value={orgSettings.probationPeriod}
                   onChange={(e) => setOrgSettings({ ...orgSettings, probationPeriod: e.target.value })}
@@ -3987,6 +5137,7 @@ export default function HRAdminPage({ defaultTab }) {
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Standard Notice Period</label>
                 <input
+                  id="org-input-noticePeriod"
                   type="text"
                   value={orgSettings.noticePeriod}
                   onChange={(e) => setOrgSettings({ ...orgSettings, noticePeriod: e.target.value })}
@@ -3998,6 +5149,7 @@ export default function HRAdminPage({ defaultTab }) {
             <div className="pt-4 border-t border-bdr flex flex-col gap-3">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
+                  id="org-input-allowEmployeeDelegation"
                   type="checkbox"
                   checked={orgSettings.allowEmployeeDelegation}
                   onChange={(e) => setOrgSettings({ ...orgSettings, allowEmployeeDelegation: e.target.checked })}
@@ -4009,6 +5161,7 @@ export default function HRAdminPage({ defaultTab }) {
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
+                  id="org-input-requireTwoFactorForAdmin"
                   type="checkbox"
                   checked={orgSettings.requireTwoFactorForAdmin}
                   onChange={(e) => setOrgSettings({ ...orgSettings, requireTwoFactorForAdmin: e.target.checked })}
@@ -4020,13 +5173,30 @@ export default function HRAdminPage({ defaultTab }) {
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
+                  id="org-input-sandwichRuleEnabled"
                   type="checkbox"
                   checked={orgSettings.sandwichRuleEnabled ?? true}
-                  onChange={(e) => setOrgSettings({ ...orgSettings, sandwichRuleEnabled: e.target.checked })}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setOrgSettings({ ...orgSettings, sandwichRuleEnabled: checked });
+                    if (typeof toggleSandwichRule === "function") toggleSandwichRule(checked);
+                  }}
                   className="w-4 h-4 rounded text-navy focus:ring-navy cursor-pointer"
                 />
                 <span className="text-[13px] text-slate-800">
                   Enforce Sandwich Rule: Holidays and weekly offs falling between leave days count as consumed leaves
+                </span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  id="org-input-gracePeriodEnabled"
+                  type="checkbox"
+                  checked={orgSettings.gracePeriodEnabled ?? true}
+                  onChange={(e) => setOrgSettings({ ...orgSettings, gracePeriodEnabled: e.target.checked })}
+                  className="w-4 h-4 rounded text-navy focus:ring-navy cursor-pointer"
+                />
+                <span className="text-[13px] text-slate-800">
+                  Enforce Attendance Grace Period: 15-minute tolerance window for employee punch-ins before late-entry deductions
                 </span>
               </label>
               <div className="flex items-center gap-3 pt-2">
@@ -4035,6 +5205,7 @@ export default function HRAdminPage({ defaultTab }) {
                 </label>
                 <div className="flex items-center gap-2">
                   <input
+                    id="org-input-maxCarryForwardDays"
                     type="number"
                     min="0"
                     max="180"
@@ -4101,32 +5272,10 @@ export default function HRAdminPage({ defaultTab }) {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                disabled={!canEditOrg}
-                title={canEditOrg ? "Reset to defaults" : "Requires edit_staff permission"}
-                onClick={() => {
-                  if (!canEditOrg) {
-                    showToast("You do not have permission to change the work schedule (edit_staff required)", "error");
-                    return;
-                  }
-                  resetDepartmentWorkingDays();
-                  showToast("Reset all departments to standard 24 working days and 8 hours/day");
-                }}
-                className="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-[12.5px] font-medium hover:bg-slate-50 transition shadow-2xs cursor-pointer"
-              >
-                Reset Defaults (24d • 8h)
-              </button>
-              <Link
-                to="/hrms/payroll"
-                style={{ color: '#ffffff', backgroundColor: '#1F2E4A' }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy text-white !text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
-              >
-                <Receipt size={14} className="text-white" style={{ color: '#ffffff' }} />
-                <span className="text-white font-semibold" style={{ color: '#ffffff' }}>Open Payroll Management</span>
-                <ArrowRight size={13} className="text-white" style={{ color: '#ffffff' }} />
-              </Link>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                {departmentsConfig.length} Operational Departments Configured
+              </span>
             </div>
           </div>
 
@@ -4636,13 +5785,11 @@ export default function HRAdminPage({ defaultTab }) {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleOpenAddAnnouncement}
-              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
-            >
-              <Plus size={16} /> Publish Announcement
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
+                {announcements.length} Published Notices • {announcements.filter((a) => a.is_pinned).length} Pinned
+              </span>
+            </div>
           </div>
 
           {/* Search & Priority Filter Toolbar */}
@@ -4854,13 +6001,11 @@ export default function HRAdminPage({ defaultTab }) {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsTravelModalOpen(true)}
-              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
-            >
-              <Plus size={16} /> Request Travel Approval
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-sky-800 bg-sky-50 px-3 py-1.5 rounded-lg border border-sky-200">
+                {travelRequests.length} Total Requests • {travelRequests.filter((t) => (t.status || "").toLowerCase() === "approved").length} Approved
+              </span>
+            </div>
           </div>
 
           {/* Search & Status Filter Toolbar */}
@@ -5104,31 +6249,52 @@ export default function HRAdminPage({ defaultTab }) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Department</label>
-                <select
-                  value={newTeam.departmentId || newTeam.dept}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const foundDept = departmentsConfig.find((d) => d.id === val || d.name === val);
-                    setNewTeam({
-                      ...newTeam,
-                      dept: foundDept ? foundDept.name : val,
-                      departmentId: foundDept ? foundDept.id : "",
-                    });
-                  }}
-                  className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition"
-                >
-                  <option value="">Select Department...</option>
-                  {departmentsList.map((deptName) => {
-                    const dObj = departmentsConfig.find((d) => d.name === deptName);
-                    return (
-                      <option key={deptName} value={dObj?.id || deptName}>
-                        {deptName}
-                      </option>
-                    );
-                  })}
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Primary Department *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    list="team-primary-dept-list"
+                    placeholder="e.g. Accounts & Finance"
+                    value={newTeam.dept}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const foundDept = departmentsConfig.find((d) => d.name === val || d.id === val);
+                      setNewTeam({
+                        ...newTeam,
+                        dept: val,
+                        departmentId: foundDept ? foundDept.id : "",
+                      });
+                    }}
+                    className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                  />
+                  <datalist id="team-primary-dept-list">
+                    {departmentsList.map((deptName) => (
+                      <option key={deptName} value={deptName} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Co-Department <span className="text-[11px] text-muted font-normal">(Optional cross-dept)</span>
+                  </label>
+                  <input
+                    type="text"
+                    list="team-secondary-dept-list"
+                    placeholder="e.g. Operations"
+                    value={newTeam.secondaryDept || ""}
+                    onChange={(e) => setNewTeam({ ...newTeam, secondaryDept: e.target.value })}
+                    className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                  />
+                  <datalist id="team-secondary-dept-list">
+                    {departmentsList.filter((d) => d !== newTeam.dept).map((deptName) => (
+                      <option key={deptName} value={deptName} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -5263,17 +6429,40 @@ export default function HRAdminPage({ defaultTab }) {
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                            {emp.department && (
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                  isDeptMatch
-                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                    : "bg-slate-100 text-slate-600"
-                                }`}
-                              >
-                                {emp.department}
-                              </span>
-                            )}
+                            {(() => {
+                              const empDepts = employeeDepartmentMap.get(emp.id) || [emp.department].filter(Boolean);
+                              const isDual = empDepts.length > 1;
+                              const isCrossDeptAssignment = newTeam.dept && !empDepts.includes(newTeam.dept);
+                              return (
+                                <div className="flex flex-wrap items-center gap-1 justify-end">
+                                  {empDepts.map((d) => (
+                                    <span
+                                      key={d}
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                        d === newTeam.dept || d === newTeam.secondaryDept
+                                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                          : "bg-slate-100 text-slate-600"
+                                      }`}
+                                    >
+                                      {d}
+                                    </span>
+                                  ))}
+                                  {isDual && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-purple-100 text-purple-800">
+                                      Dual Dept
+                                    </span>
+                                  )}
+                                  {isAssigned && isCrossDeptAssignment && (
+                                    <span
+                                      className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-100 text-emerald-800"
+                                      title={`Will be entered in both ${empDepts.join(', ')} and ${newTeam.dept}`}
+                                    >
+                                      In both depts
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </label>
                       );
@@ -5429,11 +6618,15 @@ export default function HRAdminPage({ defaultTab }) {
                       className="h-9 flex-1 px-3 text-xs rounded-xl border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy transition cursor-pointer"
                     >
                       <option value="">Select an active employee to add to this squad...</option>
-                      {availableEmployeesToAdd.map((emp) => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.name} ({emp.employeeCode || emp.empId || "Staff"}) — {emp.department || "No Dept"}
-                        </option>
-                      ))}
+                      {availableEmployeesToAdd.map((emp) => {
+                        const depts = employeeDepartmentMap.get(emp.id) || [emp.department].filter(Boolean);
+                        const isCross = activeTeamDetails.dept && !depts.includes(activeTeamDetails.dept);
+                        return (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.name} ({emp.employeeCode || emp.empId || "Staff"}) — Dept: {depts.join(", ") || "No Dept"}{isCross ? ` (Will also be entered in ${activeTeamDetails.dept})` : ""}
+                          </option>
+                        );
+                      })}
                     </select>
                     <button
                       type="submit"
@@ -5461,24 +6654,49 @@ export default function HRAdminPage({ defaultTab }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-bdr/50">
-                        {rosterMembers.map((member) => (
-                          <tr key={member.id} className="hover:bg-off/60 transition">
-                            <td className="py-2.5 px-3.5">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-[10px] shrink-0">
-                                  {(member.name || "?").substring(0, 2).toUpperCase()}
+                        {rosterMembers.map((member) => {
+                          const depts = employeeDepartmentMap.get(member.id) || [member.department].filter(Boolean);
+                          const isDual = depts.length > 1;
+                          return (
+                            <tr key={member.id} className="hover:bg-off/60 transition">
+                              <td className="py-2.5 px-3.5">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                    {(member.name || "?").substring(0, 2).toUpperCase()}
+                                  </div>
+                                  <span className="font-semibold text-slate-800">{member.name}</span>
                                 </div>
-                                <span className="font-semibold text-slate-800">{member.name}</span>
-                              </div>
-                            </td>
-                            <td className="py-2.5 px-3.5 font-mono text-muted">{member.employeeCode || "—"}</td>
-                            <td className="py-2.5 px-3.5 text-slate-600">{member.department || "—"}</td>
-                            <td className="py-2.5 px-3.5 text-slate-600">{member.designation || "Staff"}</td>
-                            <td className="py-2.5 px-3.5">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                {member.status || "Active"}
-                              </span>
-                            </td>
+                              </td>
+                              <td className="py-2.5 px-3.5 font-mono text-muted">{member.employeeCode || "—"}</td>
+                              <td className="py-2.5 px-3.5">
+                                <div className="flex flex-col gap-0.5 items-start">
+                                  <div className="flex flex-wrap gap-1">
+                                    {depts.map((d) => (
+                                      <span
+                                        key={d}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                          d === activeTeamDetails.dept || d === activeTeamDetails.secondaryDept
+                                            ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                            : "bg-slate-100 text-slate-600"
+                                        }`}
+                                      >
+                                        {d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  {isDual && (
+                                    <span className="text-[9.5px] text-purple-700 font-semibold">
+                                      Dual Department
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3.5 text-slate-600">{member.designation || "Staff"}</td>
+                              <td className="py-2.5 px-3.5">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {member.status || "Active"}
+                                </span>
+                              </td>
                             {canEditOrg && (
                               <td className="py-2.5 px-3.5 text-right">
                                 <button
@@ -5493,7 +6711,8 @@ export default function HRAdminPage({ defaultTab }) {
                               </td>
                             )}
                           </tr>
-                        ))}
+                        );
+                      })}
                       </tbody>
                     </table>
                   </div>
@@ -5659,38 +6878,142 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
             <form onSubmit={handleCreateTermination} className="flex flex-col gap-4">
               {/* Quick Select Employee from Directory */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700">
-                  Select Employee (Auto-fills from Staff Directory)
-                </label>
-                <select
-                  value={newTermination.employeeId || ""}
-                  onChange={(e) => {
-                    const emp = employees.find((x) => x.id === e.target.value);
-                    if (emp) {
-                      setNewTermination({
-                        ...newTermination,
-                        employee: emp.name,
-                        employeeId: emp.employeeCode || emp.empId || emp.employee_code || emp.id,
-                        dept: emp.department || newTermination.dept,
-                        role: emp.designation || newTermination.role,
-                      });
-                    }
-                  }}
-                  className="h-10 w-full px-3 rounded-xl border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy cursor-pointer transition"
-                >
-                  <option value="">-- Choose active staff member (or enter below) --</option>
-                  {employees.map((emp) => {
-                    const code = emp.employeeCode || emp.empId || emp.employee_code || "Staff";
-                    const desig = emp.designation || "Staff";
-                    const dept = emp.department || "General";
-                    return (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({code}) — {desig} ({dept})
-                      </option>
-                    );
-                  })}
-                </select>
+              <div
+                ref={terminationEmpDropdownRef}
+                className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 relative"
+              >
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Select Employee (Auto-fills from Staff Directory)
+                  </label>
+                  {newTermination.employee && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewTermination({
+                          ...newTermination,
+                          employee: "",
+                          employeeId: "",
+                          dept: "",
+                          role: "",
+                        });
+                        setTerminationEmpSearch("");
+                      }}
+                      className="text-[11px] text-red-600 hover:underline font-medium cursor-pointer"
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+
+                {/* Selected Employee Preview or Search Input */}
+                {newTermination.employee && !isTerminationEmpDropdownOpen ? (
+                  <div className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                        {newTermination.employee.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-[13px] text-slate-900 truncate">
+                            {newTermination.employee}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-700 font-semibold shrink-0">
+                            {newTermination.employeeId}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 truncate">
+                          {newTermination.role || "Staff"} • {newTermination.dept || "General"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTerminationEmpSearch("");
+                        setIsTerminationEmpDropdownOpen(true);
+                      }}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-2.5 py-1 rounded-lg hover:bg-indigo-50 transition cursor-pointer shrink-0 ml-2"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="relative">
+                      <Search
+                        size={14}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search employee by name, ID, or department..."
+                        value={terminationEmpSearch}
+                        onChange={(e) => {
+                          setTerminationEmpSearch(e.target.value);
+                          setIsTerminationEmpDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsTerminationEmpDropdownOpen(true)}
+                        className="h-10 w-full pl-9 pr-8 rounded-xl border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-indigo-500 transition placeholder:text-slate-400 shadow-2xs"
+                      />
+                      {terminationEmpSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setTerminationEmpSearch("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    {isTerminationEmpDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100 z-50">
+                        {filteredTerminationEmployees.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-500">
+                            No employees match "{terminationEmpSearch}"
+                          </div>
+                        ) : (
+                          filteredTerminationEmployees.map((emp) => {
+                            const code = emp.employeeCode || emp.empId || emp.employee_code || "Staff";
+                            const desig = emp.designation || "Staff";
+                            const dept = emp.department || "General";
+                            return (
+                              <button
+                                key={emp.id}
+                                type="button"
+                                onClick={() => {
+                                  setNewTermination({
+                                    ...newTermination,
+                                    employee: emp.name,
+                                    employeeId: code !== "Staff" ? code : emp.id,
+                                    dept: dept,
+                                    role: desig,
+                                  });
+                                  setTerminationEmpSearch("");
+                                  setIsTerminationEmpDropdownOpen(false);
+                                }}
+                                className="w-full text-left px-3.5 py-2.5 hover:bg-indigo-50/70 flex items-center justify-between gap-2 transition cursor-pointer"
+                              >
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-[13px] text-slate-900 truncate">
+                                    {emp.name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 truncate">
+                                    {desig} • {dept}
+                                  </div>
+                                </div>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-700 font-medium shrink-0">
+                                  {code}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -5746,7 +7069,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <select
                     value={newTermination.terminationType}
                     onChange={(e) => setNewTermination({ ...newTermination, terminationType: e.target.value })}
-                    className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition"
+                    className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-white focus:outline-none focus:border-navy cursor-pointer transition"
                   >
                     <option>Involuntary (Performance)</option>
                     <option>Disciplinary / Breach</option>
@@ -6256,6 +7579,161 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
+      {/* ── Modal: Update Grievance Status with Complaint Reason ── */}
+      {statusChangeComplaint && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-5 sm:p-6 max-h-[95vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-bdr">
+              <div>
+                <span className="text-[11px] font-mono text-muted uppercase tracking-wider block">
+                  Ticket #{statusChangeComplaint.id}
+                </span>
+                <h3 className="font-bold text-[16px] text-slate-900">
+                  Update Grievance Status
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStatusChangeComplaint(null)}
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStatusChange} className="flex flex-col gap-4">
+              {/* Complainant & Incident Meta */}
+              <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Complainant</span>
+                  <span className="font-semibold text-slate-800">
+                    {statusChangeComplaint.complainant || "Anonymous"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Target / Against</span>
+                  <span className="font-semibold text-slate-800">
+                    {statusChangeComplaint.against || "General"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Category</span>
+                  <span className="font-medium text-slate-700">
+                    {statusChangeComplaint.category}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Priority</span>
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      statusChangeComplaint.priority === "High"
+                        ? "bg-red-50 text-red-700 border border-red-200"
+                        : "bg-blue-50 text-blue-700 border border-blue-200"
+                    }`}
+                  >
+                    {statusChangeComplaint.priority}
+                  </span>
+                </div>
+              </div>
+
+              {/* Prominent Reason of Complaint Box */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                  Reason of Complaint / Incident Statement:
+                </label>
+                <div className="p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl text-[13px] text-slate-800 leading-relaxed whitespace-pre-wrap">
+                  {statusChangeComplaint.summary ||
+                    statusChangeComplaint.description ||
+                    statusChangeComplaint.reason ||
+                    "No description provided for this grievance."}
+                </div>
+              </div>
+
+              {/* Status Selection */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Select New Status:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { val: "Open", label: "Open" },
+                    { val: "Under Review", label: "Under Review" },
+                    { val: "Resolved", label: "Resolved" },
+                  ].map((s) => (
+                    <label
+                      key={s.val}
+                      className="cursor-pointer relative"
+                    >
+                      <input
+                        type="radio"
+                        name="grievance_status"
+                        value={s.val}
+                        checked={newComplaintStatus === s.val}
+                        onChange={(e) => setNewComplaintStatus(e.target.value)}
+                        className="peer sr-only"
+                      />
+                      <div
+                        className={`p-2.5 rounded-xl border text-center text-xs font-semibold transition ${
+                          newComplaintStatus === s.val
+                            ? s.val === "Resolved"
+                              ? "bg-emerald-50 border-emerald-500 text-emerald-800 shadow-xs"
+                              : s.val === "Under Review"
+                              ? "bg-purple-50 border-purple-500 text-purple-800 shadow-xs"
+                              : "bg-amber-50 border-amber-500 text-amber-800 shadow-xs"
+                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {s.label}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes / Resolution text */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">
+                  {newComplaintStatus === "Resolved"
+                    ? "Resolution Summary & Actions Taken"
+                    : newComplaintStatus === "Under Review"
+                    ? "Investigation & Review Notes"
+                    : "Notes / Comments (Optional)"}
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder={
+                    newComplaintStatus === "Resolved"
+                      ? "Describe the final outcome and corrective measures..."
+                      : "Describe ongoing review steps or findings..."
+                  }
+                  value={statusChangeNote}
+                  onChange={(e) => setStatusChangeNote(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-[12.5px] bg-white focus:outline-none focus:border-navy transition resize-none placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-bdr">
+                <button
+                  type="button"
+                  onClick={() => setStatusChangeComplaint(null)}
+                  className="h-9 px-4 border border-bdr rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingStatus}
+                  className="h-9 px-4 bg-navy text-white rounded-xl text-xs font-semibold hover:bg-slate-800 disabled:opacity-50 transition cursor-pointer shadow-xs"
+                >
+                  {isUpdatingStatus ? "Updating..." : `Confirm Status: ${newComplaintStatus}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal: Add / Edit Holiday ── */}
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
@@ -6704,17 +8182,27 @@ export default function HRAdminPage({ defaultTab }) {
 
       <TerminationLetterModal
         isOpen={isTerminationLetterModalOpen}
-        onClose={() => setIsTerminationLetterModalOpen(false)}
+        onClose={() => {
+          setIsTerminationLetterModalOpen(false);
+          setTerminationAutoPrint(false);
+        }}
         termination={activeTerminationLetter}
         onUpdateTermination={handleUpdateTermination}
+        initialEdit={terminationInitialEdit}
+        autoPrint={terminationAutoPrint}
       />
 
       {/* ── Modal: Offer Letter Live Editor & PDF ── */}
       <OfferLetterModal
         isOpen={isOfferLetterModalOpen}
-        onClose={() => setIsOfferLetterModalOpen(false)}
+        onClose={() => {
+          setIsOfferLetterModalOpen(false);
+          setOfferLetterAutoPrint(false);
+        }}
         offer={activeOfferLetter}
         onUpdateOffer={handleUpdateOffer}
+        initialEdit={offerLetterInitialEdit}
+        autoPrint={offerLetterAutoPrint}
       />
 
       {/* ── Modal: Publish Announcement ── */}

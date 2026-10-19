@@ -37,6 +37,18 @@ export function Modal({ isOpen, onClose, title, subtitle, children, footer, size
               className="modal-close"
               onClick={onClose}
               aria-label="Close modal"
+              style={{
+                width: 32,
+                height: 32,
+                minWidth: 32,
+                minHeight: 32,
+                padding: 0,
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+              }}
             >
               <X size={18} />
             </button>

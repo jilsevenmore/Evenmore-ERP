@@ -69,16 +69,25 @@ export default function BulkAttendance() {
 
   const [employees, setEmployees] = useState(() => {
     if (storeEmployees && storeEmployees.length > 0) {
-      return storeEmployees.map((e) => ({
-        id: e.id || e.empId,
-        empId: e.empId || e.employeeCode || e.id || "",
-        name: e.name || "Employee",
-        dept: e.department || e.dept || "",
-        location: e.location || e.workLocation || "",
-        shift: e.shift || "General",
-        status: "Not Marked",
-        avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
-      }));
+      const map = new Map();
+      storeEmployees.forEach((e) => {
+        const name = (e.name || "").trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, {
+            id: e.id || e.empId,
+            empId: e.empId || e.employeeCode || e.id || "",
+            name: e.name || "Employee",
+            dept: e.department || e.dept || "",
+            location: e.location || e.workLocation || "",
+            shift: e.shift || "General",
+            status: "Not Marked",
+            avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
+          });
+        }
+      });
+      return Array.from(map.values());
     }
     return [];
   });
@@ -135,8 +144,19 @@ export default function BulkAttendance() {
 
       const allEmps = emps && emps.length > 0 ? emps : [];
       if (allEmps.length > 0) {
+        const uniqueEmpsMap = new Map();
+        allEmps.forEach((emp) => {
+          const name = (emp.name || "").trim();
+          if (!name) return;
+          const key = name.toLowerCase();
+          if (!uniqueEmpsMap.has(key)) {
+            uniqueEmpsMap.set(key, emp);
+          }
+        });
+        const dedupedEmps = Array.from(uniqueEmpsMap.values());
+
         setEmployees(
-          allEmps.map((emp) => {
+          dedupedEmps.map((emp) => {
             const att =
               byEmp.get(String(emp.id)) ||
               byEmp.get(String(emp.empId)) ||

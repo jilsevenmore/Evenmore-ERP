@@ -3,7 +3,6 @@ import {
   Calendar as CalendarIcon,
   Plus,
   Search,
-  Download,
   Filter,
   RotateCcw,
   Sparkles,
@@ -18,7 +17,6 @@ import {
   generateMonthGrid,
   generateWeekDays,
   getQuarterInfo,
-  exportEventsToICS,
   isEventOnDate,
 } from "./calendarUtils";
 
@@ -203,11 +201,6 @@ export function CalendarPage() {
     showToast(target ? `Deleted "${target.title}"` : "Event deleted");
   };
 
-  const handleExport = () => {
-    exportEventsToICS(filteredEvents, `HRMS-Calendar-${MONTH_NAMES[activeMonth]}-${activeYear}`);
-    showToast("Calendar (.ics) downloaded successfully");
-  };
-
   const handleResetDefaults = () => {
     if (confirm("Discard unsaved local changes and reload calendar events from the server?")) {
       resetToDefaults();
@@ -247,17 +240,6 @@ export function CalendarPage() {
               </button>
             ))}
           </div>
-
-          {/* Export to ICS button */}
-          <button
-            type="button"
-            onClick={handleExport}
-            className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold hover:bg-card-hover transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5"
-            title="Export calendar to iCal (.ics) for Google/Outlook Calendar"
-          >
-            <Download size={15} />
-            Export (.ics)
-          </button>
 
           {/* Add Event Button */}
           <button

@@ -150,7 +150,7 @@ export const PurchaseBillsPage = () => {
     const getBillRelatedDocs = (b) => {
         const docs = [];
         const poNum = b.poRef || b.linkedPo;
-        const linkedPo = purchaseOrders.find((p) => p.poNumber === poNum || p.id === b.purchaseOrderId);
+        const linkedPo = purchaseOrders.find((p) => (poNum && p.poNumber === poNum) || (b.purchaseOrderId && p.id === b.purchaseOrderId) || (b.purchaseOrder && p.id === b.purchaseOrder) || (b.purchase_order && p.id === b.purchase_order));
         if (linkedPo) {
             docs.push({
                 type: 'Purchase Order',
@@ -203,14 +203,15 @@ export const PurchaseBillsPage = () => {
             width: '18%',
             render: (b) => {
                 const poNum = b.poRef || b.linkedPo;
-                const linkedPo = purchaseOrders.find((p) => p.poNumber === poNum || p.id === b.purchaseOrderId);
+                const linkedPo = purchaseOrders.find((p) => (poNum && p.poNumber === poNum) || (b.purchaseOrderId && p.id === b.purchaseOrderId) || (b.purchaseOrder && p.id === b.purchaseOrder) || (b.purchase_order && p.id === b.purchase_order));
+                const displayPoNum = poNum || linkedPo?.poNumber;
                 let matchBadge = {
                     label: 'Direct Entry',
                     bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
                 };
                 if (linkedPo) {
                     const poItemsCount = linkedPo.items?.reduce((acc, it) => acc + it.qty, 0) || 0;
-                    const billItemsCount = b.items?.reduce((acc, it) => acc + it.qty, 0) || 0;
+                    const billItemsCount = (b.items || b.lineItems)?.reduce((acc, it) => acc + it.qty, 0) || 0;
                     if (poItemsCount === billItemsCount && Math.abs((linkedPo.amount || 0) - (b.amount || b.total || 0)) < 1) {
                         matchBadge = {
                             label: '3-Way Matched (100%)',
@@ -232,7 +233,7 @@ export const PurchaseBillsPage = () => {
                 }
                 return (
                   <div className="space-y-1">
-                    <span className="font-mono text-text font-semibold block text-xs">{poNum || 'N/A'}</span>
+                    <span className="font-mono text-text font-semibold block text-xs">{displayPoNum || 'N/A'}</span>
                     <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold border ${matchBadge.bg}`}>
                       {matchBadge.label}
                     </span>
@@ -509,7 +510,7 @@ export const PurchaseBillsPage = () => {
                     <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">Billing Details</span>
                     <p className="text-slate-700">Bill Date: <strong>{formatDateDDMMYYYY(selectedBill.billDate || selectedBill.date)}</strong></p>
                     <p className="text-slate-700">Due Date: <strong>{selectedBill.dueDate ? formatDateDDMMYYYY(selectedBill.dueDate) : 'Net 30'}</strong></p>
-                    <p className="text-slate-700">Matched PO: <strong>{selectedBill.poRef || selectedBill.linkedPo || 'Direct Entry'}</strong></p>
+                    <p className="text-slate-700">Matched PO: <strong>{selectedBill.poRef || selectedBill.linkedPo || (purchaseOrders.find(p => p.id === selectedBill.purchaseOrderId || p.id === selectedBill.purchaseOrder || p.id === selectedBill.purchase_order)?.poNumber) || 'Direct Entry'}</strong></p>
                   </div>
                 </div>
               </div>
