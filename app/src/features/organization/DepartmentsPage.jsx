@@ -236,7 +236,7 @@ export function DepartmentsPage() {
               <select value={form.headEmployeeId} onChange={(e) => setForm({ ...form, headEmployeeId: e.target.value })}
                 className={`${inputCls} bg-white`}>
                 <option value="">Not assigned</option>
-                {employees.map((emp) => (
+                {Array.from(new Map(employees.filter((emp) => emp.name).map((emp) => [emp.name.toLowerCase(), emp])).values()).map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {emp.name}{emp.designation ? ` (${emp.designation})` : ''}
                   </option>

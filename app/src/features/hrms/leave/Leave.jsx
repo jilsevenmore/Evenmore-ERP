@@ -100,6 +100,15 @@ export default function Leave() {
     return () => { cancelled = true; };
   }, [needsColleagues]);
   const delegateDirectory = employees.length > 0 ? employees : colleagues;
+  const uniqueEmployeeList = useMemo(() => {
+    const seen = new Set();
+    return (employees || []).filter((e) => {
+      const n = (e.name || "").trim();
+      if (!n || seen.has(n.toLowerCase())) return false;
+      seen.add(n.toLowerCase());
+      return true;
+    }).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [employees]);
   const myEmployeeId = currentUser?.employeeRecordId ? String(currentUser.employeeRecordId) : "";
 
   const calendarEvents = useCalendarStore((s) => s.events || []);
@@ -547,9 +556,9 @@ export default function Leave() {
                   className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13.5px] font-medium text-slate-900 focus:outline-none focus:border-navy"
                 >
                   <option value="">Select employee</option>
-                  {employees.map((emp) => (
+                  {uniqueEmployeeList.map((emp) => (
                     <option key={emp.id} value={emp.name}>
-                      {emp.name} ({emp.department} • {emp.designation})
+                      {emp.name}{emp.department || emp.designation ? ` (${emp.department || ""}${emp.department && emp.designation ? " • " : ""}${emp.designation || ""})` : ""}
                     </option>
                   ))}
                 </select>
@@ -1325,9 +1334,9 @@ export default function Leave() {
                 onChange={(e) => setForm({ ...form, employeeName: e.target.value })}
               >
                 <option value="">Select employee</option>
-                {employees.map((emp) => (
+                {uniqueEmployeeList.map((emp) => (
                   <option key={emp.id} value={emp.name}>
-                    {emp.name} ({emp.department} • {emp.designation})
+                    {emp.name}{emp.department || emp.designation ? ` (${emp.department || ""}${emp.department && emp.designation ? " • " : ""}${emp.designation || ""})` : ""}
                   </option>
                 ))}
               </select>
@@ -1595,9 +1604,9 @@ export default function Leave() {
               onChange={(e) => setEncashForm({ ...encashForm, employeeName: e.target.value })}
             >
               <option value="">Select employee</option>
-              {employees.map((emp) => (
+              {uniqueEmployeeList.map((emp) => (
                 <option key={emp.id} value={emp.name}>
-                  {emp.name} ({emp.department} • {emp.designation})
+                  {emp.name}{emp.department || emp.designation ? ` (${emp.department || ""}${emp.department && emp.designation ? " • " : ""}${emp.designation || ""})` : ""}
                 </option>
               ))}
             </select>
@@ -1694,9 +1703,9 @@ export default function Leave() {
               onChange={(e) => setCompOffForm({ ...compOffForm, employeeName: e.target.value })}
             >
               <option value="">Select employee</option>
-              {employees.map((emp) => (
+              {uniqueEmployeeList.map((emp) => (
                 <option key={emp.id} value={emp.name}>
-                  {emp.name} ({emp.department} • {emp.designation})
+                  {emp.name}{emp.department || emp.designation ? ` (${emp.department || ""}${emp.department && emp.designation ? " • " : ""}${emp.designation || ""})` : ""}
                 </option>
               ))}
             </select>

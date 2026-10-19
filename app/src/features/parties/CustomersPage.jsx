@@ -7,6 +7,7 @@ import { Plus, Users, IndianRupee, ShieldAlert, X, Eye } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Customer360Drawer } from '../../components/common/Customer360Drawer';
 import RecordPartyFundsModal from '../../components/common/RecordPartyFundsModal';
+import { validateEmail, validatePhone } from '../../utils/validators';
 const customerGuide = {
     title: 'Customer Accounts & Statements',
     subtitle: 'Corporate client database, credit risk management, and statement of accounts.',
@@ -28,6 +29,7 @@ export const CustomersPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCust360, setSelectedCust360] = useState(null);
     const [fundsCustomer, setFundsCustomer] = useState(null);
+    const [formError, setFormError] = useState('');
     const [newCust, setNewCust] = useState({
         name: '',
         code: '',
@@ -35,6 +37,7 @@ export const CustomersPage = () => {
         email: '',
         phone: '',
         creditLimit: 0,
+        pmsAdvancePaymentPercentage: 0,
         balance: 0,
         status: 'Active',
     });
@@ -67,7 +70,7 @@ export const CustomersPage = () => {
         {
             header: 'Email / Phone',
             accessor: 'email',
-            width: '22%',
+            width: '20%',
             render: (c) => (
               <div className="text-muted text-xs">
                 <p className="text-text-secondary">{c.email}</p>
@@ -79,7 +82,7 @@ export const CustomersPage = () => {
             header: 'Receivable Balance',
             accessor: 'balance',
             align: 'right',
-            width: '14%',
+            width: '13%',
             render: (c) => {
                 const bal = c.balance ?? 0;
                 return (
@@ -93,12 +96,28 @@ export const CustomersPage = () => {
             header: 'Credit Limit',
             accessor: 'creditLimit',
             align: 'right',
-            width: '12%',
+            width: '11%',
             render: (c) => (
               <span className="font-mono text-muted whitespace-nowrap">
                 {formatCurrency(c.creditLimit ?? 0, { noDecimals: true })}
               </span>
             ),
+        },
+        {
+            header: 'PMS Adv %',
+            accessor: 'pmsAdvancePaymentPercentage',
+            align: 'center',
+            width: '10%',
+            render: (c) => {
+                const pct = Number(c.pmsAdvancePaymentPercentage ?? c.pms_advance_payment_percentage ?? 0);
+                return pct > 0 ? (
+                  <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-800 whitespace-nowrap">
+                    {pct}%
+                  </span>
+                ) : (
+                  <span className="text-muted text-xs">—</span>
+                );
+            },
         },
         {
             header: 'Status',
@@ -140,20 +159,40 @@ export const CustomersPage = () => {
     ];
     const handleCreate = (e) => {
         e.preventDefault();
-        if (!newCust.name)
+        setFormError('');
+        if (!newCust.name.trim()) {
+            setFormError('Company Name is required.');
             return;
+        }
+        if (newCust.email) {
+            const emailRes = validateEmail(newCust.email);
+            if (!emailRes.isValid) {
+                setFormError(emailRes.message);
+                return;
+            }
+        }
+        if (newCust.phone) {
+            const phoneRes = validatePhone(newCust.phone);
+            if (!phoneRes.isValid) {
+                setFormError(phoneRes.message);
+                return;
+            }
+        }
         addCustomer({
             code: newCust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
-            name: newCust.name,
+            name: newCust.name.trim(),
             contactPerson: newCust.contactPerson || '',
-            email: newCust.email || '',
-            phone: newCust.phone || '',
+            email: newCust.email ? newCust.email.trim().toLowerCase() : '',
+            phone: newCust.phone ? newCust.phone.trim() : '',
             balance: 0,
             creditLimit: Number(newCust.creditLimit) || 0,
+            pmsAdvancePaymentPercentage: Number(newCust.pmsAdvancePaymentPercentage) || 0,
+            pms_advance_payment_percentage: Number(newCust.pmsAdvancePaymentPercentage) || 0,
             status: 'Active',
         });
         setIsModalOpen(false);
-        setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '', creditLimit: 0 });
+        setFormError('');
+        setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '', creditLimit: 0, pmsAdvancePaymentPercentage: 0 });
     };
     return (<div className="space-y-6">
       <PageHeader title="Customer Master & Statements" subtitle="Corporate client accounts, active credit thresholds, multi-year invoice billing history, and real-time running statements." guide={customerGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>
@@ -191,6 +230,11 @@ export const CustomersPage = () => {
               </button>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4">
+              {formError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-medium">
+                  {formError}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Company Name *</label>
@@ -210,6 +254,28 @@ export const CustomersPage = () => {
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Credit Limit (₹)</label>
                   <input type="number" value={newCust.creditLimit} onChange={(e) => setNewCust({ ...newCust, creditLimit: Number(e.target.value) })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
+                </div>
+              </div>
+
+              {/* PMS Advance Requirement */}
+              <div className="p-3 bg-violet-50/60 dark:bg-violet-950/20 border border-violet-200/80 rounded-xl space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="font-semibold text-slate-800 text-xs block">PMS Project Required Advance (%)</label>
+                    <p className="text-[11px] text-slate-500">Advance % required on sales orders before PMS project conversion (e.g. 10%, 20%).</p>
+                  </div>
+                  <div className="relative w-28 shrink-0">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={newCust.pmsAdvancePaymentPercentage || 0}
+                      onChange={(e) => setNewCust({ ...newCust, pmsAdvancePaymentPercentage: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)) })}
+                      className="w-full pr-7 pl-3 py-1.5 border border-slate-300 rounded bg-white text-slate-800 font-mono font-bold text-xs text-right"
+                    />
+                    <span className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 font-bold text-xs pointer-events-none">%</span>
+                  </div>
                 </div>
               </div>
 

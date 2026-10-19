@@ -63,6 +63,16 @@ export default function Requests() {
     hydrateAttendance?.();
   }, [hydrateAttendance]);
 
+  // Unique sorted list of employees
+  const uniqueEmployeeNames = useMemo(() => {
+    const set = new Set();
+    (storeEmployees || []).forEach((e) => {
+      const n = (e.name || "").trim();
+      if (n) set.add(n);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [storeEmployees]);
+
   // Normalize requests with accurate type inference, times, and employee mapping
   const requestsList = useMemo(() => {
     if (storeRequests && storeRequests.length > 0) {
@@ -639,7 +649,7 @@ export default function Requests() {
               onChange={(e) => setRegForm({ ...regForm, employee: e.target.value })}
             >
               <option value="">Select employee</option>
-              {storeEmployees.map((e) => e.name).map((name) => (
+              {uniqueEmployeeNames.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>
@@ -727,7 +737,7 @@ export default function Requests() {
               onChange={(e) => setEarlyForm({ ...earlyForm, employee: e.target.value })}
             >
               <option value="">Select employee</option>
-              {storeEmployees.map((e) => e.name).map((name) => (
+              {uniqueEmployeeNames.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>

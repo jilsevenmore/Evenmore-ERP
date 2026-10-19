@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
-import { X, Printer, CheckCircle2, FileText } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Printer, CheckCircle2, FileText, Download, Loader2 } from 'lucide-react';
+import { downloadElementAsPdf } from '../../services/exportUtils';
 import { useERP } from '../../context/ERPContext';
 import { addressLines, companyInitial, joinNonEmpty, pickPrintBankAccount } from './printLetterhead';
 import { LetterpadBrand, LetterpadFooter } from './SalesLetterpad';
@@ -41,6 +42,9 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
             ? { rate, taxAmt, cgst: isIntraState ? taxAmt / 2 : 0, sgst: isIntraState ? taxAmt / 2 : 0, igst: isIntraState ? 0 : taxAmt }
             : { rate, taxAmt, cgst: taxAmt / 2, sgst: taxAmt / 2, igst: 0 };
     };
+    const sheetRef = useRef(null);
+    const [downloading, setDownloading] = useState(false);
+
     // UX only: Esc dismisses. No logic changes.
     useEffect(() => {
         if (!isOpen) return;
@@ -52,6 +56,15 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
         return null;
     const handlePrint = () => {
         window.print();
+    };
+    const handleDirectDownload = async () => {
+        if (!sheetRef.current || downloading) return;
+        setDownloading(true);
+        try {
+            await downloadElementAsPdf(sheetRef.current, `Invoice_${invoice.invoiceNumber || 'Document'}.pdf`);
+        } finally {
+            setDownloading(false);
+        }
     };
     const isPaid = invoice.status === 'Paid' || balanceDue <= 0.01;
     const totalAmount = invoice.total || 0;
@@ -70,9 +83,13 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handlePrint} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs">
+            <button onClick={handlePrint} className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer">
               <Printer size={14}/>
-              Print / Save as PDF
+              Print
+            </button>
+            <button onClick={handleDirectDownload} disabled={downloading} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs">
+              {downloading ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
+              {downloading ? 'Downloading...' : 'Download PDF'}
             </button>
             <button onClick={onClose} className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer" title="Close Preview">
               <X size={18}/>
@@ -82,7 +99,7 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
 
         {/* Real Invoice Sheet (A4 Proportion) */}
         <div className="overflow-x-auto p-2 sm:p-6 lg:p-0 print:p-0 print:overflow-visible">
-        <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
+        <div ref={sheetRef} className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
           {/* Header / Letterhead */}
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
             {USE_LEGACY_LETTERHEAD ? (

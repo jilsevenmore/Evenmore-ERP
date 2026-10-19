@@ -115,8 +115,8 @@ export const PurchaseOrdersPage = () => {
     const issuePo = (id) => {
         updatePurchaseOrderStatus(id, 'Issued');
     };
-    const handleConvertToBill = (poId) => {
-        convertPurchaseOrderToBill(poId);
+    const handleConvertToBill = async (poId) => {
+        await convertPurchaseOrderToBill(poId);
         navigate('/purchase/bills');
     };
 
@@ -374,9 +374,10 @@ export const PurchaseOrdersPage = () => {
             width: '13%',
             render: (p) => {
                 const info = getPoBilledStatus(p.id);
+                const displayStatus = p.status === 'Cancelled' ? 'Cancelled' : (info.status === 'Billed' || p.status === 'Billed' ? 'Billed' : info.status);
                 return (
                   <div className="space-y-0.5">
-                    <StatusBadge status={info.status}/>
+                    <StatusBadge status={displayStatus}/>
                     {info.status === 'Partially Billed' && (
                       <span className="block text-[10px] text-amber-700 font-mono">
                         {info.totalBilledQty}/{info.totalOrderedQty} Received
@@ -394,8 +395,8 @@ export const PurchaseOrdersPage = () => {
             render: (p) => {
                 const poStatusInfo = getPoBilledStatus(p.id);
                 const isCancelled = p.status === 'Cancelled';
-                const isFullyBilled = poStatusInfo.status === 'Billed';
-                const hasRemaining = poStatusInfo.totalRemainingQty > 0;
+                const isFullyBilled = poStatusInfo.status === 'Billed' || p.status === 'Billed';
+                const hasRemaining = poStatusInfo.totalRemainingQty > 0 && !isFullyBilled;
                 return (
                   <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                     <button onClick={() => setPrintPoTarget(p)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Print Official Purchase Order">

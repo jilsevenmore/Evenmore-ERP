@@ -17,6 +17,7 @@ import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal
 import { usePmsStore } from '../../stores/pmsStore';
 import { CreateProjectModal } from '../pms/projects/components/CreateProjectModal';
 import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
+import { validateLineProducts } from '../../utils/validators';
 const salesOrderGuide = {
     title: 'Sales Orders',
     subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
@@ -57,7 +58,7 @@ const PortalOrderBadge = ({ className = '' }) => (
 );
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
-    const { salesOrders, customers, addSalesOrder, updateSalesOrderAllocation, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, addPaymentIn, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
+    const { salesOrders, customers, addSalesOrder, updateSalesOrderAllocation, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, addPaymentIn, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO, showToast } = useERP();
     const pmsProjects = usePmsStore((s) => s.projects || []);
     const [pmsModalOrder, setPmsModalOrder] = useState(null);
     const [stageFilter, setStageFilter] = useState('All');
@@ -72,6 +73,7 @@ export const SalesOrdersPage = () => {
         setSearchParams(next, { replace: true });
     };
     const [showAddModal, setShowAddModal] = useState(false);
+    const [formError, setFormError] = useState('');
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [printSalesOrderTarget, setPrintSalesOrderTarget] = useState(null);
@@ -209,6 +211,7 @@ export const SalesOrdersPage = () => {
     };
 
     const handleOpenCreateModal = () => {
+        setFormError('');
         setSelectedCustomerId(customers[0]?.id || '');
         setDeliveryDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
@@ -228,6 +231,7 @@ export const SalesOrdersPage = () => {
 
     const handleCloseCreateModal = () => {
         setShowAddModal(false);
+        setFormError('');
         setSelectedCustomerId(customers[0]?.id || '');
         setDeliveryDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
@@ -235,6 +239,7 @@ export const SalesOrdersPage = () => {
     };
 
     const handleCloneOrder = (order) => {
+        setFormError('');
         setSelectedCustomerId(order.customerId || customers[0]?.id || '');
         setDeliveryDate(order.deliveryDate || addDaysISO(getCurrentISODate(), 10));
         setLineItems((order.items || []).map((it) => ({
@@ -256,6 +261,15 @@ export const SalesOrdersPage = () => {
             return;
         }
 
+        const productValidation = validateLineProducts(lineItems, 'sales order');
+        if (!productValidation.isValid) {
+            alert(productValidation.message);
+            showToast?.(productValidation.message);
+            setFormError(productValidation.message);
+            return;
+        }
+        setFormError('');
+
         addSalesOrder({
             customerId: cust?.id,
             customer: cust?.name || 'Walk-in Customer',
@@ -273,7 +287,7 @@ export const SalesOrdersPage = () => {
             stage: 'Draft',
             status: 'Draft',
             paymentStatus: cashAmountInput >= effectiveOrderAmt ? 'Paid' : (cashAmountInput > 0 ? 'Partial' : 'Unpaid'),
-            items: lineItems,
+            items: productValidation.validItems,
         });
         handleCloseCreateModal();
     };
@@ -317,6 +331,12 @@ export const SalesOrdersPage = () => {
     // Portal orders arrive as Drafts and wait for staff to confirm them.
     const portalAwaitingReview = salesOrders.filter((o) => isPortalOrder(o) && o.stage === 'Draft').length;
     const handleGenerateProforma = (order) => {
+        const prodVal = validateLineProducts(order?.items, 'proforma invoice');
+        if (!prodVal.isValid) {
+            alert(prodVal.message);
+            showToast?.(prodVal.message);
+            return;
+        }
         const cust = customers.find((c) => c.id === order.customerId || c.name === order.customer) || customers[0];
         const nextId = (proformaInvoices.length + 101);
         const piNumber = `PI-2026-${String(nextId).padStart(3, '0')}`;
@@ -491,6 +511,34 @@ export const SalesOrdersPage = () => {
         });
         return docs;
     };
+    const getOrderAdvanceInfo = (o) => {
+        const cust = customers.find((c) => c.id === o.customerId || c.name === o.customer);
+        const reqPct = Number(cust?.pmsAdvancePaymentPercentage ?? cust?.pms_advance_payment_percentage ?? 0);
+        if (!reqPct || reqPct <= 0) return null;
+        const orderTotal = Number(o.total ?? o.amount ?? 0);
+        const requiredAmount = (orderTotal * reqPct) / 100;
+        const directSoPayments = (paymentIns || [])
+            .filter((p) => p.salesOrderId === o.id || p.salesOrderNumber === o.orderNumber)
+            .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const orderPis = (proformaInvoices || []).filter((pi) => pi.salesOrderId === o.id || pi.referenceSo === o.orderNumber);
+        const piIds = new Set(orderPis.map((pi) => pi.id));
+        const piPayments = (paymentIns || [])
+            .filter((p) => piIds.has(p.proformaInvoiceId) || (p.proformaNumber && orderPis.some((pi) => pi.piNumber === p.proformaNumber)))
+            .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const orderInvs = (invoices || []).filter((inv) => inv.salesOrderId === o.id || inv.linkedSo === o.orderNumber);
+        const invIds = new Set(orderInvs.map((inv) => inv.id));
+        const invNumbers = new Set(orderInvs.map((inv) => inv.invoiceNumber));
+        const invPayments = (paymentIns || [])
+            .filter((p) => invIds.has(p.invoiceId) || (p.invoiceNumber && invNumbers.has(p.invoiceNumber)))
+            .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const cashAmt = Number(o.cashAmount || o.cashReceipt?.amount || 0);
+        const orderSpecificReceived = directSoPayments + piPayments + invPayments + cashAmt;
+        const custBalance = Number(cust?.balance || 0);
+        const customerAccountAdvance = custBalance < 0 ? Math.abs(custBalance) : 0;
+        const totalReceived = Math.max(orderSpecificReceived, customerAccountAdvance);
+        const isSatisfied = totalReceived >= (requiredAmount - 0.01);
+        return { reqPct, requiredAmount, totalReceived, isSatisfied };
+    };
     const columns = [
         {
             key: 'orderNumber',
@@ -628,26 +676,41 @@ export const SalesOrdersPage = () => {
             {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                 Confirm Order
               </button>)}
-            {o.stage === 'Confirmed' && (<>
-                <button
-                  onClick={() => setPmsModalOrder(o.orderNumber)}
-                  className={`px-2 py-1 rounded-md text-xs font-semibold cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap ${
-                    pmsProjects.some((p) => p.crmOrderId === o.orderNumber)
-                      ? 'bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100'
-                      : 'bg-violet-600 text-white hover:bg-violet-700'
-                  }`}
-                  title={
-                    pmsProjects.some((p) => p.crmOrderId === o.orderNumber)
-                      ? "View or configure planned duration for linked PMS Project"
-                      : "Convert this Confirmed Sales Order into a PMS Production Project"
-                  }
-                >
-                  <Layers size={12}/> PMS Project
-                </button>
-                <button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
-                  <Truck size={12}/> Issue Challan
-                </button>
-              </>)}
+            {o.stage === 'Confirmed' && (() => {
+                const isLinked = pmsProjects.some((p) => p.crmOrderId === o.orderNumber);
+                const advInfo = !isLinked ? getOrderAdvanceInfo(o) : null;
+                return (
+                  <>
+                    <button
+                      onClick={() => setPmsModalOrder(o.orderNumber)}
+                      className={`px-2 py-1 rounded-md text-xs font-semibold cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap ${
+                        isLinked
+                          ? 'bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100'
+                          : advInfo && !advInfo.isSatisfied
+                          ? 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100'
+                          : 'bg-violet-600 text-white hover:bg-violet-700'
+                      }`}
+                      title={
+                        isLinked
+                          ? "View or configure planned duration for linked PMS Project"
+                          : advInfo && !advInfo.isSatisfied
+                          ? `Requires ${advInfo.reqPct}% advance (${formatCurrency(advInfo.requiredAmount)}) before project conversion`
+                          : "Convert this Confirmed Sales Order into a PMS Production Project"
+                      }
+                    >
+                      <Layers size={12}/> PMS Project
+                      {advInfo && !advInfo.isSatisfied && (
+                        <span className="ml-0.5 text-[10px] px-1 py-0.2 rounded bg-amber-200 text-amber-900 font-bold">
+                          {advInfo.reqPct}% Adv Req
+                        </span>
+                      )}
+                    </button>
+                    <button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
+                      <Truck size={12}/> Issue Challan
+                    </button>
+                  </>
+                );
+              })()}
             {(o.stage === 'Delivered' || o.stage === 'Dispatched') && (<button onClick={() => advanceStage(o.id, 'Delivered')} className="px-2.5 py-1 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
                 <Receipt size={12}/> Invoice
               </button>)}
@@ -754,6 +817,12 @@ export const SalesOrdersPage = () => {
               </div>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              {formError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0 text-rose-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
               <FormSection number="01" title="Customer & delivery" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -1091,7 +1160,7 @@ export const SalesOrdersPage = () => {
                   Cancel
                 </Button>
                 <Button type="submit">
-                  Confirm & Create Order
+                  Generate Sales Order
                 </Button>
               </div>
             </form>
@@ -1279,6 +1348,12 @@ export const SalesOrdersPage = () => {
                               <button
                                 type="button"
                                 onClick={() => {
+                                  const prodVal = validateLineProducts(selectedOrder?.items, 'sales invoice');
+                                  if (!prodVal.isValid) {
+                                    alert(prodVal.message);
+                                    showToast?.(prodVal.message);
+                                    return;
+                                  }
                                   convertSalesOrderToInvoice(selectedOrder.id);
                                   setSelectedOrder(null);
                                   navigate('/sales/invoices');
@@ -1468,7 +1543,17 @@ export const SalesOrdersPage = () => {
                     {(selectedOrder.stage === 'Confirmed' || selectedOrder.stage === 'Partially Dispatched') && (<Button onClick={() => { advanceStage(selectedOrder.id, selectedOrder.stage); setSelectedOrder(null); }}>
                         {selectedOrder.stage === 'Partially Dispatched' ? 'Dispatch Remaining' : 'Issue Delivery Challan'}
                       </Button>)}
-                    {(selectedOrder.stage === 'Delivered' || selectedOrder.stage === 'Dispatched' || selectedOrder.stage === 'Partially Dispatched') && (<Button variant="outline" onClick={() => { convertSalesOrderToInvoice(selectedOrder.id); setSelectedOrder(null); navigate('/sales/invoices'); }}>
+                    {(selectedOrder.stage === 'Delivered' || selectedOrder.stage === 'Dispatched' || selectedOrder.stage === 'Partially Dispatched') && (<Button variant="outline" onClick={() => {
+                        const prodVal = validateLineProducts(selectedOrder?.items, 'sales invoice');
+                        if (!prodVal.isValid) {
+                          alert(prodVal.message);
+                          showToast?.(prodVal.message);
+                          return;
+                        }
+                        convertSalesOrderToInvoice(selectedOrder.id);
+                        setSelectedOrder(null);
+                        navigate('/sales/invoices');
+                      }}>
                         Generate Sales Invoice
                       </Button>)}
                     <button

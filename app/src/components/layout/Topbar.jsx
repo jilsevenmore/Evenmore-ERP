@@ -81,7 +81,7 @@ const QUICK_ACTIONS = [
   { label: 'Create Tax Invoice', path: '/sales/invoices', permission: 'create_invoice', icon: Receipt, color: 'text-emerald-500 bg-emerald-50' },
   { label: 'New Purchase Bill', path: '/purchase/bills', permission: 'create_bill', icon: FilePlus, color: 'text-amber-500 bg-amber-50' },
   { label: 'Register Trade Party', path: '/parties', permission: ['create_quotation', 'create_sales_order', 'create_invoice', 'create_purchase_order', 'create_bill'], icon: Building, color: 'text-purple-500 bg-purple-50' },
-  { label: 'Add Inventory Item', path: '/inventory/items/new', permission: 'view_inventory', icon: Layers, color: 'text-rose-500 bg-rose-50' },
+  { label: 'Add Product Master', path: '/inventory/items/new', permission: 'view_inventory', icon: Layers, color: 'text-rose-500 bg-rose-50' },
 ];
 
 export default function Topbar() {
@@ -290,6 +290,7 @@ export default function Topbar() {
   // Bell: one list, every notification tagged with its module.
   const [notifModule, setNotifModule] = useState('all');
   const [expandedModules, setExpandedModules] = useState({});
+  const [filterUnread, setFilterUnread] = useState(false);
   const [isModuleMenuOpen, setIsModuleMenuOpen] = useState(false);
   const moduleMenuRef = useRef(null);
 
@@ -306,9 +307,13 @@ export default function Topbar() {
 
   const moduleGroups = useMemo(
     () => NOTIF_MODULES
-      .map((m) => ({ ...m, items: moduleNotifs.filter((n) => n.module === m.id) }))
+      .map((m) => {
+        const items = moduleNotifs.filter((n) => n.module === m.id);
+        const filteredItems = filterUnread ? items.filter((n) => n.unread) : items;
+        return { ...m, items: filteredItems };
+      })
       .filter((group) => group.items.length > 0),
-    [moduleNotifs]
+    [moduleNotifs, filterUnread]
   );
 
   const totalUnreadCount = moduleNotifs.filter((n) => n.unread).length;
@@ -321,6 +326,7 @@ export default function Topbar() {
     if (n.eventId) markEventNotificationRead(n.eventId);
     if (n.path) navigate(n.path);
     setIsNotifOpen(false);
+    setIsModuleMenuOpen(false);
   };
 
   const storeShowToast = useAppStore((s) => s.showToast || s.setToast);
@@ -332,8 +338,13 @@ export default function Topbar() {
       if (themeRef.current && !themeRef.current.contains(event.target)) setIsThemeOpen(false);
       if (quickAddRef.current && !quickAddRef.current.contains(event.target)) setIsQuickAddOpen(false);
       if (punchRef.current && !punchRef.current.contains(event.target)) setIsPunchOpen(false);
-      if (notifRef.current && !notifRef.current.contains(event.target)) setIsNotifOpen(false);
-      if (moduleMenuRef.current && !moduleMenuRef.current.contains(event.target)) setIsModuleMenuOpen(false);
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setIsNotifOpen(false);
+        setIsModuleMenuOpen(false);
+      }
+      if (moduleMenuRef.current && !moduleMenuRef.current.contains(event.target)) {
+        setIsModuleMenuOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -507,6 +518,7 @@ export default function Topbar() {
                 setIsNotifOpen(!isNotifOpen);
                 setIsThemeOpen(false);
                 setIsQuickAddOpen(false);
+                setIsModuleMenuOpen(false);
               }}
               className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text flex items-center justify-center transition cursor-pointer relative shadow-2xs"
               aria-label="Notifications & Reminders"
@@ -521,15 +533,29 @@ export default function Topbar() {
             </button>
 
             {isNotifOpen && (
-              <div className="top-dropdown-menu w-84 sm:w-96 p-3 animate-in fade-in zoom-in-95 duration-150 shadow-xl">
+              <div
+                className={`top-dropdown-menu w-84 sm:w-96 p-3 animate-in fade-in zoom-in-95 duration-150 shadow-xl transition-all ${
+                  isModuleMenuOpen ? 'min-h-[465px]' : ''
+                }`}
+              >
                 {/* Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-border">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-xs text-text">Notifications</span>
                     {totalUnreadCount > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
-                        {totalUnreadCount} unread
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFilterUnread(!filterUnread)}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border transition cursor-pointer flex items-center gap-1 ${
+                          filterUnread
+                            ? 'bg-rose-500 text-white border-rose-600 shadow-2xs'
+                            : 'bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border-rose-500/20'
+                        }`}
+                        title={filterUnread ? 'Showing unread only. Click to show all' : 'Click to filter unread only'}
+                      >
+                        <span>{totalUnreadCount} unread</span>
+                        {filterUnread && <span className="text-[9px] font-black leading-none ml-0.5">&times;</span>}
+                      </button>
                     )}
                   </div>
                   {hasUnreadEvents && (
@@ -543,7 +569,7 @@ export default function Topbar() {
                   )}
                 </div>
 
-                {/* Module selector */}
+                {/* Module selector dropdown */}
                 {(() => {
                   const options = [
                     { id: 'all', label: 'All Modules', count: totalNotifCount, icon: Bell },
@@ -576,7 +602,7 @@ export default function Topbar() {
                       </button>
 
                       {isModuleMenuOpen && (
-                        <div className="absolute top-full right-0 left-0 mt-1 p-1 rounded-xl bg-card border border-border shadow-xl z-30 space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                        <div className="absolute top-full right-0 left-0 mt-1 p-1 rounded-xl bg-card border border-border shadow-xl z-30 space-y-0.5 animate-in fade-in zoom-in-95 duration-100 max-h-[360px] overflow-y-auto">
                           <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-muted">
                             Notification Modules
                           </div>
@@ -704,10 +730,27 @@ export default function Topbar() {
                   })}
 
                   {visibleGroups.length === 0 && (
-                    <div className="py-6 text-center text-xs text-muted">
-                      {activeModule === 'all'
-                        ? 'All caught up! No notifications right now.'
-                        : `No ${NOTIF_MODULES.find((m) => m.id === activeModule)?.label || ''} notifications right now.`}
+                    <div className="py-8 text-center text-xs text-muted flex flex-col items-center justify-center gap-1.5">
+                      <CheckCircle2 size={24} className="text-muted/40 mb-0.5" />
+                      <span className="font-semibold text-text">
+                        {filterUnread
+                          ? 'No unread notifications'
+                          : activeModule === 'all'
+                            ? 'All caught up! No notifications right now.'
+                            : `No ${NOTIF_MODULES.find((m) => m.id === activeModule)?.label || ''} notifications right now.`}
+                      </span>
+                      {(activeModule !== 'all' || filterUnread) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNotifModule('all');
+                            setFilterUnread(false);
+                          }}
+                          className="mt-1 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                        >
+                          Show all notifications
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

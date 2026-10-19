@@ -17,11 +17,11 @@ import BulkAssignModal from './components/BulkAssignModal';
 import InfoBanner from '../common/InfoBanner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../stores/appStore';
-import { Users, UserPlus, Clock, TrendingUp } from 'lucide-react';
+import { Users, UserPlus, Clock, TrendingUp, Download, Printer } from 'lucide-react';
 import { useCrmStore } from '../../../stores/crmStore';
 import { formatCurrency } from '../../../utils/currencyUtils';
 import { describeError } from '../../../services/crmSync';
-import { exportToCSV } from '../../../services/exportUtils';
+import { exportToCSV, downloadElementAsPdf } from '../../../services/exportUtils';
 import { runLeadStageAutomation } from '../../../services/leadStageAutomation';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
 import { useERP } from '../../../context/ERPContext';
@@ -96,6 +96,38 @@ function printLeadsAsPdf(rows) {
   setTimeout(() => {
     printWindow.print();
   }, 250);
+}
+
+async function downloadLeadsAsPdf(rows) {
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '1120px';
+  container.style.backgroundColor = '#ffffff';
+  container.style.padding = '24px';
+  container.style.fontFamily = 'Arial, sans-serif';
+  container.style.color = '#172033';
+
+  const headers = LEAD_EXPORT_FIELDS.map(([label]) => `<th style="border: 1px solid #cbd5e1; padding: 7px; text-align: left; background: #e2e8f0; font-size: 11px;">${escapeExportHtml(label)}</th>`).join('');
+  const tableRows = rows.map((lead) => `<tr>${LEAD_EXPORT_FIELDS.map(([, key]) => `<td style="border: 1px solid #cbd5e1; padding: 7px; text-align: left; font-size: 11px;">${escapeExportHtml(lead[key])}</td>`).join('')}</tr>`).join('');
+
+  container.innerHTML = `
+    <h1 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Lead Details</h1>
+    <p style="font-size: 12px; color: #64748b; margin-bottom: 16px;">Exported ${rows.length} lead records on ${new Date().toLocaleDateString('en-GB')}</p>
+    <table style="border-collapse: collapse; width: 100%; font-size: 11px;">
+      <thead><tr>${headers}</tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `;
+  document.body.appendChild(container);
+
+  try {
+    const filename = `leads_details_${new Date().toISOString().slice(0, 10)}.pdf`;
+    await downloadElementAsPdf(container, filename);
+  } finally {
+    document.body.removeChild(container);
+  }
 }
 
 const leadsGuide = {
@@ -350,11 +382,12 @@ export default function LeadsPage() {
     setIsSortOpen(false);
   }
 
-  function exportLeads(format) {
+  async function exportLeads(format) {
     const headers = LEAD_EXPORT_FIELDS.map(([label]) => label);
     if (format === 'CSV') exportToCSV('leads_details', headers, exportLeadRows(rows));
     if (format === 'Excel') downloadLeadsAsExcel(rows);
-    if (format === 'PDF') printLeadsAsPdf(rows);
+    if (format === 'PDF') await downloadLeadsAsPdf(rows);
+    if (format === 'Print') printLeadsAsPdf(rows);
     setIsPrintOpen(false);
   }
 
@@ -601,20 +634,27 @@ export default function LeadsPage() {
 
       {isPrintOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsPrintOpen(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-5" onClick={(event) => event.stopPropagation()}>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md p-6" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-sm font-bold text-slate-900">Print Leads</h2>
-                <p className="text-xs text-slate-500 mt-1">Choose a format for {rows.length} lead records</p>
+                <h2 className="text-sm font-bold text-slate-900">Export &amp; Print Leads</h2>
+                <p className="text-xs text-slate-500 mt-1">Download or print {rows.length} lead records</p>
               </div>
-              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsPrintOpen(false)} aria-label="Close print options">×</button>
+              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg cursor-pointer" onClick={() => setIsPrintOpen(false)} aria-label="Close export options">×</button>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {['CSV', 'Excel', 'PDF'].map((format) => (
-                <button key={format} type="button" className="btn-outline h-9 text-xs font-semibold" onClick={() => exportLeads(format)}>
-                  {format}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-2.5">
+              <button type="button" className="btn-outline h-10 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer rounded-xl" onClick={() => exportLeads('CSV')}>
+                <Download size={14} /> Download CSV
+              </button>
+              <button type="button" className="btn-outline h-10 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer rounded-xl" onClick={() => exportLeads('Excel')}>
+                <Download size={14} /> Download Excel
+              </button>
+              <button type="button" className="btn-primary h-10 text-xs font-semibold flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white cursor-pointer rounded-xl" onClick={() => exportLeads('PDF')}>
+                <Download size={14} /> Download PDF
+              </button>
+              <button type="button" className="btn-outline h-10 text-xs font-semibold flex items-center justify-center gap-1.5 text-slate-700 bg-slate-100 hover:bg-slate-200 border-slate-200 cursor-pointer rounded-xl" onClick={() => exportLeads('Print')}>
+                <Printer size={14} /> Print Document
+              </button>
             </div>
           </div>
         </div>
@@ -637,21 +677,17 @@ export default function LeadsPage() {
           />
         )}
         <div className="table-col">
-          {leadView === 'list' ? (
+          {leadView === 'tile' ? (
             <>
-              <LeadsTable
+              <LeadCardGridView
                 rows={pagedRows}
                 selected={selected}
                 pinnedLeadIds={pinnedLeadIds}
                 onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
                 onRequestDelete={requestDeleteLead}
-                onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onOpenLead={openLeadDetails}
-                onEditLead={editLeadDetails}
-                onConvertLead={setConvertTarget}
-                onUpdateLead={updateLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
                 <Pagination
@@ -665,47 +701,7 @@ export default function LeadsPage() {
                 />
               </div>
             </>
-          ) : leadView === 'grid' ? (
-            <>
-              <LeadsTable
-                rows={pagedRows}
-                selected={selected}
-                pinnedLeadIds={pinnedLeadIds}
-                onTogglePin={togglePinLead}
-                onToggleOne={toggleOne}
-                onRequestDelete={requestDeleteLead}
-                onToggleAll={toggleAll}
-                onAddNote={openNotes}
-                onOpenLead={openLeadDetails}
-                onEditLead={editLeadDetails}
-                onConvertLead={setConvertTarget}
-                onUpdateLead={updateLead}
-                variant="grid"
-              />
-              <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
-                <Pagination
-                  total={rows.length}
-                  page={page}
-                  pageSize={pageSize}
-                  onChange={setPage}
-                  showTotalRecords
-                  pageSizeOptions={[10, 20, 50]}
-                  onPageSizeChange={handlePageSizeChange}
-                />
-              </div>
-            </>
-          ) : leadView === 'tile' ? (
-            <LeadCardGridView
-              rows={pagedRows}
-              selected={selected}
-              pinnedLeadIds={pinnedLeadIds}
-              onTogglePin={togglePinLead}
-              onToggleOne={toggleOne}
-              onRequestDelete={requestDeleteLead}
-              onAddNote={openNotes}
-              onOpenLead={openLeadDetails}
-            />
-          ) : (
+          ) : leadView === 'map' ? (
             <LeadMapView
               rows={rows}
               selected={selected}
@@ -714,6 +710,34 @@ export default function LeadsPage() {
               onOpenListView={() => setLeadView('list')}
               onOpenLead={openLeadDetails}
             />
+          ) : (
+            <>
+              <LeadsTable
+                rows={pagedRows}
+                selected={selected}
+                pinnedLeadIds={pinnedLeadIds}
+                onTogglePin={togglePinLead}
+                onToggleOne={toggleOne}
+                onRequestDelete={requestDeleteLead}
+                onToggleAll={toggleAll}
+                onAddNote={openNotes}
+                onOpenLead={openLeadDetails}
+                onEditLead={editLeadDetails}
+                onConvertLead={setConvertTarget}
+                onUpdateLead={updateLead}
+              />
+              <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
+                <Pagination
+                  total={rows.length}
+                  page={page}
+                  pageSize={pageSize}
+                  onChange={setPage}
+                  showTotalRecords
+                  pageSizeOptions={[10, 20, 50]}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>

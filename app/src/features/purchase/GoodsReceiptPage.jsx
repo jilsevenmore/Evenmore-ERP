@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
+import { Pagination } from '../../components/ui/Pagination';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PackageCheck, Truck, ClipboardCheck, ShieldCheck, X, CheckCircle2, AlertTriangle, Boxes, Scale, FileText, ArrowRight } from 'lucide-react';
 import { createShortSupplyDebitNote, fetchVendorWeightVariations } from '../../services/upgradeService';
@@ -122,6 +123,21 @@ export const GoodsReceiptPage = () => {
     const qcReviewBills = (purchaseBills || []).filter((b) =>
         b.goodsReceived === true && b.status !== 'Cancelled' && b.qcStatus && b.qcStatus !== 'Approved'
     );
+
+    // ── Pagination States ──
+    const [pendingPage, setPendingPage] = useState(1);
+    const [pendingPageSize, setPendingPageSize] = useState(10);
+    const [completedPage, setCompletedPage] = useState(1);
+    const [completedPageSize, setCompletedPageSize] = useState(10);
+    const [qcPage, setQcPage] = useState(1);
+    const [qcPageSize, setQcPageSize] = useState(10);
+    const [varPage, setVarPage] = useState(1);
+    const [varPageSize, setVarPageSize] = useState(10);
+
+    const pagedVariationHistory = variationHistory.slice((varPage - 1) * varPageSize, varPage * varPageSize);
+    const pagedQcReviewBills = qcReviewBills.slice((qcPage - 1) * qcPageSize, qcPage * qcPageSize);
+    const pagedPendingReceipts = pendingReceipts.slice((pendingPage - 1) * pendingPageSize, pendingPage * pendingPageSize);
+    const pagedCompletedReceipts = completedReceipts.slice((completedPage - 1) * completedPageSize, completedPage * completedPageSize);
 
     const openReceiveModal = (bill) => {
         setSelectedBill(bill);
@@ -308,7 +324,7 @@ export const GoodsReceiptPage = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {variationHistory.map((row, i) => {
+                                {pagedVariationHistory.map((row, i) => {
                                     const overTol = Math.abs(row.variationPct) > (row.tolerancePct ?? 2);
                                     return (
                                         <tr key={`${row.billNumber}-${i}`} className="hover:bg-slate-50/70">
@@ -336,6 +352,21 @@ export const GoodsReceiptPage = () => {
                             </tbody>
                         </table>
                     </div>
+                    {variationHistory.length > 0 && (
+                        <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+                            <Pagination
+                                total={variationHistory.length}
+                                page={varPage}
+                                pageSize={varPageSize}
+                                pageSizeOptions={[10, 20, 50, 100]}
+                                onPageSizeChange={(newSize) => {
+                                    setVarPageSize(newSize);
+                                    setVarPage(1);
+                                }}
+                                onChange={setVarPage}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -373,7 +404,7 @@ export const GoodsReceiptPage = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {qcReviewBills.map((b) => {
+                                {pagedQcReviewBills.map((b) => {
                                     const isPending = b.qcStatus !== 'Approved' && b.qcStatus !== 'Rejected' && b.qcStatus !== 'Rework';
                                     return (
                                         <tr key={b.id} className="hover:bg-slate-50/70">
@@ -425,6 +456,22 @@ export const GoodsReceiptPage = () => {
                     </div>
                 )}
 
+                {qcReviewBills.length > 0 && (
+                    <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+                        <Pagination
+                            total={qcReviewBills.length}
+                            page={qcPage}
+                            pageSize={qcPageSize}
+                            pageSizeOptions={[10, 20, 50, 100]}
+                            onPageSizeChange={(newSize) => {
+                                setQcPageSize(newSize);
+                                setQcPage(1);
+                            }}
+                            onChange={setQcPage}
+                        />
+                    </div>
+                )}
+
                 {/* QC standards master (reference) */}
                 {qualityStandards.length > 0 && (
                     <div className="border-t border-slate-100 px-5 py-3 bg-slate-50/60">
@@ -471,6 +518,7 @@ export const GoodsReceiptPage = () => {
                             All purchase bills are received — no pending GRNs.
                         </div>
                     ) : (
+                        <>
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[720px] lg:min-w-0 text-left text-xs text-slate-600">
                                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
@@ -486,7 +534,7 @@ export const GoodsReceiptPage = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {pendingReceipts.map((b) => {
+                                    {pagedPendingReceipts.map((b) => {
                                         const billQty = (b.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0);
                                         return (
                                             <tr key={b.id} className="hover:bg-slate-50/70">
@@ -517,6 +565,22 @@ export const GoodsReceiptPage = () => {
                                 </tbody>
                             </table>
                         </div>
+                        {pendingReceipts.length > 0 && (
+                            <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+                                <Pagination
+                                    total={pendingReceipts.length}
+                                    page={pendingPage}
+                                    pageSize={pendingPageSize}
+                                    pageSizeOptions={[10, 20, 50, 100]}
+                                    onPageSizeChange={(newSize) => {
+                                        setPendingPageSize(newSize);
+                                        setPendingPage(1);
+                                    }}
+                                    onChange={setPendingPage}
+                                />
+                            </div>
+                        )}
+                        </>
                     )
                 ) : (
                     completedReceipts.length === 0 ? (
@@ -525,6 +589,7 @@ export const GoodsReceiptPage = () => {
                             No completed goods receipt notes found.
                         </div>
                     ) : (
+                        <>
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[780px] lg:min-w-0 text-left text-xs text-slate-600">
                                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
@@ -539,7 +604,7 @@ export const GoodsReceiptPage = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {completedReceipts.map((b) => {
+                                    {pagedCompletedReceipts.map((b) => {
                                         const totalRec = (b.items || []).reduce((s, it) => s + (Number(it.receivedQty ?? it.qty) || 0), 0);
                                         const locName = b.receiptLocationName || locations.find((l) => l.id === b.receiptLocationId)?.name || 'Main Warehouse';
                                         return (
@@ -575,6 +640,22 @@ export const GoodsReceiptPage = () => {
                                 </tbody>
                             </table>
                         </div>
+                        {completedReceipts.length > 0 && (
+                            <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+                                <Pagination
+                                    total={completedReceipts.length}
+                                    page={completedPage}
+                                    pageSize={completedPageSize}
+                                    pageSizeOptions={[10, 20, 50, 100]}
+                                    onPageSizeChange={(newSize) => {
+                                        setCompletedPageSize(newSize);
+                                        setCompletedPage(1);
+                                    }}
+                                    onChange={setCompletedPage}
+                                />
+                            </div>
+                        )}
+                        </>
                     )
                 )}
             </div>

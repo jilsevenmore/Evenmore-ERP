@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { fetchMe } from '../services/authService';
-import { getStoredToken } from '../utils/authUtils';
+import {
+  getStoredToken,
+  isTokenValid,
+  EVENMORE_AUTH_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+} from '../utils/authUtils';
+import { attemptTokenRefresh } from '../services/api';
 import { useAppStore } from '../stores/appStore';
 
 /**
@@ -19,6 +25,7 @@ export default function SessionGate({ children }) {
   const setCurrentUser = useAppStore((s) => s.setCurrentUser);
   const setPermissions = useAppStore((s) => s.setPermissions);
   const [resolving, setResolving] = useState(() => Boolean(getStoredToken()));
+  const isInitialRef = useRef(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,13 +35,22 @@ export default function SessionGate({ children }) {
         setCurrentUser(null);
         setPermissions([]);
         setResolving(false);
+        isInitialRef.current = false;
         return;
       }
-      setResolving(true);
+
+      if (isInitialRef.current) {
+        setResolving(true);
+      }
+
       const session = await fetchMe();
       if (cancelled) return;
-      setCurrentUser(session?.user || null);
-      setPermissions(session?.permissions || []);
+
+      if (session) {
+        setCurrentUser(session?.user || null);
+        setPermissions(session?.permissions || []);
+      }
+      isInitialRef.current = false;
       setResolving(false);
     };
 
@@ -43,8 +59,21 @@ export default function SessionGate({ children }) {
     // A sign-in elsewhere in the app (or in another tab) re-resolves the user.
     window.addEventListener('evenmore:authorized', resolve);
     window.addEventListener('storage', resolve);
+
+    // Proactive background refresh: inspect token every 60s; if expiring within 2 minutes, renew silently
+    const refreshInterval = setInterval(() => {
+      try {
+        const token = localStorage.getItem(EVENMORE_AUTH_TOKEN_KEY);
+        const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+        if (token && refresh && !isTokenValid(token, 120000)) {
+          attemptTokenRefresh().catch(() => {});
+        }
+      } catch {}
+    }, 60000);
+
     return () => {
       cancelled = true;
+      clearInterval(refreshInterval);
       window.removeEventListener('evenmore:authorized', resolve);
       window.removeEventListener('storage', resolve);
     };

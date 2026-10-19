@@ -277,7 +277,7 @@ export const PurchaseReturnsPage = () => {
         columns={columns}
         data={purchaseReturns}
         keyExtractor={(r) => r.id}
-        pageSize={20}
+        pageSize={10}
         pageSizeOptions={[10, 20, 50, 100]}
         searchPlaceholder="Search debit note # or vendor..."
         searchFilter={(r, term) =>

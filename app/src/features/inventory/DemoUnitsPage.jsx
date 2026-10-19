@@ -422,7 +422,7 @@ export const DemoUnitsPage = () => {
                   onChange={(e) => setDeployForm({ ...deployForm, itemId: e.target.value, serial_number: '' })}
                   className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
                 >
-                  <option value="">Select machine from Item Master...</option>
+                  <option value="">Select machine from Product Master...</option>
                   {machineOptions.map((it) => (
                     <option key={it.id} value={it.id}>
                       [{it.sku}] {it.name}{it.itemKind === 'Machine' ? ' (Machine)' : ''}

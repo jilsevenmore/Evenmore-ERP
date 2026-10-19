@@ -8,11 +8,7 @@ export default function RecordActionPanel({ lead, leads = [], onClose, onDelete,
   const count = selectedLeads.length;
 
   function handleDelete() {
-    if (count > 1) {
-      onDelete(selectedLeads);
-      return;
-    }
-    onDelete(selectedLeads[0].id);
+    onDelete(selectedLeads);
   }
 
   return (

@@ -15,6 +15,7 @@ import {
 import { hrmsSync } from '../../services/hrmsSync';
 import { useAppStore } from '../../stores/appStore';
 import { PermissionPicker, permissionLabels } from './PermissionPicker';
+import { validateEmail, validatePhone } from '../../utils/validators';
 import {
   Users,
   UserCheck,
@@ -392,13 +393,27 @@ export function UsersPage() {
     e.preventDefault();
     if (!userForm.name || !userForm.email || isSubmitting) return;
 
+    const emailRes = validateEmail(userForm.email, true);
+    if (!emailRes.isValid) {
+      showNotification(emailRes.message);
+      return;
+    }
+
+    if (userForm.phone && userForm.phone.trim() !== '+91') {
+      const phoneRes = validatePhone(userForm.phone);
+      if (!phoneRes.isValid) {
+        showNotification(phoneRes.message);
+        return;
+      }
+    }
+
     let newUser;
     setIsSubmitting(true);
     try {
       newUser = await adminSync.create('users', {
-        name: userForm.name,
-        email: userForm.email,
-        phone: userForm.phone,
+        name: userForm.name.trim(),
+        email: emailRes.cleanValue,
+        phone: userForm.phone ? userForm.phone.trim() : '',
         roleId: userForm.roleId,
         department: userForm.department,
         status: userForm.status || 'Active',
@@ -448,10 +463,24 @@ export function UsersPage() {
     e.preventDefault();
     if (!userToModify || isSubmitting) return;
 
+    const emailRes = validateEmail(userForm.email, true);
+    if (!emailRes.isValid) {
+      showNotification(emailRes.message);
+      return;
+    }
+
+    if (userForm.phone && userForm.phone.trim() !== '+91') {
+      const phoneRes = validatePhone(userForm.phone);
+      if (!phoneRes.isValid) {
+        showNotification(phoneRes.message);
+        return;
+      }
+    }
+
     const updates = {
-      name: userForm.name,
-      email: userForm.email,
-      phone: userForm.phone,
+      name: userForm.name.trim(),
+      email: emailRes.cleanValue,
+      phone: userForm.phone ? userForm.phone.trim() : '',
       roleId: userForm.roleId,
       department: userForm.department,
       status: userForm.status,

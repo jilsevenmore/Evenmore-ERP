@@ -46,6 +46,25 @@ const OFFERS_GUIDE = {
   ],
 };
 
+function toDateInputValue(val) {
+  if (!val) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  const parsed = new Date(val);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split("T")[0];
+  }
+  return "";
+}
+
+function formatDisplayDate(val) {
+  if (!val) return "—";
+  const d = new Date(val);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  return val;
+}
+
 export default function Offers() {
   const { offers, addOffer, updateOffer, candidates, jobs = [], changeStage } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
@@ -120,13 +139,16 @@ export default function Offers() {
   }, [allOffers, filter, search]);
 
   function openCreate() {
+    const today = new Date();
+    const defaultJoining = new Date(today.getTime() + 21 * 86400000).toISOString().split("T")[0];
+    const defaultExpiry = new Date(today.getTime() + 7 * 86400000).toISOString().split("T")[0];
     setEditing(null);
     setForm({
       candidateId: "",
       job: "",
       salary: "",
-      joiningDate: "",
-      expiry: "",
+      joiningDate: defaultJoining,
+      expiry: defaultExpiry,
       benefits: "",
       notes: "",
     });
@@ -284,7 +306,7 @@ export default function Offers() {
       render: (r) => (
         <div className="flex items-center gap-1.5 text-[12px] font-medium text-slate-700 dark:text-slate-200">
           <Calendar size={13} className="text-indigo-400" />
-          <span>{r.joiningDate}</span>
+          <span>{formatDisplayDate(r.joiningDate)}</span>
         </div>
       ),
     },
@@ -345,8 +367,8 @@ export default function Offers() {
                 candidateId: r.candidateId,
                 job: r.position,
                 salary: r.salary,
-                joiningDate: r.joiningDate,
-                expiry: r.expiry,
+                joiningDate: toDateInputValue(r.joiningDate) || r.joiningDate || "",
+                expiry: toDateInputValue(r.expiry) || r.expiry || "",
                 benefits: "",
                 notes: "",
               });
@@ -576,10 +598,10 @@ export default function Offers() {
               Joining Date *
             </span>
             <input
-              value={form.joiningDate}
+              type="date"
+              value={toDateInputValue(form.joiningDate)}
               onChange={(e) => setForm({ ...form, joiningDate: e.target.value })}
               className="h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-[13px]"
-              placeholder="01 Oct 2026"
             />
           </label>
 
@@ -588,10 +610,10 @@ export default function Offers() {
               Offer Expiry Date
             </span>
             <input
-              value={form.expiry}
+              type="date"
+              value={toDateInputValue(form.expiry)}
               onChange={(e) => setForm({ ...form, expiry: e.target.value })}
               className="h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-[13px]"
-              placeholder="15 Sep 2026"
             />
           </label>
 

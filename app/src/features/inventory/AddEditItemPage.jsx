@@ -67,8 +67,8 @@ export const AddEditItemPage = () => {
   // Form state
   const [sku, setSku] = useState('');
   const [status, setStatus] = useState('Optimal');
-  const [itemLifecycle, setItemLifecycle] = useState('Active');
-  const [itemKind, setItemKind] = useState(queryKind === 'Machine' ? 'Machine' : (queryKind === 'Part' ? 'Part' : 'Standalone'));
+  // Original: const [itemKind, setItemKind] = useState(queryKind === 'Machine' ? 'Machine' : (queryKind === 'Part' ? 'Part' : 'Standalone'));
+  const [itemKind, setItemKind] = useState(queryKind === 'Part' ? 'Part' : (queryKind === 'Raw Material' ? 'Raw Material' : 'Standalone'));
   const [name, setName] = useState('');
   const [itemTypeId, setItemTypeId] = useState('');
   const [category, setCategory] = useState(categories[0]?.name || '');
@@ -304,7 +304,8 @@ export const AddEditItemPage = () => {
 
     }
     else if (!isEditMode) {
-      const prefix = queryKind === 'Machine' ? 'MACH' : queryKind === 'Part' ? 'PART' : 'PRD';
+      // Original: const prefix = queryKind === 'Machine' ? 'MACH' : queryKind === 'Part' ? 'PART' : 'PRD';
+      const prefix = queryKind === 'Part' ? 'SPR' : (queryKind === 'Raw Material' ? 'RAW' : 'FAB');
       const generatedSku = `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
       setSku(generatedSku);
       setBatchPrefix(`SN-${generatedSku}-`);
@@ -663,16 +664,16 @@ export const AddEditItemPage = () => {
               to="/inventory/items"
               className="text-blue-600 hover:underline font-semibold"
             >
-              Item Master
+              Product Master
             </Link>
             <ChevronRight size={14} className="text-slate-300" />
             <span className="font-semibold text-slate-700">
-              {isEditMode ? `Edit ${sku}` : `Add New Item`}
+              {isEditMode ? `Edit ${sku}` : `Add New Product`}
             </span>
           </div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2.5">
             <Package className="w-6 h-6 text-blue-600" />
-            {isEditMode ? `Edit Item: ${existingItem?.name || sku}` : `Create New Inventory Item`}
+            {isEditMode ? `Edit Product Master: ${existingItem?.name || sku}` : `Create Product Master`}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Configure catalog item parameters, metal specifications, serial/batch tracking, units, pricing, and storage coordinates.
@@ -682,7 +683,7 @@ export const AddEditItemPage = () => {
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <Link to="/inventory/items">
             <Button variant="outline" icon={ArrowLeft}>
-              Back to Item Master
+              Back to Product Master
             </Button>
           </Link>
         </div>
@@ -704,10 +705,13 @@ export const AddEditItemPage = () => {
             <div>
               <span className="text-xs font-bold text-slate-800 block">Item Classification</span>
               <span className="text-[11px] text-slate-500">
-                Select whether this item is an assembled Machine, Component Part, Finished Good, Consumable, Raw Material, or Service.
+                {/* Original: Select whether this item is an assembled Machine, Component Part, Finished Good, Consumable, Raw Material, or Service. */}
+                Select whether this item is a Fabricated Product, Spare Part, or Raw Material (Steel by Wt).
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              {/* [SWEVEN LETTER PAD] Machine & Component Part commented out per specification */}
+              {/*
               <label
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Machine'
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
@@ -741,6 +745,7 @@ export const AddEditItemPage = () => {
                 />
                 🧩 Component Part
               </label>
+              */}
 
               <label
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Standalone' || itemKind === 'Finished Product'
@@ -756,9 +761,45 @@ export const AddEditItemPage = () => {
                   onChange={() => handleItemKindChange('Standalone')}
                   className="sr-only"
                 />
-                📦 Finished Product
+                📦 Fabricated Product
               </label>
 
+              <label
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Part'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+              >
+                <input
+                  type="radio"
+                  name="itemKind"
+                  value="Part"
+                  checked={itemKind === 'Part'}
+                  onChange={() => handleItemKindChange('Part')}
+                  className="sr-only"
+                />
+                ⚙️ Spare Part
+              </label>
+
+              <label
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Raw Material'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+              >
+                <input
+                  type="radio"
+                  name="itemKind"
+                  value="Raw Material"
+                  checked={itemKind === 'Raw Material'}
+                  onChange={() => handleItemKindChange('Raw Material')}
+                  className="sr-only"
+                />
+                🧱 Raw Material (Steel)
+              </label>
+
+              {/* [SWEVEN LETTER PAD] Consumable & Service commented out per specification */}
+              {/*
               <label
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Consumable'
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
@@ -777,23 +818,6 @@ export const AddEditItemPage = () => {
               </label>
 
               <label
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Raw Material'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                <input
-                  type="radio"
-                  name="itemKind"
-                  value="Raw Material"
-                  checked={itemKind === 'Raw Material'}
-                  onChange={() => handleItemKindChange('Raw Material')}
-                  className="sr-only"
-                />
-                🧱 Raw Material
-              </label>
-
-              <label
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Service'
                     ? 'bg-amber-600 text-white border-amber-600 shadow-sm shadow-amber-500/20'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -809,6 +833,7 @@ export const AddEditItemPage = () => {
                 />
                 ⚡ Service
               </label>
+              */}
             </div>
           </div>
 
@@ -857,7 +882,8 @@ export const AddEditItemPage = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Product / Machine Name *
+                  {/* Original: Product / Machine Name * */}
+                  Product Name *
                 </label>
                 <input
                   required
@@ -866,9 +892,12 @@ export const AddEditItemPage = () => {
                   onChange={(e) => setName(e.target.value)}
                   className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
                   placeholder={
-                    itemKind === 'Machine'
-                      ? 'e.g. Endoscopy System X1 4K Master Console'
-                      : 'e.g. Camera Sensor Head 4K'
+                    /* Original: itemKind === 'Machine' ? 'e.g. Endoscopy System X1 4K Master Console' : 'e.g. Camera Sensor Head 4K' */
+                    itemKind === 'Raw Material'
+                      ? 'e.g. Mild Steel Square Hollow Pipe 50x50x2.5mm'
+                      : itemKind === 'Part'
+                      ? 'e.g. Industrial Spherical Roller Bearing 22212-E1'
+                      : 'e.g. Heavy Duty MS Fabrication Table 8x4 ft'
                   }
                 />
               </div>
@@ -2260,7 +2289,8 @@ export const AddEditItemPage = () => {
                     </div>
 
                     <p className="text-[11px] text-emerald-800 bg-emerald-100/50 p-2 rounded-lg border border-emerald-200">
-                      💡 <strong>Default Warranty Rule:</strong> When physical machines or components are dispatched via Delivery Challan, this rule automatically populates the Customer Warranty Card without requiring repetitive entry.
+                      {/* Original: 💡 <strong>Default Warranty Rule:</strong> When physical machines or components are dispatched via Delivery Challan, this rule automatically populates the Customer Warranty Card without requiring repetitive entry. */}
+                      💡 <strong>Default Warranty Rule:</strong> When fabricated products or spare parts are dispatched via Delivery Challan, this rule automatically populates the Customer Warranty Card without requiring repetitive entry.
                     </p>
                   </div>
                 ) : (
@@ -2625,7 +2655,8 @@ export const AddEditItemPage = () => {
                   required
                   value={batchPrefix}
                   onChange={(e) => setBatchPrefix(e.target.value)}
-                  placeholder="e.g. SN-ENDO-X1- or SN-MACH-2026-"
+                  /* Original: placeholder="e.g. SN-ENDO-X1- or SN-MACH-2026-" */
+                  placeholder="e.g. SN-FAB-2026- or SN-SPR-2026-"
                   className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 font-mono text-xs text-slate-800"
                 />
               </div>

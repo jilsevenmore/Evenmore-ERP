@@ -22,6 +22,9 @@ import {
   Eye,
   Plane,
   ShieldCheck,
+  Shield,
+  FileCheck,
+  History,
   Building2,
   Sparkles,
   Tag,
@@ -47,6 +50,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useAttendanceStore } from '../../stores/attendanceStore';
 import { useAssetStore } from '../../stores/assetStore';
 import { useDocumentStore } from '../../stores/documentStore';
+import { usePolicyStore } from '../../stores/policyStore';
 import { api } from '../../services/api';
 import { hrmsSync } from '../../services/hrmsSync';
 import { Modal } from '../../components/ui/Modal';
@@ -59,6 +63,7 @@ import {
   fetchEmployeeWarnings,
   fetchEmployeeAwards,
 } from '../../services/upgradeService';
+import { NOTIFICATION_EVENT } from '../../services/crmEventNotifications';
 
 const PORTAL_DOC_CATEGORIES = [
   'Identity',
@@ -112,10 +117,23 @@ export default function EmployeePortal() {
   const attendanceRequests = useAttendanceStore((s) => s.requests || []);
   const addAttendanceRequest = useAttendanceStore((s) => s.addRequest);
 
+  // Policy Store
+  const policies = usePolicyStore((s) => s.policies || []);
+  const policyCategories = usePolicyStore((s) => s.categories || []);
+  const policyAcknowledgements = usePolicyStore((s) => s.acknowledgements || []);
+  const acknowledgePolicy = usePolicyStore((s) => s.acknowledgePolicy);
+
   // Local state
-  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'LEAVE' | 'HALFDAY' | 'EARLY' | 'REGULARIZATION' | 'WFH' | 'ASSET'
+  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'POLICIES' | 'LEAVE' | 'HALFDAY' | 'EARLY' | 'REGULARIZATION' | 'WFH' | 'ASSET'
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'Pending' | 'Approved' | 'Rejected'
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Policy Portal filters & modal states
+  const [policyScopeFilter, setPolicyScopeFilter] = useState('DEPARTMENT'); // 'DEPARTMENT' | 'ALL'
+  const [policyStatusFilter, setPolicyStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'ARCHIVED'
+  const [policyCategoryFilter, setPolicyCategoryFilter] = useState('All');
+  const [viewPolicyModal, setViewPolicyModal] = useState(null);
+  const [viewHistoricalVersion, setViewHistoricalVersion] = useState(null);
 
   // Modals for each request type
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -221,6 +239,7 @@ export default function EmployeePortal() {
     fetchTodayPunch();
     hydrateAssets?.();
     fetchMyResignations();
+    usePolicyStore.getState().hydrate();
 
     // Pull leave types
     hrmsSync.pull('leaveTypes').then((rows) => {
@@ -275,19 +294,98 @@ export default function EmployeePortal() {
   const [myAwards, setMyAwards] = useState([]);
 
   useEffect(() => {
-    if (!currentEmployee?.id) return;
-    Promise.all([
-      fetchEmployeeTransfers(currentEmployee.id).catch(() => []),
-      fetchEmployeePromotions(currentEmployee.id).catch(() => []),
-      fetchEmployeeWarnings(currentEmployee.id).catch(() => []),
-      fetchEmployeeAwards(currentEmployee.id).catch(() => []),
-    ]).then(([t, p, w, a]) => {
-      setMyTransfers(Array.isArray(t?.data) ? t.data : Array.isArray(t) ? t : []);
-      setMyPromotions(Array.isArray(p?.data) ? p.data : Array.isArray(p) ? p : []);
-      setMyWarnings(Array.isArray(w?.data) ? w.data : Array.isArray(w) ? w : []);
-      setMyAwards(Array.isArray(a?.data) ? a.data : Array.isArray(a) ? a : []);
+    const empTarget = currentEmployee?.id || currentEmployee?.employeeCode || employeeCode || employeeName;
+    if (!empTarget) return;
+
+    let cancelled = false;
+    const loadCareer = () => {
+      Promise.all([
+        fetchEmployeeTransfers(empTarget).catch(() => []),
+        fetchEmployeePromotions(empTarget).catch(() => []),
+        fetchEmployeeWarnings(empTarget).catch(() => []),
+        fetchEmployeeAwards(empTarget).catch(() => []),
+      ]).then(([t, p, w, a]) => {
+        if (cancelled) return;
+        setMyTransfers(Array.isArray(t?.data) ? t.data : Array.isArray(t) ? t : []);
+        setMyPromotions(Array.isArray(p?.data) ? p.data : Array.isArray(p) ? p : []);
+        setMyWarnings(Array.isArray(w?.data) ? w.data : Array.isArray(w) ? w : []);
+        setMyAwards(Array.isArray(a?.data) ? a.data : Array.isArray(a) ? a : []);
+      });
+    };
+
+    loadCareer();
+    window.addEventListener(NOTIFICATION_EVENT, loadCareer);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NOTIFICATION_EVENT, loadCareer);
+    };
+  }, [currentEmployee?.id, currentEmployee?.employeeCode, employeeCode, employeeName]);
+
+  // Map of policyId -> current employee acknowledged record
+  const employeeAckMap = useMemo(() => {
+    const map = {};
+    const myId = currentEmployee?.id || employeeCode;
+    const myName = employeeName?.toLowerCase();
+    (policyAcknowledgements || [])
+      .filter((a) => (
+        (a.employeeId && (a.employeeId === myId || a.employeeId === currentEmployee?.id)) ||
+        (a.employeeName && a.employeeName.toLowerCase() === myName)
+      ) && a.status === 'Acknowledged')
+      .forEach((a) => {
+        map[a.policyId] = a;
+      });
+    return map;
+  }, [policyAcknowledgements, currentEmployee, employeeCode, employeeName]);
+
+  // Check if a policy belongs or is applicable to this employee's department
+  const isDeptRelatedPolicy = (p) => {
+    if (!p) return false;
+    const deptNorm = (department || '').toLowerCase().trim();
+    const ownerNorm = (p.ownerDept || '').toLowerCase().trim();
+    const appNorm = (p.applicableTo || '').toLowerCase().trim();
+
+    if (appNorm === 'all employees' || appNorm === 'all' || !appNorm) return true;
+    if (deptNorm && deptNorm !== 'general') {
+      if (ownerNorm === deptNorm || ownerNorm.includes(deptNorm) || deptNorm.includes(ownerNorm)) return true;
+      if (appNorm === deptNorm || appNorm.includes(deptNorm) || deptNorm.includes(appNorm)) return true;
+    }
+    return false;
+  };
+
+  const myDeptPoliciesCount = useMemo(() => {
+    return policies.filter((p) => isDeptRelatedPolicy(p)).length;
+  }, [policies, department]);
+
+  const filteredPortalPolicies = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return policies.filter((p) => {
+      // 1. Department/Scope filter
+      if (policyScopeFilter === 'DEPARTMENT' && !isDeptRelatedPolicy(p)) {
+        return false;
+      }
+
+      // 2. Status / version filter (Active vs Old/Archived)
+      if (policyStatusFilter === 'ACTIVE' && p.status !== 'Active') return false;
+      if (policyStatusFilter === 'ARCHIVED' && p.status !== 'Archived') return false;
+
+      // 3. Category filter
+      if (policyCategoryFilter !== 'All' && p.category !== policyCategoryFilter) return false;
+
+      // 4. Search query matching
+      if (q) {
+        const matchesName = String(p.name || '').toLowerCase().includes(q);
+        const matchesCat = String(p.category || '').toLowerCase().includes(q);
+        const matchesDept = String(p.ownerDept || '').toLowerCase().includes(q);
+        const matchesSummary = String(p.summary || '').toLowerCase().includes(q);
+        const matchesVersion = String(p.version || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesCat && !matchesDept && !matchesSummary && !matchesVersion) {
+          return false;
+        }
+      }
+
+      return true;
     });
-  }, [currentEmployee?.id]);
+  }, [policies, policyScopeFilter, policyStatusFilter, policyCategoryFilter, searchQuery, department]);
 
   // Document Submission State & Helpers
   const { documents, uploadDocument, addDocument } = useDocumentStore();
@@ -1183,6 +1281,14 @@ export default function EmployeePortal() {
                 <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-semibold">
                   {employeeCode}
                 </span>
+                {Number(currentEmployee?.standardSalary || currentEmployee?.salary || currentEmployee?.ctc || 0) > 0 && (
+                  <>
+                    <span className="text-slate-300">•</span>
+                    <span className="font-mono text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md font-semibold">
+                      CTC: Rs {Number(currentEmployee?.standardSalary || currentEmployee?.salary || currentEmployee?.ctc).toLocaleString('en-IN')}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -1476,6 +1582,31 @@ export default function EmployeePortal() {
               <Plus size={14} /> Upload PDF Document
             </button>
           </div>
+
+          {/* 10. Company Policies & Departmental Governance */}
+          <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs hover:border-blue-300 hover:shadow-sm transition-all group flex flex-col justify-between">
+            <div>
+              <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                <ShieldCheck size={20} />
+              </div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 text-[14.5px]">Company Policies</h3>
+                <span className="text-[10.5px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                  {myDeptPoliciesCount} In Scope
+                </span>
+              </div>
+              <p className="text-xs text-muted mt-1 leading-relaxed">
+                Review official policies for {department}, explore historical versions, and submit required compliance acknowledgements.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('POLICIES')}
+              className="mt-4 w-full h-9 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Eye size={14} /> View Company Policies
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1542,14 +1673,18 @@ export default function EmployeePortal() {
         <div className="p-5 border-b border-bdr flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              {activeTab === 'CAREER'
+              {activeTab === 'POLICIES'
+                ? 'Company Policies & Departmental Governance'
+                : activeTab === 'CAREER'
                 ? 'My Career Milestones, Promotions & Notices'
                 : activeTab === 'DOCUMENTS'
                 ? 'My Personal Documents & Vault Records'
                 : 'My Requests & HR Verification Status'}
             </h2>
             <p className="text-xs text-muted mt-0.5">
-              {activeTab === 'CAREER'
+              {activeTab === 'POLICIES'
+                ? `Official standards and governance policies applicable to ${department} and all staff, including revision history.`
+                : activeTab === 'CAREER'
                 ? 'Official record of promotions, department transfers, awards, and formal conduct notices.'
                 : activeTab === 'DOCUMENTS'
                 ? 'Your uploaded PDF verification documents, certificates, and contracts saved to the HRMS Vault.'
@@ -1574,7 +1709,7 @@ export default function EmployeePortal() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder={activeTab === 'DOCUMENTS' ? 'Search documents…' : 'Search requests…'}
+                placeholder={activeTab === 'POLICIES' ? 'Search company policies…' : activeTab === 'DOCUMENTS' ? 'Search documents…' : 'Search requests…'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-9 pl-9 pr-3 rounded-xl bg-slate-50 border border-bdr text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-primary w-48 sm:w-56"
@@ -1582,7 +1717,7 @@ export default function EmployeePortal() {
             </div>
 
             {/* Status Filter */}
-            {activeTab !== 'CAREER' && activeTab !== 'DOCUMENTS' && (
+            {activeTab !== 'CAREER' && activeTab !== 'DOCUMENTS' && activeTab !== 'POLICIES' && (
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -1601,6 +1736,7 @@ export default function EmployeePortal() {
         <div className="flex items-center gap-1 px-5 pt-3 border-b border-bdr bg-slate-50/50 overflow-x-auto">
           {[
             { id: 'ALL', label: 'All Requests', count: unifiedRequests.length },
+            { id: 'POLICIES', label: 'Company Policies', count: myDeptPoliciesCount },
             { id: 'DOCUMENTS', label: 'My Documents', count: myDocuments.length },
             { id: 'LEAVE', label: 'Leaves', count: unifiedRequests.filter((r) => r.requestType === 'LEAVE').length },
             { id: 'HALFDAY', label: 'Half Day', count: unifiedRequests.filter((r) => r.requestType === 'HALFDAY').length },
@@ -1933,6 +2069,243 @@ export default function EmployeePortal() {
                             >
                               <Download size={13} />
                               <span>Download</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : activeTab === 'POLICIES' ? (
+            <div className="p-6">
+              {/* Scope & Version Filter Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-4 border-b border-bdr/60">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Scope filter: My Department vs All Policies */}
+                  <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setPolicyScopeFilter('DEPARTMENT')}
+                      className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                        policyScopeFilter === 'DEPARTMENT'
+                          ? 'bg-white text-primary shadow-xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Building2 size={13} />
+                      <span>My Department ({department})</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                        policyScopeFilter === 'DEPARTMENT' ? 'bg-primary/10 text-primary' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {myDeptPoliciesCount}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPolicyScopeFilter('ALL')}
+                      className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                        policyScopeFilter === 'ALL'
+                          ? 'bg-white text-primary shadow-xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Layers size={13} />
+                      <span>All Company Policies</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                        policyScopeFilter === 'ALL' ? 'bg-primary/10 text-primary' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {policies.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Status / Version filter: All vs Active vs Old/Archived */}
+                  <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setPolicyStatusFilter('ALL')}
+                      className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                        policyStatusFilter === 'ALL'
+                          ? 'bg-white text-slate-900 shadow-xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All Versions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPolicyStatusFilter('ACTIVE')}
+                      className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                        policyStatusFilter === 'ACTIVE'
+                          ? 'bg-white text-emerald-700 shadow-xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Active & Enforced
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPolicyStatusFilter('ARCHIVED')}
+                      className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer ${
+                        policyStatusFilter === 'ARCHIVED'
+                          ? 'bg-white text-slate-800 shadow-xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Old / Archived Policies
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-muted">Category:</span>
+                  <select
+                    value={policyCategoryFilter}
+                    onChange={(e) => setPolicyCategoryFilter(e.target.value)}
+                    className="h-8 px-2.5 rounded-xl bg-slate-50 border border-bdr text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary cursor-pointer"
+                  >
+                    <option value="All">All Categories</option>
+                    {policyCategories.map((c) => (
+                      <option key={c.id || c.name} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Policies List or Empty State */}
+              {filteredPortalPolicies.length === 0 ? (
+                <div className="py-14 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mx-auto mb-3 font-bold text-xs shadow-xs">
+                    <Shield size={20} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800">No company policies found</h3>
+                  <p className="text-xs text-muted mt-1 max-w-md mx-auto">
+                    {searchQuery || policyCategoryFilter !== 'All' || policyStatusFilter !== 'ALL'
+                      ? 'No policies match the selected filters. Try clearing search or viewing All Company Policies.'
+                      : `No published policies are currently assigned to ${department}. Switch to "All Company Policies" to view organization-wide standards.`}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredPortalPolicies.map((p) => {
+                    const ackRecord = employeeAckMap[p.id];
+                    const isAcked = Boolean(ackRecord);
+                    const isDeptMatch = isDeptRelatedPolicy(p);
+                    const pastVersionsCount = (p.versionHistory || []).length;
+
+                    return (
+                      <div
+                        key={p.id}
+                        className="bg-white border border-bdr rounded-2xl p-5 shadow-xs hover:border-primary/50 hover:shadow-sm transition-all flex flex-col justify-between group"
+                      >
+                        <div>
+                          {/* Card Header: Category & Status */}
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-1">
+                                <Tag size={11} /> {p.category || 'General'}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold bg-slate-100 text-slate-700">
+                                {p.version || 'v1.0'}
+                              </span>
+                              {isDeptMatch && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                  Your Dept
+                                </span>
+                              )}
+                            </div>
+
+                            <div>
+                              {p.status === 'Active' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-emerald-100 text-emerald-800">
+                                  Active
+                                </span>
+                              ) : p.status === 'Archived' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-slate-200 text-slate-700">
+                                  Archived
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-amber-100 text-amber-800">
+                                  {p.status}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Title */}
+                          <h3 className="font-bold text-slate-900 text-sm group-hover:text-primary transition-colors">
+                            {p.name}
+                          </h3>
+
+                          {/* Scope / Dept metadata */}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted mt-1.5">
+                            <span className="flex items-center gap-1">
+                              <Building2 size={12} className="text-slate-400" />
+                              <b>Dept:</b> {p.ownerDept || 'General'}
+                            </span>
+                            <span>•</span>
+                            <span>
+                              <b>Applicable:</b> {p.applicableTo || 'All Employees'}
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <Calendar size={12} className="text-slate-400" />
+                              <b>Effective:</b> {formatDate(p.effectiveDate)}
+                            </span>
+                          </div>
+
+                          {/* Summary */}
+                          <p className="text-xs text-slate-600 mt-2.5 line-clamp-2 leading-relaxed">
+                            {p.summary || p.content || 'Standard enterprise policy guidelines and corporate compliance requirements.'}
+                          </p>
+                        </div>
+
+                        {/* Card Footer: Acknowledgement & Action */}
+                        <div className="mt-4 pt-3.5 border-t border-bdr flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-xs">
+                            {p.ackRequired ? (
+                              isAcked ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-[11.5px] border border-emerald-200">
+                                  <CheckCircle2 size={13} />
+                                  <span>Acknowledged</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-[11.5px] border border-amber-200">
+                                  <AlertCircle size={13} />
+                                  <span>Pending Acknowledgment</span>
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-[11px] text-muted font-medium">Standard Compliance</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {p.ackRequired && !isAcked && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  acknowledgePolicy(p.id, employeeName, currentEmployee?.id || employeeCode, department);
+                                  showToast?.(`Acknowledged policy "${p.name}"`);
+                                }}
+                                className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                              >
+                                <Check size={13} /> Acknowledge
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewPolicyModal(p);
+                                setViewHistoricalVersion(null);
+                              }}
+                              className="h-8 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Eye size={13} />
+                              <span>View & History {pastVersionsCount > 1 ? `(${pastVersionsCount})` : ''}</span>
                             </button>
                           </div>
                         </div>
@@ -3204,6 +3577,176 @@ export default function EmployeePortal() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Policy Details & Version History Modal */}
+      <Modal
+        isOpen={Boolean(viewPolicyModal)}
+        onClose={() => {
+          setViewPolicyModal(null);
+          setViewHistoricalVersion(null);
+        }}
+        title={`Policy: ${viewPolicyModal?.name || 'Company Policy'}`}
+        size="lg"
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+            <div>
+              {viewPolicyModal?.ackRequired && (
+                employeeAckMap[viewPolicyModal.id] ? (
+                  <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                    <CheckCircle2 size={15} /> Acknowledged on {employeeAckMap[viewPolicyModal.id].ackDate || 'file'}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      acknowledgePolicy(viewPolicyModal.id, employeeName, currentEmployee?.id || employeeCode, department);
+                      showToast?.(`Acknowledged policy "${viewPolicyModal.name}"`);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  >
+                    <Check size={14} /> I have read & acknowledge this policy
+                  </button>
+                )
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setViewPolicyModal(null);
+                setViewHistoricalVersion(null);
+              }}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {viewPolicyModal && (
+          <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+            {/* Header info banner */}
+            <div className="bg-slate-50 border border-bdr rounded-2xl p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    {viewPolicyModal.category || 'General'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-slate-200 text-slate-800">
+                    {viewHistoricalVersion ? viewHistoricalVersion.version : viewPolicyModal.version || 'v1.0'}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                    (viewHistoricalVersion ? viewHistoricalVersion.status : viewPolicyModal.status) === 'Active'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {viewHistoricalVersion ? viewHistoricalVersion.status : viewPolicyModal.status}
+                  </span>
+                </div>
+                <div className="text-xs text-muted">
+                  ID: <b className="text-slate-800 font-mono">{viewPolicyModal.id}</b>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs mt-3 pt-3 border-t border-bdr/60">
+                <div>
+                  <span className="text-muted block text-[11px]">Owner Department</span>
+                  <span className="font-bold text-slate-800">{viewPolicyModal.ownerDept || 'General'}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Applicable To</span>
+                  <span className="font-bold text-slate-800">{viewPolicyModal.applicableTo || 'All Employees'}</span>
+                </div>
+                <div>
+                  <span className="text-muted block text-[11px]">Effective Date</span>
+                  <span className="font-bold text-slate-800">
+                    {formatDate(viewHistoricalVersion ? viewHistoricalVersion.effectiveDate : viewPolicyModal.effectiveDate)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* If viewing historical version banner */}
+            {viewHistoricalVersion && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-800">
+                <span>
+                  Viewing historical version <b>{viewHistoricalVersion.version}</b> (effective {formatDate(viewHistoricalVersion.effectiveDate)})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setViewHistoricalVersion(null)}
+                  className="font-bold underline hover:text-amber-900 cursor-pointer"
+                >
+                  Return to Current ({viewPolicyModal.version})
+                </button>
+              </div>
+            )}
+
+            {/* Policy Summary */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Executive Summary</h4>
+              <p className="text-xs text-slate-700 bg-slate-50/80 p-3.5 rounded-xl border border-bdr leading-relaxed">
+                {viewHistoricalVersion?.summary || viewPolicyModal.summary || 'No summary available.'}
+              </p>
+            </div>
+
+            {/* Policy Clauses & Full Content */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted mb-1.5">Policy Content & Clauses</h4>
+              <div className="text-xs text-slate-800 bg-white p-4 rounded-xl border border-bdr leading-relaxed whitespace-pre-wrap font-sans">
+                {viewHistoricalVersion?.content || viewPolicyModal.content || 'Standard operational procedures and obligations apply as prescribed by enterprise compliance standards.'}
+              </div>
+            </div>
+
+            {/* Old Versions & Revision History */}
+            <div className="pt-2">
+              <div className="flex items-center gap-2 mb-2">
+                <History size={15} className="text-slate-500" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Version History & Old Policies ({(viewPolicyModal.versionHistory || []).length})
+                </h4>
+              </div>
+
+              {(viewPolicyModal.versionHistory || []).length <= 1 ? (
+                <p className="text-xs text-muted bg-slate-50 p-3 rounded-xl border border-dashed border-bdr">
+                  This is the initial version ({viewPolicyModal.version || 'v1.0'}) of this policy. No previous versions recorded.
+                </p>
+              ) : (
+                <div className="divide-y divide-bdr/60 border border-bdr rounded-xl overflow-hidden bg-slate-50/50">
+                  {(viewPolicyModal.versionHistory || []).map((v, idx) => (
+                    <div key={`${v.version}-${idx}`} className="p-3 flex items-center justify-between gap-3 text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-800">{v.version}</span>
+                          <span className="text-[11px] text-muted">• {formatDate(v.effectiveDate)}</span>
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                            v.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                          }`}>
+                            {v.status || (idx === 0 ? 'Active' : 'Archived')}
+                          </span>
+                        </div>
+                        <p className="text-[11.5px] text-slate-600 mt-1">
+                          {v.summary || 'Policy update'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (idx === 0) setViewHistoricalVersion(null);
+                          else setViewHistoricalVersion(v);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-bdr text-[11px] font-bold hover:bg-slate-100 transition cursor-pointer shrink-0"
+                      >
+                        {viewHistoricalVersion?.version === v.version ? 'Current View' : 'Inspect Version'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Modal>

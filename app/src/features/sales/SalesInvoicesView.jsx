@@ -15,6 +15,7 @@ import { FormSection } from '../../components/common/FormSection';
 import { Pagination } from '../../components/ui/Pagination';
 import PartySelector from '../../components/common/PartySelector';
 import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
+import { validateLineProducts } from '../../utils/validators';
 
 const invoiceGuide = {
     title: 'Sales Invoices & Receivables',
@@ -55,6 +56,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         getCurrentISODate,
         addDaysISO,
         companyProfile,
+        showToast,
     } = useERP();
 
     const [filterText, setFilterText] = useState('');
@@ -321,6 +323,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     }, [lineItems, showCreateModal, editingDraftTarget, totalSalesValueInput]);
 
     const handleSaveInvoice = (statusTarget) => {
+        const productValidation = validateLineProducts(lineItems, 'sales invoice');
+        if (!productValidation.isValid) {
+            setErrorMessage(productValidation.message);
+            alert(productValidation.message);
+            showToast?.(productValidation.message);
+            return;
+        }
+        setErrorMessage('');
+
         const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
         const party = parties.find((p) => p.id === selectedCustomerId || p.name?.toLowerCase() === cust?.name?.toLowerCase());
         const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
@@ -342,7 +353,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         let discountTotal = 0;
         let totalTax = 0;
 
-        const effectiveItems = lineItems;
+        const effectiveItems = productValidation.validItems;
 
         effectiveItems.forEach((it) => {
             const lineSub = Number(it.rate || 0) * Number(it.qty || 1);
@@ -1335,11 +1346,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             {!editingDraftTarget && (
                                 <>
                                     <button onClick={() => handleSaveInvoice('Unpaid')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-xs shadow-sm cursor-pointer">
-                                        Finalize Invoice (Unpaid)
+                                        Generate Invoice (Unpaid)
                                     </button>
                                     <button onClick={() => handleSaveInvoice('Paid')} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
                                         <CheckCircle2 className="w-3.5 h-3.5"/>
-                                        Finalize & Record Full Payment
+                                        Generate & Record Full Payment
                                     </button>
                                 </>
                             )}

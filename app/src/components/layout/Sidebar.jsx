@@ -209,8 +209,8 @@ const NAV = [
     menu: 'menu_inventory',
     icon: Package,
     children: [
-      { label: 'Item Master', icon: Boxes, to: '/inventory/items' },
-      { label: 'Category Master', icon: Layers, to: '/inventory/categories' },
+      { label: 'Product Master', icon: Boxes, to: '/inventory/items' },
+      { label: 'Spare-Part Categories', icon: Layers, to: '/inventory/categories' },
       { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },
@@ -326,7 +326,6 @@ const NAV = [
     children: [
       { label: 'Users', to: '/administration/users' },
       { label: 'Roles', to: '/administration/roles' },
-      { label: 'Clients', to: '/administration/clients' },
       { label: 'System Settings', to: '/administration/settings' },
     ],
   },
@@ -570,8 +569,6 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
 // ── Sidebar ─────────────────────────────────────────────────
 export default function Sidebar() {
   const navigate = useNavigate();
-  const sidebarWidth = useAppStore((s) => s.sidebarWidth) ?? 280;
-  const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const setMobileSidebarOpen = useAppStore((s) => s.setMobileSidebarOpen);
   const currentUser = useAppStore((s) => s.currentUser);
   const theme = useAppStore((s) => s.theme) || 'light';
@@ -581,7 +578,6 @@ export default function Sidebar() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const profileRef = useRef(null);
-  const dragRef = useRef({ dragging: false, startX: 0, startWidth: sidebarWidth });
 
   // Hide what the server would refuse (UX only -- the API is the real gate).
   const permissions = useAppStore((s) => s.permissions);
@@ -648,57 +644,6 @@ export default function Sidebar() {
     }
   } catch { }
 
-  useEffect(() => {
-    function handleMove(e) {
-      if (!dragRef.current.dragging) return;
-      const dx = e.clientX - dragRef.current.startX;
-      const nextWidth = Math.min(380, Math.max(240, dragRef.current.startWidth + dx));
-      setSidebarWidth(nextWidth);
-    }
-
-    function handleUp() {
-      dragRef.current.dragging = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    }
-
-    if (dragRef.current.dragging) {
-      window.addEventListener('mousemove', handleMove);
-      window.addEventListener('mouseup', handleUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-  }, [setSidebarWidth]);
-
-  function handleResizeStart(e) {
-    e.preventDefault();
-    dragRef.current = { dragging: true, startX: e.clientX, startWidth: sidebarWidth };
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    function handleMove(ev) {
-      const dx = ev.clientX - dragRef.current.startX;
-      const nextWidth = Math.min(380, Math.max(240, dragRef.current.startWidth + dx));
-      setSidebarWidth(nextWidth);
-    }
-
-    function handleUp() {
-      dragRef.current.dragging = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    }
-
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  }
-
   // Mobile drawer: any link inside the sidebar dismisses it (including a
   // re-click on the current route, which does not change the pathname).
   function handleNavClick(e) {
@@ -707,7 +652,7 @@ export default function Sidebar() {
 
   return (
     <>
-    <aside className="sidebar" style={{ width: sidebarWidth }} onClick={handleNavClick}>
+    <aside className="sidebar" onClick={handleNavClick}>
       <div className="side-top">
         {/* Brand Header */}
         <div className="brand-block">
@@ -972,15 +917,6 @@ export default function Sidebar() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Visual Drag Handle for Sidebar Width (hidden below lg) */}
-      <div
-        className="sidebar-resize-handle"
-        onMouseDown={handleResizeStart}
-        title="Drag to resize sidebar width"
-      >
-        <div className="resize-thumb" />
       </div>
     </aside>
 

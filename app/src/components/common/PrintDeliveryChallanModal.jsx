@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
-import { X, Printer, CheckCircle2, Truck, ShieldCheck, FileText, MapPin } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Printer, CheckCircle2, Truck, ShieldCheck, FileText, MapPin, Download, Loader2 } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { addressLines, companyInitial, joinNonEmpty } from './printLetterhead';
 import { LetterpadBrand, LetterpadFooter } from './SalesLetterpad';
 import { lineSpecText, lineTotalWeight, formatKg } from '../../utils/salesLineMetal';
+import { downloadElementAsPdf } from '../../services/exportUtils';
 
 // Letterpad (documents/sewen letter pad.pdf). The previous letterhead block is
 // kept below, switched off -- flip this to restore it.
@@ -11,6 +12,8 @@ const USE_LEGACY_LETTERHEAD = false;
 
 export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
     const { companyProfile, resolvePartyAddresses, salesOrders = [], formatCurrency } = useERP();
+    const sheetRef = useRef(null);
+    const [downloading, setDownloading] = useState(false);
     const companyName = companyProfile?.name || '';
     const companyShort = companyInitial(companyName);
     const gstin = companyProfile?.gstin || '';
@@ -29,6 +32,16 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleDirectDownload = async () => {
+        if (!sheetRef.current || downloading) return;
+        setDownloading(true);
+        try {
+            await downloadElementAsPdf(sheetRef.current, `DeliveryChallan_${challan.challanNumber || 'Document'}.pdf`);
+        } finally {
+            setDownloading(false);
+        }
     };
 
     const linkedOrder = salesOrders.find(
@@ -63,10 +76,18 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handlePrint}
-                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
+                            className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer"
                         >
                             <Printer size={14} />
-                            Print / Save as PDF
+                            Print
+                        </button>
+                        <button
+                            onClick={handleDirectDownload}
+                            disabled={downloading}
+                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
+                        >
+                            {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                            {downloading ? 'Downloading...' : 'Download PDF'}
                         </button>
                         <button
                             onClick={onClose}
@@ -80,7 +101,7 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
 
                 {/* Printable Challan Sheet (A4 Proportion) */}
                 <div className="overflow-x-auto p-2 sm:p-6 lg:p-0 print:p-0 print:overflow-visible">
-                <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
+                <div ref={sheetRef} className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
                     {/* Header / Letterhead */}
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
                         {USE_LEGACY_LETTERHEAD ? (

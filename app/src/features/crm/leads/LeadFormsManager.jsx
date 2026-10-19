@@ -25,8 +25,8 @@ function getFieldCount(form) {
   return form.sections.reduce((total, section) => total + (section.fields?.length || 0), 0);
 }
 
-/** Forms saved before the Active toggle existed have no flag: they are active. */
-const isActive = (form) => form.isActive !== false;
+/** At a time only one form is active. */
+const isActive = (form) => form.isActive === true;
 
 export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDeleteForm, onToggleActive, onOpenGuide }) {
   const [statusFilter, setStatusFilter] = useState("All Status");

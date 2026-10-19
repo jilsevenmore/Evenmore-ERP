@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Pagination } from "../../../components/ui/Pagination";
 import {
   Plus,
   LayoutGrid,
@@ -59,6 +60,12 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   // Filters
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, deptFilter]);
 
   // Modal / Drawer state
   const [modalOpen, setModalOpen] = useState(false);
@@ -567,7 +574,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/60">
-                {filteredTrainings.map((t) => {
+                {filteredTrainings.slice((page - 1) * pageSize, page * pageSize).map((t) => {
                   const stageObj =
                     TRAINING_FUNNEL_STAGES.find((s) => s.key === t.stage) ||
                     TRAINING_FUNNEL_STAGES[0];
@@ -627,6 +634,21 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 })}
               </tbody>
             </table>
+            {filteredTrainings.length > 0 && (
+              <div className="border-t border-bdr bg-off/50 px-4 py-2">
+                <Pagination
+                  total={filteredTrainings.length}
+                  page={page}
+                  pageSize={pageSize}
+                  pageSizeOptions={[10, 20, 50]}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize);
+                    setPage(1);
+                  }}
+                  onChange={setPage}
+                />
+              </div>
+            )}
           </div>
         )}
 

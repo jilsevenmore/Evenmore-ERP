@@ -5,6 +5,7 @@ import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Plus, Building2, IndianRupee, Clock, X, Eye, FileSpreadsheet } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { validateEmail, validatePhone } from '../../utils/validators';
 const vendorGuide = {
     title: 'Vendor Master & Supplier Directory',
     subtitle: 'Supplier relationship management, procurement terms, and Accounts Payable ledgers',
@@ -36,6 +37,7 @@ export const VendorsPage = () => {
     const { vendors, addVendor, getVendorLedger, formatCurrency, formatDateDDMMYYYY } = useERP();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedVendor, setSelectedVendor] = useState(null);
+    const [formError, setFormError] = useState('');
     const [newVend, setNewVend] = useState({
         name: '',
         code: '',
@@ -147,21 +149,39 @@ export const VendorsPage = () => {
     ];
     const handleCreate = (e) => {
         e.preventDefault();
-        if (!newVend.name)
+        setFormError('');
+        if (!newVend.name.trim()) {
+            setFormError('Company / Supplier Name is required.');
             return;
+        }
+        if (newVend.email) {
+            const emailRes = validateEmail(newVend.email);
+            if (!emailRes.isValid) {
+                setFormError(emailRes.message);
+                return;
+            }
+        }
+        if (newVend.phone) {
+            const phoneRes = validatePhone(newVend.phone);
+            if (!phoneRes.isValid) {
+                setFormError(phoneRes.message);
+                return;
+            }
+        }
         addVendor({
             code: newVend.code || `VEND-${String(vendors.length + 1).padStart(3, '0')}`,
-            name: newVend.name,
+            name: newVend.name.trim(),
             category: newVend.category || 'Hardware',
             contactPerson: newVend.contactPerson || '',
-            email: newVend.email || '',
-            phone: newVend.phone || '',
+            email: newVend.email ? newVend.email.trim().toLowerCase() : '',
+            phone: newVend.phone ? newVend.phone.trim() : '',
             balance: 0,
             paymentTerms: newVend.paymentTerms || 'Net 30',
             weightTolerancePct: parseFloat(newVend.weightTolerancePct) || 1.5,
             status: 'Active',
         });
         setIsModalOpen(false);
+        setFormError('');
         setNewVend({ name: '', code: '', category: 'Hardware', contactPerson: '', email: '', phone: '', paymentTerms: 'Net 30', weightTolerancePct: '1.50' });
     };
     const vendorEntries = selectedVendor ? getVendorLedger(selectedVendor.id) : [];
@@ -199,6 +219,11 @@ export const VendorsPage = () => {
               </button>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4">
+              {formError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-medium">
+                  {formError}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Vendor Code</label>

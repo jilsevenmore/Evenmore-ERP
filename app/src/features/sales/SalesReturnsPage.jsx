@@ -401,6 +401,8 @@ export const SalesReturnsPage = () => {
                 columns={columns}
                 data={salesReturns}
                 keyExtractor={(r) => r.id}
+                pageSize={10}
+                pageSizeOptions={[10, 20, 50, 100]}
                 searchPlaceholder="Search return #, customer, invoice, or reason..."
                 searchFilter={(r, term) =>
                     String(r.returnNumber ?? '').toLowerCase().includes(term) ||

@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, Printer, Tag, PackageX } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, Printer, Tag, PackageX, Download, Loader2 } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { downloadElementAsPdf } from '../../services/exportUtils';
 
 /**
  * [PHASE-4] Consolidated barcode/label printer.
@@ -15,8 +16,22 @@ import { useERP } from '../../context/ERPContext';
  */
 export const BarcodeLabelModal = ({ item, onClose, variant = 'shelf', rmaNumber, product, vendor, serialNumber, qty, notes, date }) => {
     const { companyProfile, locations } = useERP();
+    const sheetRef = useRef(null);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
     if (!item)
         return null;
+
+    const handleDownloadPdf = async () => {
+        if (!sheetRef.current || isDownloadingPdf) return;
+        setIsDownloadingPdf(true);
+        try {
+            const labelName = (item.name || item.sku || 'label').replace(/\s+/g, '_');
+            await downloadElementAsPdf(sheetRef.current, `Barcode_${labelName}.pdf`);
+        } finally {
+            setIsDownloadingPdf(false);
+        }
+    };
     const isRma = variant === 'rma';
     const companyName = companyProfile?.name || '';
     const brandLabel = isRma ? 'RMA Logistics' : 'Warehouse Asset';
@@ -45,7 +60,7 @@ export const BarcodeLabelModal = ({ item, onClose, variant = 'shelf', rmaNumber,
 
         {/* Printable Label Card */}
         <div className="py-6 flex justify-center">
-          <div className="border-2 border-slate-400 rounded-xl p-4 bg-white shadow-sm w-full max-w-80 space-y-3 print:border-black text-center">
+          <div ref={sheetRef} className="border-2 border-slate-400 rounded-xl p-4 bg-white shadow-sm w-full max-w-80 space-y-3 print:border-black text-center">
             <div className="border-b border-slate-200 pb-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{brand}</span>
               <h4 className="font-bold text-sm text-slate-900 truncate">{isRma ? (item.name || product || 'RMA Return') : item.name}</h4>
@@ -112,10 +127,28 @@ export const BarcodeLabelModal = ({ item, onClose, variant = 'shelf', rmaNumber,
             {isRma ? 'Barcode verified' : <>Current Stock: <strong>{Number(item.stock ?? item.availableQty) || 0} {item.unit || item.uom || 'pcs'}</strong></>}
           </span>
           <div className="flex items-center gap-2">
-            <button onClick={() => window.print()} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-[0.99]">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-[0.99]"
+              title="Download PDF directly to Downloads folder"
+            >
+              {isDownloadingPdf ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Download PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl font-semibold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-[0.99]"
+              title="Open printer dialog"
+            >
               <Printer size={13}/> {isRma ? 'Print RMA Label' : 'Print Shelf Tag'}
             </button>
-            <button onClick={onClose} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition"
+            >
               Close
             </button>
           </div>

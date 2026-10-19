@@ -93,7 +93,7 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
   const isSubmitted = stage.status === 'Submitted';
   const notStarted = stage.status === 'Not Started' || stage.status === 'Assigned';
   const isStarted = stage.status === 'In Progress' || stage.status === 'At Risk' || stage.status === 'Delayed';
-  const canSubmit = isStarted && !isDone && !isSubmitted;
+  const canSubmit = !isDone && !isSubmitted;
 
   // Remaining / overdue ticker
   let ticker = { text: '—', tone: '#64748b' };
@@ -250,9 +250,7 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
               onClick={() => onSubmit?.(stage)}
               disabled={!canSubmit}
               title={
-                !isStarted
-                  ? 'Start the stage first before submitting'
-                  : isSubmitted
+                isSubmitted
                   ? 'Stage already submitted'
                   : isDone
                   ? 'Stage completed'

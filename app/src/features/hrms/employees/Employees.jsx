@@ -21,7 +21,9 @@ import {
   extendEmployeeProbation,
   evaluateEmployeeLifecycle,
 } from "../../../services/upgradeService";
+import { dispatchNotification } from "../../../services/crmEventNotifications";
 import PerformanceReportModal from "../performance/PerformanceReportModal";
+import { validateEmail, validatePhone } from "../../../utils/validators";
 
 const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
@@ -58,6 +60,7 @@ export default function Employees() {
   const location = useLocation();
   const storeEmployees = useAppStore((s) => s.employees || []);
   const addStoreEmployee = useAppStore((s) => s.addEmployee);
+  const updateStoreEmployee = useAppStore((s) => s.updateEmployee);
   const deleteStoreEmployee = useAppStore((s) => s.deleteEmployee);
   const refreshHrms = useAppStore((s) => s.refreshHrms);
   const setToast = useAppStore((s) => s.setToast || s.showToast);
@@ -291,6 +294,9 @@ export default function Employees() {
 
   async function handleAdd() {
     if (!form.name || !form.email) return setToast("Name and email are required.", "error");
+
+    const emailRes = validateEmail(form.email, true);
+    if (!emailRes.isValid) return setToast(emailRes.message, "error");
 
     const matchedDept = departmentsList.find((d) => d.name?.toLowerCase() === form.dept?.trim().toLowerCase());
     const matchedDesig = designationsList.find((d) => d.name?.toLowerCase() === form.designation?.trim().toLowerCase());
@@ -960,14 +966,33 @@ export default function Employees() {
                         try {
                           await createEmployeeTransfer({
                             employeeId: selectedLifecycleEmp.id,
+                            employeeName: selectedLifecycleEmp.name,
                             from_department: selectedLifecycleEmp.department,
                             to_department: transferForm.to_department,
                             effective_date: transferForm.effective_date,
                             reason: transferForm.reason,
                           });
+                          await updateStoreEmployee?.(selectedLifecycleEmp.id, {
+                            department: transferForm.to_department,
+                            dept: transferForm.to_department,
+                          });
+                          setSelectedLifecycleEmp((prev) => prev ? {
+                            ...prev,
+                            department: transferForm.to_department,
+                            dept: transferForm.to_department,
+                          } : prev);
+                          dispatchNotification({
+                            id: `transfer-${Date.now()}`,
+                            title: 'Department Transfer Recorded',
+                            message: `${selectedLifecycleEmp.name} transferred from ${selectedLifecycleEmp.department || 'General'} to ${transferForm.to_department}. Effective: ${transferForm.effective_date}.${transferForm.reason ? ` Reason: ${transferForm.reason}` : ''}`,
+                            category: 'hrms',
+                            type: 'hrms.transfer',
+                            entityType: 'EmployeeTransfer',
+                            createdAt: new Date().toISOString(),
+                            status: 'unread',
+                          });
                           setToast("Transfer recorded successfully.");
                           setShowEventCreateModal(false);
-                          setSelectedLifecycleEmp((prev) => prev ? { ...prev, department: transferForm.to_department } : prev);
                           await loadLifecycleData(selectedLifecycleEmp.id);
                           refreshHrms?.("employees");
                         } catch (err) {
@@ -1026,18 +1051,51 @@ export default function Employees() {
                       onSubmit={async (e) => {
                         e.preventDefault();
                         try {
+                          const revisedSalary = parseFloat(promotionForm.new_salary) || 0;
+                          const prevSalary = parseFloat(promotionForm.previous_salary) || 0;
                           await createEmployeePromotion({
                             employeeId: selectedLifecycleEmp.id,
+                            employeeName: selectedLifecycleEmp.name,
                             previous_designation: selectedLifecycleEmp.designation,
                             new_designation: promotionForm.new_designation,
-                            previous_salary: parseFloat(promotionForm.previous_salary) || 0,
-                            new_salary: parseFloat(promotionForm.new_salary) || 0,
+                            previous_salary: prevSalary,
+                            new_salary: revisedSalary,
                             effective_date: promotionForm.effective_date,
                             notes: promotionForm.notes,
                           });
-                          setToast("Promotion confirmed successfully.");
+                          await updateStoreEmployee?.(selectedLifecycleEmp.id, {
+                            designation: promotionForm.new_designation,
+                            role: promotionForm.new_designation,
+                            position: promotionForm.new_designation,
+                            ...(revisedSalary > 0 ? {
+                              standardSalary: revisedSalary,
+                              salary: revisedSalary,
+                              basicSalary: revisedSalary,
+                              ctc: revisedSalary,
+                            } : {}),
+                          });
+                          setSelectedLifecycleEmp((prev) => prev ? {
+                            ...prev,
+                            designation: promotionForm.new_designation,
+                            role: promotionForm.new_designation,
+                            position: promotionForm.new_designation,
+                            ...(revisedSalary > 0 ? {
+                              standardSalary: revisedSalary,
+                              salary: revisedSalary,
+                            } : {}),
+                          } : prev);
+                          dispatchNotification({
+                            id: `promotion-${Date.now()}`,
+                            title: 'Employee Promotion & Revision',
+                            message: `${selectedLifecycleEmp.name} was promoted to ${promotionForm.new_designation}.${revisedSalary > 0 ? ` Revised CTC: Rs ${Number(revisedSalary).toLocaleString('en-IN')}.` : ''} Effective: ${promotionForm.effective_date}.`,
+                            category: 'hrms',
+                            type: 'hrms.promotion',
+                            entityType: 'EmployeePromotion',
+                            createdAt: new Date().toISOString(),
+                            status: 'unread',
+                          });
+                          setToast("Promotion confirmed and employee profile updated.");
                           setShowEventCreateModal(false);
-                          setSelectedLifecycleEmp((prev) => prev ? { ...prev, designation: promotionForm.new_designation, standardSalary: promotionForm.new_salary } : prev);
                           await loadLifecycleData(selectedLifecycleEmp.id);
                           refreshHrms?.("employees");
                         } catch (err) {
@@ -1118,10 +1176,21 @@ export default function Employees() {
                         try {
                           await createEmployeeWarning({
                             employeeId: selectedLifecycleEmp.id,
+                            employeeName: selectedLifecycleEmp.name,
                             severity: warningForm.warning_level,
                             subject: warningForm.title,
                             description: warningForm.explanation,
                             issue_date: warningForm.warning_date,
+                          });
+                          dispatchNotification({
+                            id: `warning-${Date.now()}`,
+                            title: `Disciplinary Notice: ${warningForm.title}`,
+                            message: `Disciplinary notice (${warningForm.warning_level}) issued to ${selectedLifecycleEmp.name}. Reason: ${warningForm.explanation || warningForm.title}.`,
+                            category: 'hrms',
+                            type: 'hrms.warning',
+                            entityType: 'EmployeeWarning',
+                            createdAt: new Date().toISOString(),
+                            status: 'unread',
                           });
                           setToast("Disciplinary notice issued successfully.");
                           setShowEventCreateModal(false);
@@ -1179,13 +1248,26 @@ export default function Employees() {
                       onSubmit={async (e) => {
                         e.preventDefault();
                         try {
+                          const cashReward = parseFloat(awardForm.cash_reward) || 0;
                           await createEmployeeAward({
                             employeeId: selectedLifecycleEmp.id,
+                            employeeName: selectedLifecycleEmp.name,
                             award_name: awardForm.award_name,
                             category: awardForm.category || "Excellence",
                             citation: awardForm.citation,
-                            gift_amount: parseFloat(awardForm.cash_reward) || 0,
+                            gift_amount: cashReward,
+                            cash_reward: cashReward,
                             award_date: awardForm.presentation_date,
+                          });
+                          dispatchNotification({
+                            id: `award-${Date.now()}`,
+                            title: `Excellence Award: ${awardForm.award_name}`,
+                            message: `${selectedLifecycleEmp.name} was honored with '${awardForm.award_name}' (${awardForm.category || 'Excellence'}).${cashReward > 0 ? ` Cash Reward: Rs ${Number(cashReward).toLocaleString('en-IN')}.` : ''}`,
+                            category: 'hrms',
+                            type: 'hrms.award',
+                            entityType: 'EmployeeAward',
+                            createdAt: new Date().toISOString(),
+                            status: 'unread',
                           });
                           setToast("Award recorded and presented.");
                           setShowEventCreateModal(false);

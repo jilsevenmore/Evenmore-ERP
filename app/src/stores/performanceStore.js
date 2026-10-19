@@ -44,7 +44,13 @@ export function getRatingScaleTier(rating) {
 // (self-review, manager-review, return, approve, finalize), which records history.
 function postAppraisalAction(id, action, payload) {
   if (!isServerId(id)) return;
-  hrmsSync.act("appraisals", id, action, payload).catch((err) => {
+  hrmsSync.act("appraisals", id, action, payload).then((serverRecord) => {
+    if (serverRecord && serverRecord.id) {
+      usePerformanceStoreBase.setState((s) => ({
+        appraisals: s.appraisals.map((a) => (a.id === serverRecord.id ? { ...a, ...serverRecord } : a)),
+      }));
+    }
+  }).catch((err) => {
     console.warn(`Appraisal ${action} was not saved`, err);
   });
 }
@@ -108,23 +114,40 @@ const usePerformanceStoreBase = create((set, get) => ({
   /**
    * Every action calls this after changing part of the state. Each collection
    * is written through to its own endpoint; `writeThrough` works out which rows
-   * are new, changed or gone.
+   * are new, changed or gone and updates state with server IDs.
    */
   persist: () => {
     const s = get();
-    writeThrough("cycles", s.cycles);
-    writeThrough("appraisals", s.appraisals);
-    writeThrough("indicators", s.indicators);
-    writeThrough("kpis", s.kpis);
-    writeThrough("goals", s.goals);
+    writeThrough("cycles", s.cycles).then((rows) => {
+      if (Array.isArray(rows) && rows.length > 0) set({ cycles: rows });
+    });
+    writeThrough("appraisals", s.appraisals).then((rows) => {
+      if (Array.isArray(rows) && rows.length > 0) set({ appraisals: rows });
+    });
+    writeThrough("indicators", s.indicators).then((rows) => {
+      if (Array.isArray(rows) && rows.length > 0) set({ indicators: rows });
+    });
+    writeThrough("kpis", s.kpis).then((rows) => {
+      if (Array.isArray(rows) && rows.length > 0) set({ kpis: rows });
+    });
+    writeThrough("goals", s.goals).then((rows) => {
+      if (Array.isArray(rows) && rows.length > 0) set({ goals: rows });
+    });
   },
 
   // ── Cycle Management ──────────────────────────────────────────
   addCycle: (cycle) => {
     const id = cycle.id || `CYC-${Date.now()}`;
+    const pStart = cycle.periodStart || cycle.startDate || "";
+    const pEnd = cycle.periodEnd || cycle.endDate || "";
     const newCycle = {
       ...cycle,
       id,
+      periodStart: pStart,
+      periodEnd: pEnd,
+      startDate: cycle.startDate || pStart,
+      endDate: cycle.endDate || pEnd,
+      reviewPeriod: cycle.reviewPeriod || (pStart && pEnd ? `${pStart} - ${pEnd}` : ""),
       status: cycle.status || "Active",
       appraisalCount: 0,
       completedCount: 0,
@@ -252,7 +275,21 @@ const usePerformanceStoreBase = create((set, get) => ({
     const id = appraisal.id || `APR-${String(get().appraisals.length + 1).padStart(3, "0")}`;
     const initialRating = Number(appraisal.rating) || 4.0;
     const tier = getRatingScaleTier(initialRating);
-    const activeCycle = get().cycles.find((c) => c.id === get().activeCycleId) || get().cycles.find((c) => c.status === "Active");
+    const activeCycle = get().cycles.find((c) => c.id === appraisal.cycleId || c.id === get().activeCycleId) ||
+                        get().cycles.find((c) => c.status === "Active") ||
+                        get().cycles[0];
+
+    const appStore = useAppStore.getState();
+    const employees = appStore.employees || [];
+    const emp = employees.find(
+      (e) => e.id === appraisal.employeeId ||
+             String(e.name ?? '').toLowerCase() === String(appraisal.employee ?? '').toLowerCase()
+    );
+    const mgr = employees.find(
+      (e) => e.id === appraisal.managerId ||
+             String(e.name ?? '').toLowerCase() === String(appraisal.reviewer ?? '').toLowerCase()
+    );
+
     const defaultKpis = get().indicators
       .filter((i) => i.status === "Active")
       .map((i) => ({
@@ -262,21 +299,24 @@ const usePerformanceStoreBase = create((set, get) => ({
         weight: Number(i.weight) || 0,
         score: initialRating,
       }));
+
     const newAppr = {
       id,
-      avatar: appraisal.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(appraisal.employee || id)}`,
-      employee: appraisal.employee,
+      employeeId: emp?.id || appraisal.employeeId || "",
+      managerId: mgr?.id || appraisal.managerId || "",
+      cycleId: activeCycle?.id || appraisal.cycleId || "",
+      avatar: appraisal.avatar || emp?.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(appraisal.employee || id)}`,
+      employee: emp?.name || appraisal.employee,
       cycle: appraisal.cycle || activeCycle?.name || "",
-      cycleId: appraisal.cycleId || activeCycle?.id || "",
-      reviewer: appraisal.reviewer,
-      department: appraisal.department || "",
-      designation: appraisal.designation || "",
+      reviewer: mgr?.name || appraisal.reviewer,
+      department: appraisal.department || emp?.department || emp?.dept || "",
+      designation: appraisal.designation || emp?.designation || emp?.role || "",
       rating: initialRating,
       ratingScaleLabel: tier.label,
       weightedScore: Math.round((initialRating / 5) * 100),
       stage: appraisal.stage || "Self Review",
       status: appraisal.status || "Pending",
-      due: appraisal.due || "",
+      due: appraisal.due || (activeCycle?.periodEnd || activeCycle?.endDate || ""),
       selfReview: appraisal.selfReview || {
         rating: initialRating,
         comments: "",

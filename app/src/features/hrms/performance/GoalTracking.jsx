@@ -71,6 +71,16 @@ export default function GoalTracking() {
         <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
       </div> }
   ];
+  const uniqueEmployeeList = useMemo(() => {
+    const seen = new Set();
+    return (employees || []).filter((e) => {
+      const n = (e.name || "").trim();
+      if (!n || seen.has(n.toLowerCase())) return false;
+      seen.add(n.toLowerCase());
+      return true;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [employees]);
+
   function FormFields() {
     return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="flex flex-col gap-1">
@@ -78,7 +88,7 @@ export default function GoalTracking() {
           <select
             value={form.employee}
             onChange={(e) => {
-              const emp = employees.find((x) => x.name === e.target.value);
+              const emp = uniqueEmployeeList.find((x) => x.name === e.target.value);
               setForm({
                 ...form,
                 employee: e.target.value,
@@ -88,9 +98,9 @@ export default function GoalTracking() {
             className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]"
           >
             <option value="">Select Employee</option>
-            {employees.map((e) => (
+            {uniqueEmployeeList.map((e) => (
               <option key={e.id || e.name} value={e.name}>
-                {e.name} ({e.department || e.designation})
+                {e.name}{e.department || e.designation ? ` (${e.department || e.designation})` : ""}
               </option>
             ))}
           </select>
@@ -124,7 +134,7 @@ export default function GoalTracking() {
         label: "Employee",
         value: employee,
         onChange: setEmployee,
-        options: [{ value: "All", label: "All Employees" }, ...employees.map((e) => ({ value: e.name, label: e.name }))],
+        options: [{ value: "All", label: "All Employees" }, ...uniqueEmployeeList.map((e) => ({ value: e.name, label: e.name }))],
       },
       { label: "Department", value: dept, onChange: setDept, options: [{ value: "All", label: "All Departments" }, ...[...new Set([...employees.map((e) => e.department), ...data.map((r) => r.department)].filter(Boolean))].map((d) => ({ value: d, label: d }))] },
       { label: "Status", value: status, onChange: setStatus, options: [{ value: "All", label: "All Status" }, { value: "Not Started", label: "Not Started" }, { value: "In Progress", label: "In Progress" }, { value: "At Risk", label: "At Risk" }, { value: "Completed", label: "Completed" }] }

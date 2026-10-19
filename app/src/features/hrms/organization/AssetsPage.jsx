@@ -46,6 +46,15 @@ import {
 export function AssetsPage() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees || []);
+  const uniqueEmployees = useMemo(() => {
+    const seen = new Set();
+    return (employees || []).filter((e) => {
+      const n = (e.name || "").trim();
+      if (!n || seen.has(n.toLowerCase())) return false;
+      seen.add(n.toLowerCase());
+      return true;
+    }).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [employees]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -1257,9 +1266,9 @@ export function AssetsPage() {
                 className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
               >
                 <option value="">Select Employee</option>
-                {employees.map((emp) => (
+                {uniqueEmployees.map((emp) => (
                   <option key={emp.id || emp.name} value={emp.name}>
-                    {emp.name} — {emp.designation || emp.department} ({emp.id})
+                    {emp.name}{emp.designation || emp.department ? ` — ${emp.designation || emp.department}` : ""}{emp.employeeCode || emp.empId ? ` (${emp.employeeCode || emp.empId})` : ""}
                   </option>
                 ))}
               </select>
@@ -1505,9 +1514,9 @@ export function AssetsPage() {
               className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
             >
               <option value="">Select Employee</option>
-              {employees.map((emp) => (
+              {uniqueEmployees.map((emp) => (
                 <option key={emp.id || emp.name} value={emp.name}>
-                  {emp.name} — {emp.designation || emp.department} ({emp.id})
+                  {emp.name}{emp.designation || emp.department ? ` — ${emp.designation || emp.department}` : ""}{emp.employeeCode || emp.empId ? ` (${emp.employeeCode || emp.empId})` : ""}
                 </option>
               ))}
             </select>
@@ -1799,9 +1808,9 @@ export function AssetsPage() {
                 className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
               >
                 <option value="">Select Employee</option>
-                {employees.map((emp) => (
+                {uniqueEmployees.map((emp) => (
                   <option key={emp.id || emp.name} value={emp.name}>
-                    {emp.name} — {emp.designation || emp.department} ({emp.id})
+                    {emp.name}{emp.designation || emp.department ? ` — ${emp.designation || emp.department}` : ""}{emp.employeeCode || emp.empId ? ` (${emp.employeeCode || emp.empId})` : ""}
                   </option>
                 ))}
               </select>

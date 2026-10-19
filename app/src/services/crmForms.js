@@ -16,14 +16,42 @@ import { syncCollection } from './crmCollections';
 export const LEAD_FORM = 'lead';
 export const TASK_FORM = 'task';
 
+export function normalizeLeadForms(forms) {
+  if (!Array.isArray(forms) || forms.length === 0) return forms || [];
+  const activeId = getActiveFormId();
+  let activeIndex = -1;
+  if (activeId) {
+    activeIndex = forms.findIndex((f) => String(f.id) === String(activeId));
+  }
+  if (activeIndex === -1) {
+    activeIndex = forms.findIndex((f) => f.isActive === true);
+  }
+  if (activeIndex === -1 && forms.length > 0) {
+    activeIndex = 0;
+  }
+
+  return forms.map((form, idx) => ({
+    ...form,
+    isActive: idx === activeIndex,
+  }));
+}
+
 /** The forms of one kind, as the server returned them. */
 export function loadForms(kind = LEAD_FORM) {
-  return useCrmStore.getState().forms.filter((form) => (form.kind || LEAD_FORM) === kind);
+  const forms = useCrmStore.getState().forms.filter((form) => (form.kind || LEAD_FORM) === kind);
+  if (kind === LEAD_FORM && forms.length > 0) {
+    return normalizeLeadForms(forms);
+  }
+  return forms;
 }
 
 /** Persist the form list a builder just produced. */
 export function saveForms(next = [], kind = LEAD_FORM) {
-  const stamped = next.map((form) => ({ ...form, kind: form.kind || kind }));
+  let toSave = next;
+  if (kind === LEAD_FORM && toSave.length > 0) {
+    toSave = normalizeLeadForms(toSave);
+  }
+  const stamped = toSave.map((form) => ({ ...form, kind: form.kind || kind }));
   const previous = useCrmStore.getState().forms;
   // Forms of the other kind are untouched, so they are carried through as-is.
   const others = previous.filter((form) => (form.kind || LEAD_FORM) !== kind);

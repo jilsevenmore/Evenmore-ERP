@@ -436,7 +436,9 @@ export const QuotationsPage = () => {
                 ? { ...it, description: sheetAutoDescription(it.sheetSpec) } : it))
             .filter((it) => it.itemId || String(it.description || it.name || '').trim() || Number(it.rate));
         if (quoteLines.length === 0) {
-            showToast('Add at least one line: an inventory item or a custom / service description.');
+            const msg = 'Please select at least one product before generating the quotation.';
+            alert(msg);
+            showToast(msg);
             return;
         }
         const unnamed = quoteLines.findIndex((it) => !it.itemId && !String(it.description || it.name || '').trim());

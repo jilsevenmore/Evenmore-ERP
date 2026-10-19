@@ -1,6 +1,8 @@
 /**
  * Evenmore ERP — Statutory & Format Validation Utilities
  */
+import { sheetAutoDescription } from './salesLineMetal';
+
 
 /**
  * Validates Indian 15-character GSTIN format
@@ -49,38 +51,122 @@ export const validateIFSC = (ifsc) => {
 
 /**
  * Validates Standard Email Address
+ * @param {string} email
+ * @param {boolean} required
  */
-export const validateEmail = (email) => {
-  if (!email) return { isValid: false, message: 'Email address is required' };
-  const clean = email.trim().toLowerCase();
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const validateEmail = (email, required = false) => {
+  if (!email || !String(email).trim()) {
+    if (required) return { isValid: false, message: 'Email address is required' };
+    return { isValid: true, cleanValue: '' };
+  }
+  const clean = String(email).trim().toLowerCase();
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(clean)) {
-    return { isValid: false, message: 'Please enter a valid email address' };
+    return { isValid: false, message: 'Please enter a valid email address (e.g. name@example.com)' };
   }
   return { isValid: true, cleanValue: clean };
 };
 
 /**
- * Validates 10-Digit Mobile Phone Number
+ * Validates Mobile or Phone Number
+ * Allowed characters: digits, spaces, hyphens, parentheses, optional leading +
+ * Must contain between 10 and 15 digits.
+ * @param {string} phone
+ * @param {boolean} required
  */
-export const validatePhone = (phone) => {
-  if (!phone) return { isValid: false, message: 'Phone number is required' };
-  const clean = phone.replace(/[^0-9+]/g, '');
-  if (clean.length < 10 || clean.length > 13) {
-    return { isValid: false, message: 'Phone number must be 10-12 digits' };
+export const validatePhone = (phone, required = false) => {
+  if (!phone || !String(phone).trim() || String(phone).trim() === '+91') {
+    if (required) return { isValid: false, message: 'Phone number is required' };
+    return { isValid: true, cleanValue: '' };
   }
-  return { isValid: true, cleanValue: clean };
+  const raw = String(phone).trim();
+  const allowedRegex = /^\+?[0-9\s\-()]+$/;
+  if (!allowedRegex.test(raw)) {
+    return { isValid: false, message: "Phone number can only contain digits, spaces, hyphens, and optional leading '+'" };
+  }
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 15) {
+    return { isValid: false, message: 'Phone number must contain between 10 and 15 digits' };
+  }
+  return { isValid: true, cleanValue: raw };
 };
 
 /**
  * Validates 6-Digit Indian Pincode
+ * @param {string|number} pincode
+ * @param {boolean} required
  */
-export const validatePincode = (pincode) => {
-  if (!pincode) return { isValid: false, message: 'Postal Pincode is required' };
+export const validatePincode = (pincode, required = false) => {
+  if (!pincode || !String(pincode).trim()) {
+    if (required) return { isValid: false, message: 'Postal Pincode is required' };
+    return { isValid: true, cleanValue: '' };
+  }
   const clean = String(pincode).trim();
   const pinRegex = /^[1-9][0-9]{5}$/;
   if (!pinRegex.test(clean)) {
-    return { isValid: false, message: 'Pincode must be 6 digits (e.g. 560100)' };
+    return { isValid: false, message: 'Pincode must be a 6-digit number (e.g. 560100)' };
   }
   return { isValid: true, cleanValue: clean };
+};
+
+/**
+ * Validates Address Dictionary (including embedded pincode)
+ * @param {object} address
+ * @param {object} options
+ */
+export const validateAddress = (address, { requiredPincode = false } = {}) => {
+  if (!address || typeof address !== 'object') {
+    return { isValid: true, cleanValue: address };
+  }
+  const pincode = address.pincode || address.pin_code || address.postal_code;
+  if (pincode || requiredPincode) {
+    const pinRes = validatePincode(pincode, requiredPincode);
+    if (!pinRes.isValid) return pinRes;
+  }
+  return { isValid: true, cleanValue: address };
+};
+
+/**
+ * Validates that line items contain at least one valid selected product / line item
+ * (either linked to an inventory item, or with a custom item name / description or metal spec)
+ * @param {Array} items
+ * @param {string} docType
+ */
+export const validateLineProducts = (items = [], docType = 'document') => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return {
+      isValid: false,
+      message: `Please select at least one product before generating the ${docType}.`,
+      validItems: [],
+    };
+  }
+
+  const validItems = items
+    .map((it) => {
+      if (!it) return null;
+      if (!it.itemId && !String(it.description || it.name || '').trim() && it.sheetSpec && sheetAutoDescription(it.sheetSpec) && Number(it.rate)) {
+        return { ...it, description: sheetAutoDescription(it.sheetSpec) };
+      }
+      return it;
+    })
+    .filter((it) => it && (Boolean(it.itemId) || Boolean(String(it.description || it.name || '').trim()) || (it.sheetSpec && sheetAutoDescription(it.sheetSpec))));
+
+  if (validItems.length === 0) {
+    return {
+      isValid: false,
+      message: `Please select at least one product before generating the ${docType}.`,
+      validItems: [],
+    };
+  }
+
+  const unnamedIdx = validItems.findIndex((it) => !it.itemId && !String(it.description || it.name || '').trim());
+  if (unnamedIdx !== -1) {
+    return {
+      isValid: false,
+      message: `Line ${unnamedIdx + 1} needs a product name or description (or select an inventory item).`,
+      validItems,
+    };
+  }
+
+  return { isValid: true, message: '', validItems };
 };

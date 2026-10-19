@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { useERP } from "../../../context/ERPContext";
+import { downloadElementAsPdf } from "../../../services/exportUtils";
 import {
   X,
   Printer,
@@ -17,6 +18,8 @@ import {
   Clock,
   User,
   UserCheck,
+  Download,
+  Loader2,
 } from "lucide-react";
 
 export default function OfferLetterModal({
@@ -26,12 +29,16 @@ export default function OfferLetterModal({
   onUpdateOffer,
   onConfirmOffer,
   onAcceptOffer,
+  initialEdit = false,
+  autoPrint = false,
 }) {
   const currentUser = useAppStore((s) => s.currentUser);
   const { companyProfile } = useERP();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEdit);
   const [formData, setFormData] = useState(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const sheetRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -74,15 +81,35 @@ export default function OfferLetterModal({
         companyName: companyProfile?.name || "",
         companyAddress: [companyProfile?.address, companyProfile?.email].filter(Boolean).join(" • "),
       });
-      setIsEditing(false);
+      setIsEditing(initialEdit);
       setSavedSuccess(false);
     }
-  }, [offer, currentUser?.name, companyProfile?.name, companyProfile?.address, companyProfile?.email]);
+  }, [offer, initialEdit, currentUser?.name, companyProfile?.name, companyProfile?.address, companyProfile?.email]);
+
+  useEffect(() => {
+    if (isOpen && autoPrint && formData && !isEditing) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoPrint, formData, isEditing]);
 
   if (!isOpen || !offer || !formData) return null;
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!sheetRef.current || isDownloadingPdf) return;
+    setIsDownloadingPdf(true);
+    try {
+      const candidateSafeName = (formData.candidateName || offer.candidateName || 'Candidate').replace(/\s+/g, '_');
+      await downloadElementAsPdf(sheetRef.current, `Offer_Letter_${candidateSafeName}.pdf`);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   const handleConfirm = () => {
@@ -162,8 +189,8 @@ export default function OfferLetterModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
-      <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-3xl w-full my-auto overflow-hidden flex flex-col print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none print:overflow-visible">
+      <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-3xl w-full my-auto overflow-hidden flex flex-col print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none print:overflow-visible">
         
         {/* Top Control Bar (Hidden during Print) */}
         <div className="bg-[#1F2E4A] text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 no-print shrink-0">
@@ -238,15 +265,27 @@ export default function OfferLetterModal({
               </button>
             )}
 
-            {/* Print / Save PDF */}
+            {/* Download PDF (Direct 1-Click) */}
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
+              title="Download PDF directly to Downloads folder"
+            >
+              {isDownloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              <span>Download PDF</span>
+            </button>
+
+            {/* Print */}
             <button
               type="button"
               onClick={handlePrint}
-              className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
-              title="Print or Export as PDF"
+              className="h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs bg-white/10 hover:bg-white/20 text-white border border-white/20"
+              title="Print document"
             >
               <Printer size={14} />
-              <span>Print / Save as PDF</span>
+              <span>Print</span>
             </button>
 
             {/* Close */}
@@ -270,7 +309,7 @@ export default function OfferLetterModal({
         )}
 
         {/* Modal Body */}
-        <div className="max-h-[calc(88vh-55px)] overflow-y-auto">
+        <div className="max-h-[calc(88vh-55px)] overflow-y-auto print:max-h-none print:overflow-visible">
           {isEditing ? (
             /* ── EDIT MODE FORM ── */
             <div className="p-4 sm:p-6 bg-slate-50 space-y-4 no-print text-xs">
@@ -518,7 +557,7 @@ export default function OfferLetterModal({
 
           {/* ── MINIMAL & SIMPLE PRINTABLE OFFER LETTER ── */}
           <div className="overflow-x-auto p-2 sm:p-6 lg:p-0 print:p-0 print:overflow-visible">
-          <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
+          <div ref={sheetRef} className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
             
             {/* Header / Company Info */}
             <div className="flex items-start justify-between border-b border-slate-200 pb-4">

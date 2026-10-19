@@ -5,6 +5,7 @@ import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X } from "lucide-re
 import { activeLeadForm, customLeadFields, isBlankValue, isSupportedCustomField, leadFormLayout, missingRequiredField } from '../../../services/leadFormFields';
 import { PERMANENT_LEAD_FIELD_ID } from '../../../data/crm/leadFormSchema';
 import { CustomLeadFieldInput } from './CustomLeadFieldInput';
+import { validateEmail, validatePhone } from '../../../utils/validators';
 
 /** Who a lead can be assigned to, from `/crm/team-roster/` (one row per person). */
 function useUserOptions() {
@@ -159,6 +160,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   const [createdOn, setCreatedOn] = useState("");
   const [taskDate, setTaskDate] = useState("");
   const [taskTime, setTaskTime] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   // Fields added in the Lead Create Form builder, saved as lead.customValues.
   const storeForms = useCrmStore((s) => s.forms);
   const activeForm = useMemo(() => activeLeadForm(), [storeForms, isOpen]);
@@ -325,6 +327,21 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   }
 
   function handleCreate() {
+    setErrorMsg("");
+    if (email) {
+      const emailRes = validateEmail(email, false);
+      if (!emailRes.isValid) {
+        setErrorMsg(emailRes.message);
+        return;
+      }
+    }
+    if (phone) {
+      const phoneRes = validatePhone(phone, false);
+      if (!phoneRes.isValid) {
+        setErrorMsg(phoneRes.message);
+        return;
+      }
+    }
     isNavigatingToLayoutRef.current = false;
     try {
       sessionStorage.removeItem('crm_lead_create_draft');
@@ -332,8 +349,8 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
     onCreate({
       leadName,
       company,
-      email,
-      phone,
+      email: email ? email.trim().toLowerCase() : "",
+      phone: phone ? phone.trim() : "",
       // The API records the lookup ids; the labels are only for display.
       sourceId,
       source: sources.find((option) => option.id === sourceId)?.name || "",
@@ -512,6 +529,12 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
             </Fragment>
           ))}
         </div>
+
+        {errorMsg && (
+          <div className="mx-6 mt-2 mb-1 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-medium">
+            {errorMsg}
+          </div>
+        )}
 
         <div className="lead-create-modal-actions">
           <div className="relative inline-block">

@@ -236,9 +236,24 @@ const useCrmStoreBase = create((set, get) => ({
 
   /** Leads to Lost (not deleted); the server moves or opens their deals, so both re-read. */
   markLeadsLost: async (ids, lostReasonId) => {
-    const result = await markLeadsLostRequest(ids, lostReasonId);
-    await Promise.all([get().refresh('leads'), get().refresh('deals')]);
-    return result;
+    // Optimistically update local leads
+    set((s) => ({
+      leads: (s.leads || []).map((lead) => {
+        if (ids.includes(lead.id)) {
+          return { ...lead, status: 'Lost', lostReasonId: lostReasonId || lead.lostReasonId };
+        }
+        return lead;
+      }),
+    }));
+    try {
+      const result = await markLeadsLostRequest(ids, lostReasonId);
+      await Promise.all([get().refresh('leads'), get().refresh('deals')]);
+      window.dispatchEvent(new Event('crm:data-updated'));
+      return result;
+    } catch (err) {
+      await get().refresh('leads');
+      throw err;
+    }
   },
 
   /** The server creates the party and/or deal, so both collections re-read. */

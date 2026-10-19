@@ -304,7 +304,7 @@ export const PaymentOutPage = () => {
         columns={columns}
         data={paymentOuts}
         keyExtractor={(p) => p.id}
-        pageSize={20}
+        pageSize={10}
         pageSizeOptions={[10, 20, 50, 100]}
         searchPlaceholder="Search voucher #, vendor, or bill..."
         searchFilter={(p, term) =>

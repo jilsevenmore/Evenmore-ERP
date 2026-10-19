@@ -4,7 +4,7 @@ import { Button } from '../../../../components/ui/Button';
 import { usePmsStore, nextProjectId, getProjectManagers } from '../../../../stores/pmsStore';
 import { useERP } from '../../../../context/ERPContext';
 import { formatCurrency } from '../../../../utils/currencyUtils';
-import { AlertCircle, Link2, PackageCheck, Info, Clock, Check } from 'lucide-react';
+import { AlertCircle, Link2, PackageCheck, Info, Clock, Check, CheckCircle2, ShieldAlert, IndianRupee } from 'lucide-react';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 
 /**
@@ -46,7 +46,15 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
   const createProjectFromOrder = usePmsStore((s) => s.createProjectFromOrder);
   const showToast = usePmsStore((s) => s.showToast);
   // The sales orders a project can be created from, as the server returned them.
-  const { salesOrders = [] } = useERP() || {};
+  const {
+    salesOrders = [],
+    parties = [],
+    customers = [],
+    paymentIns = [],
+    invoices = [],
+    proformaInvoices = [],
+    cashPaymentReceipts = [],
+  } = useERP() || {};
 
   const activeConfigs = useMemo(
     () => stageConfigs.filter((c) => c.isActive).sort((a, b) => a.sequence - b.sequence),
@@ -120,6 +128,77 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     if (!effectiveOrderNumber) return null;
     return salesOrders.find((o) => o.orderNumber === effectiveOrderNumber) ?? null;
   }, [salesOrders, effectiveOrderNumber]);
+
+  // Mandatory PMS Advance Requirement Check
+  const advanceCheck = useMemo(() => {
+    if (!selectedOrder) {
+      return { required: false, satisfied: true, requiredPct: 0, requiredAmount: 0, receivedAmount: 0, shortfall: 0, customerName: '', orderTotal: 0 };
+    }
+
+    // 1. Find the customer party record
+    const partyMatch =
+      parties.find((p) => (selectedOrder.customerId && (p.id === selectedOrder.customerId || p.code === selectedOrder.customerId)) || (p.name && selectedOrder.customer && p.name.trim().toLowerCase() === selectedOrder.customer.trim().toLowerCase())) ||
+      customers.find((c) => (selectedOrder.customerId && (c.id === selectedOrder.customerId || c.code === selectedOrder.customerId)) || (c.name && selectedOrder.customer && c.name.trim().toLowerCase() === selectedOrder.customer.trim().toLowerCase())) ||
+      null;
+
+    const requiredPct = Number(partyMatch?.pmsAdvancePaymentPercentage ?? partyMatch?.pms_advance_payment_percentage ?? 0) || 0;
+    const customerName = partyMatch?.name || selectedOrder.customer || 'Customer';
+    const orderTotal = Number(selectedOrder.total ?? selectedOrder.amount ?? selectedOrder.totalSalesValue ?? 0) || 0;
+
+    if (requiredPct <= 0 || orderTotal <= 0) {
+      return { required: false, satisfied: true, requiredPct: 0, requiredAmount: 0, receivedAmount: 0, shortfall: 0, customerName, orderTotal };
+    }
+
+    const requiredAmount = Math.round((orderTotal * requiredPct) / 100 * 100) / 100;
+
+    // 2. Compute order-specific payments & advances
+    const directOrderPaid = Number(selectedOrder.amount_paid ?? selectedOrder.paidAmount ?? selectedOrder.amountPaid ?? 0) || 0;
+    const cashAmountPaid = selectedOrder.paymentStatus === 'Paid' ? (Number(selectedOrder.cashAmount) || 0) : 0;
+
+    // Active payments in paymentIns linked directly to this order
+    const orderDirectPmts = paymentIns
+      .filter((p) => p.status !== 'Cancelled' && ((p.salesOrderId && (p.salesOrderId === selectedOrder.id || p.salesOrderId === selectedOrder.orderNumber)) || (p.salesOrderNumber && p.salesOrderNumber === selectedOrder.orderNumber) || (p.reference && String(p.reference).includes(selectedOrder.orderNumber))))
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    // Payments linked to proformas for this order
+    const orderProformaIds = new Set(proformaInvoices.filter((pi) => pi.referenceSo === selectedOrder.orderNumber || pi.salesOrderId === selectedOrder.id).map((pi) => pi.id || pi.piNumber));
+    const proformaPmts = paymentIns
+      .filter((p) => p.status !== 'Cancelled' && ((p.proformaInvoiceId && orderProformaIds.has(p.proformaInvoiceId)) || (p.invoiceNumber && orderProformaIds.has(p.invoiceNumber)) || (p.proformaId && orderProformaIds.has(p.proformaId))))
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    // Payments linked to invoices for this order
+    const orderInvoiceIds = new Set(invoices.filter((inv) => inv.salesOrderId === selectedOrder.id || inv.linkedSo === selectedOrder.orderNumber).map((inv) => inv.id || inv.invoiceNumber));
+    const invoicePmts = paymentIns
+      .filter((p) => p.status !== 'Cancelled' && ((p.invoiceId && orderInvoiceIds.has(p.invoiceId)) || (p.invoiceNumber && orderInvoiceIds.has(p.invoiceNumber))))
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    // Cash payment receipts
+    const cprPmts = cashPaymentReceipts
+      .filter((r) => r.status !== 'CANCELLED' && r.status !== 'VOIDED' && ((r.salesOrderId && (r.salesOrderId === selectedOrder.id || r.salesOrderId === selectedOrder.orderNumber)) || (r.salesOrderNumber && r.salesOrderNumber === selectedOrder.orderNumber) || (r.referenceNumber && String(r.referenceNumber).includes(selectedOrder.orderNumber))))
+      .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+    const orderSpecificTotal = Math.max(directOrderPaid, cashAmountPaid, orderDirectPmts + proformaPmts + invoicePmts + cprPmts);
+
+    // Customer account advance balance (negative balance in SEWEN represents customer advance)
+    const partyBal = Number(partyMatch?.balance ?? 0);
+    const customerAccountAdvance = partyBal < 0 ? Math.abs(partyBal) : 0;
+
+    const receivedAmount = Math.max(orderSpecificTotal, customerAccountAdvance);
+    const satisfied = receivedAmount >= requiredAmount - 0.01;
+    const shortfall = Math.max(0, Math.round((requiredAmount - receivedAmount) * 100) / 100);
+
+    return {
+      required: true,
+      satisfied,
+      requiredPct,
+      requiredAmount,
+      receivedAmount,
+      shortfall,
+      orderTotal,
+      customerName,
+      partyId: partyMatch?.id,
+    };
+  }, [selectedOrder, parties, customers, paymentIns, proformaInvoices, invoices, cashPaymentReceipts]);
 
   const projectCode = useMemo(() => nextProjectId(projects), [projects]);
 
@@ -339,6 +418,9 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     }
 
     // Creating a new project
+    if (advanceCheck.required && !advanceCheck.satisfied) {
+      nextErrors.advance = `PMS Project conversion blocked: Customer '${advanceCheck.customerName}' requires at least ${advanceCheck.requiredPct}% advance payment (${formatCurrency(advanceCheck.requiredAmount)}) for order value ${formatCurrency(advanceCheck.orderTotal)}. Current advance received is ${formatCurrency(advanceCheck.receivedAmount)} (Shortfall: ${formatCurrency(advanceCheck.shortfall)}).`;
+    }
     if (!managerId) nextErrors.manager = 'Assign a project manager.';
     if (selectedConfigIds.length === 0) nextErrors.stages = 'Pick at least one stage.';
     if (selectedConfigIds.length > 0 && Math.round(totalPercentage * 100) / 100 !== 100) {
@@ -356,7 +438,12 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     }
 
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      if (nextErrors.advance) {
+        showToast(nextErrors.advance, 'error');
+      }
+      return;
+    }
 
     const manager = managers.find((m) => m.id === managerId);
     let id;
@@ -414,11 +501,19 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
           <Button variant="secondary" onClick={handleClose} type="button">
             Cancel
           </Button>
-          <Button type="submit" form="pms-create-project" icon={PackageCheck}>
+          <Button
+            type="submit"
+            form="pms-create-project"
+            icon={PackageCheck}
+            disabled={!existingProject && advanceCheck.required && !advanceCheck.satisfied}
+            title={!existingProject && advanceCheck.required && !advanceCheck.satisfied ? `Mandatory ${advanceCheck.requiredPct}% advance payment required before PMS project conversion` : undefined}
+          >
             {existingProject
               ? existingProject.status === 'Completed'
                 ? 'Open Project'
                 : 'Save Stage Durations & Open'
+              : !existingProject && advanceCheck.required && !advanceCheck.satisfied
+              ? `Advance Required (${advanceCheck.requiredPct}%)`
               : 'Create Project'}
           </Button>
         </>
@@ -501,6 +596,85 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
               ))}
             </dl>
           </div>
+        )}
+
+        {/* Advance Requirement Status for Selected Order */}
+        {!existingProject && selectedOrder && advanceCheck.required && (
+          <div
+            className={`rounded-xl border p-3.5 space-y-2 text-xs transition-all ${
+              advanceCheck.satisfied
+                ? 'border-emerald-200 bg-emerald-50/90 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200'
+                : 'border-rose-200 bg-rose-50/90 dark:bg-rose-950/20 text-rose-900 dark:text-rose-200'
+            }`}
+          >
+            <div className="flex items-start gap-2.5">
+              {advanceCheck.satisfied ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              )}
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="font-bold text-xs">
+                    {advanceCheck.satisfied
+                      ? `✓ Advance Payment Requirement Cleared (${advanceCheck.requiredPct}%)`
+                      : `Advance Payment Required: ${advanceCheck.requiredPct}% Policy`}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      advanceCheck.satisfied
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : 'bg-rose-100 text-rose-800 border-rose-300'
+                    }`}
+                  >
+                    {advanceCheck.satisfied ? 'Eligible for PMS' : 'Conversion Blocked'}
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
+                  {advanceCheck.satisfied
+                    ? `Customer policy requirement of ${advanceCheck.requiredPct}% advance payment has been satisfied. Received ${formatCurrency(advanceCheck.receivedAmount)} against required ${formatCurrency(advanceCheck.requiredAmount)}.`
+                    : `Customer "${advanceCheck.customerName}" requires at least ${advanceCheck.requiredPct}% advance payment before converting this sales order into a PMS production project.`}
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
+                  <div className="bg-white/90 dark:bg-card p-2 rounded-lg border border-border/60">
+                    <span className="text-[10px] text-muted block">Order Total</span>
+                    <span className="font-mono font-bold text-text">{formatCurrency(advanceCheck.orderTotal)}</span>
+                  </div>
+                  <div className="bg-white/90 dark:bg-card p-2 rounded-lg border border-border/60">
+                    <span className="text-[10px] text-muted block">Required ({advanceCheck.requiredPct}%)</span>
+                    <span className="font-mono font-bold text-indigo-700 dark:text-indigo-400">{formatCurrency(advanceCheck.requiredAmount)}</span>
+                  </div>
+                  <div className="bg-white/90 dark:bg-card p-2 rounded-lg border border-border/60">
+                    <span className="text-[10px] text-muted block">Received Advance</span>
+                    <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(advanceCheck.receivedAmount)}</span>
+                  </div>
+                  <div className="bg-white/90 dark:bg-card p-2 rounded-lg border border-border/60">
+                    <span className={`text-[10px] block font-bold ${advanceCheck.satisfied ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {advanceCheck.satisfied ? 'Surplus / Cleared' : 'Shortfall Needed'}
+                    </span>
+                    <span className={`font-mono font-bold ${advanceCheck.satisfied ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {advanceCheck.satisfied ? '✓ Satisfied' : formatCurrency(advanceCheck.shortfall)}
+                    </span>
+                  </div>
+                </div>
+
+                {!advanceCheck.satisfied && (
+                  <div className="pt-1.5 flex items-center justify-between text-[11px]">
+                    <span className="text-rose-700 dark:text-rose-300 font-medium">
+                      Please record an advance payment of at least <strong>{formatCurrency(advanceCheck.shortfall)}</strong> before project start.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {errors.advance && (
+          <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1">
+            <AlertCircle size={11} /> {errors.advance}
+          </p>
         )}
 
         {/* Project Attributes (Start Date, Priority, Project Manager) */}

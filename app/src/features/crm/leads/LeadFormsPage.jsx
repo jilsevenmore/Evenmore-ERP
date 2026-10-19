@@ -51,10 +51,17 @@ export default function LeadFormsPage() {
       sections: withStandardLeadFields([{ id: 'lead-information', title: 'Lead Information', fields: [] }]),
     };
 
-    const updated = [...leadForms, newForm];
+    const willBeActive = Boolean(formActive);
+    const existingUpdated = willBeActive
+      ? leadForms.map((f) => ({ ...f, isActive: false }))
+      : leadForms;
+
+    const updated = [...existingUpdated, newForm];
     saveForms(updated, LEAD_FORM);
-    setActiveFormId(newId);
-    setLeadForms(updated);
+    if (willBeActive) {
+      setActiveFormId(newId);
+    }
+    setLeadForms(loadForms(LEAD_FORM));
     setIsModalOpen(false);
     navigate(`/crm/leads/form-builder?formId=${newId}`);
   }
@@ -64,11 +71,30 @@ export default function LeadFormsPage() {
     navigate(`/crm/leads/form-builder?formId=${formId}`);
   }
 
-  /** Switch a form on or off in place: the same form row, only its status changes. */
+  /** Switch a form on or off in place: at a time only one form is active, all others inactive. */
   function handleToggleActive(formId) {
-    const updated = leadForms.map((f) => (f.id === formId ? { ...f, isActive: f.isActive === false } : f));
+    const target = leadForms.find((f) => String(f.id) === String(formId));
+    const willBeActive = target ? target.isActive !== true : true;
+
+    const updated = leadForms.map((f) => {
+      if (String(f.id) === String(formId)) {
+        return { ...f, isActive: willBeActive };
+      }
+      // If activating this form, all other forms become inactive
+      if (willBeActive) {
+        return { ...f, isActive: false };
+      }
+      return f;
+    });
+
+    if (willBeActive) {
+      setActiveFormId(formId);
+    } else if (getActiveFormId() === formId) {
+      setActiveFormId(null);
+    }
+
     saveForms(updated, LEAD_FORM);
-    setLeadForms(updated);
+    setLeadForms(loadForms(LEAD_FORM));
   }
 
   function handleDeleteForm(formId) {

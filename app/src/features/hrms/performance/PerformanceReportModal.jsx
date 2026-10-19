@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { usePerformanceStore, getRatingScaleTier } from "../../../stores/performanceStore";
 import { useERP } from "../../../context/ERPContext";
+import { downloadElementAsPdf } from "../../../services/exportUtils";
 import {
   X,
   Printer,
@@ -18,6 +19,8 @@ import {
   Briefcase,
   Layers,
   ChevronDown,
+  Download,
+  Loader2,
 } from "lucide-react";
 import UserInitials from "../../../components/common/UserInitials";
 
@@ -137,10 +140,22 @@ export default function PerformanceReportModal({
   // Performance Rating & Metrics
   const ratingValue = primaryAppraisal?.rating || 4.2;
   const ratingTier = getRatingScaleTier(ratingValue);
-  const weightedScore = primaryAppraisal?.weightedScore || Math.round((ratingValue / 5) * 100);
+  const sheetRef = useRef(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!sheetRef.current || isDownloadingPdf) return;
+    setIsDownloadingPdf(true);
+    try {
+      const empSafeName = (currentEmp?.name || 'Employee').replace(/\s+/g, '_');
+      await downloadElementAsPdf(sheetRef.current, `Performance_Report_${empSafeName}.pdf`);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -189,15 +204,27 @@ export default function PerformanceReportModal({
               </div>
             )}
 
-            {/* Print / Save PDF */}
+            {/* Download PDF (Direct 1-Click) */}
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
+              title="Download PDF directly to Downloads folder"
+            >
+              {isDownloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              <span>Download PDF</span>
+            </button>
+
+            {/* Print */}
             <button
               type="button"
               onClick={handlePrint}
-              className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs bg-blue-600 hover:bg-blue-500 text-white"
-              title="Print or Export as PDF"
+              className="h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs bg-white/10 hover:bg-white/20 text-white border border-white/20"
+              title="Print document"
             >
               <Printer size={14} />
-              <span>Print / Export PDF</span>
+              <span>Print</span>
             </button>
 
             {/* Close */}
@@ -213,7 +240,7 @@ export default function PerformanceReportModal({
         </div>
 
         {/* Report Content Body (Printable Document Sheet) */}
-        <div className="p-6 sm:p-10 bg-white text-slate-800 space-y-6 max-h-[85vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-8">
+        <div ref={sheetRef} className="p-6 sm:p-10 bg-white text-slate-800 space-y-6 max-h-[85vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-8">
           
           {/* Document Header */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b-2 border-slate-900">

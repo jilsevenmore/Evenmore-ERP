@@ -21,7 +21,7 @@ function splitLayout(sections) {
 import { useCrmStore } from '../../../stores/crmStore';
 import FormActiveToggle, { FormStatusBadge } from './FormActiveToggle';
 import { sessionCan } from '../../../services/lazyModules';
-import { loadForms, saveForms, findForm, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
+import { loadForms, saveForms, findForm, getActiveFormId, setActiveFormId, LEAD_FORM } from '../../../services/crmForms';
 
 export default function LeadFormBuilderPage() {
   const navigate = useNavigate();
@@ -231,8 +231,8 @@ export default function LeadFormBuilderPage() {
       index === 0 ? { ...section, fields: [...section.fields, ...removedStandardFields] } : section
     );
     const updated = forms.some((f) => String(f.id) === String(targetId))
-      ? forms.map((f) => (String(f.id) === String(targetId) ? { ...f, sections: sectionsToSave, isActive: true } : f))
-      : [...forms, { id: targetId || `lead-form-${Date.now()}`, name: currentForm?.name || 'Lead create form', sections: sectionsToSave, isActive: true }];
+      ? forms.map((f) => (String(f.id) === String(targetId) ? { ...f, sections: sectionsToSave, isActive: true } : { ...f, isActive: false }))
+      : [...forms.map((f) => ({ ...f, isActive: false })), { id: targetId || `lead-form-${Date.now()}`, name: currentForm?.name || 'Lead create form', sections: sectionsToSave, isActive: true }];
     const effectiveId = targetId || updated[updated.length - 1]?.id;
     if (effectiveId) {
       setActiveFormId(effectiveId);
@@ -269,10 +269,22 @@ export default function LeadFormBuilderPage() {
   function toggleFormActive() {
     if (!currentForm) return;
     const forms = loadForms(LEAD_FORM);
-    saveForms(
-      forms.map((f) => (f.id === currentForm.id ? { ...f, isActive: f.isActive === false } : f)),
-      LEAD_FORM,
-    );
+    const willBeActive = currentForm.isActive !== true;
+    const updated = forms.map((f) => {
+      if (String(f.id) === String(currentForm.id)) {
+        return { ...f, isActive: willBeActive };
+      }
+      if (willBeActive) {
+        return { ...f, isActive: false };
+      }
+      return f;
+    });
+    if (willBeActive) {
+      setActiveFormId(currentForm.id);
+    } else if (getActiveFormId() === currentForm.id) {
+      setActiveFormId(null);
+    }
+    saveForms(updated, LEAD_FORM);
   }
 
   return (

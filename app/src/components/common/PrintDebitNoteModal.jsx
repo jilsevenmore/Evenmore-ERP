@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
-import { X, Printer, RotateCcw, Building2, Calendar, FileText } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Printer, RotateCcw, Building2, Calendar, FileText, Download, Loader2 } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { companyInitial, joinNonEmpty } from './printLetterhead';
+import { downloadElementAsPdf } from '../../services/exportUtils';
 
 export const PrintDebitNoteModal = ({
   isOpen,
@@ -9,6 +10,8 @@ export const PrintDebitNoteModal = ({
   debitNote,
 }) => {
   const { companyProfile } = useERP();
+  const sheetRef = useRef(null);
+  const [downloading, setDownloading] = useState(false);
   const companyName = companyProfile?.name || '';
   const companyAddress = companyProfile?.address || '';
   const gstin = companyProfile?.gstin || '';
@@ -28,6 +31,16 @@ export const PrintDebitNoteModal = ({
     window.print();
   };
 
+  const handleDirectDownload = async () => {
+    if (!sheetRef.current || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadElementAsPdf(sheetRef.current, `DebitNote_${debitNote.debitNoteNumber || 'Document'}.pdf`);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const totalAmount = debitNote.totalCredit || debitNote.total || 0;
   const items = debitNote.items || [];
 
@@ -45,10 +58,18 @@ export const PrintDebitNoteModal = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer"
             >
               <Printer size={14} />
-              Print / Save as PDF
+              Print
+            </button>
+            <button
+              onClick={handleDirectDownload}
+              disabled={downloading}
+              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
+            >
+              {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {downloading ? 'Downloading...' : 'Download PDF'}
             </button>
             <button
               onClick={onClose}
@@ -62,7 +83,7 @@ export const PrintDebitNoteModal = ({
 
         {/* Real Document Sheet (A4 Proportion) */}
         <div className="overflow-x-auto p-2 sm:p-6 lg:p-0 print:p-0 print:overflow-visible">
-        <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
+        <div ref={sheetRef} className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
           {/* Header / Corporate Letterhead */}
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
             <div className="space-y-1">

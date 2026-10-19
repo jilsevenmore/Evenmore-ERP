@@ -22,6 +22,7 @@ import {
     describeError,
     CHALLAN_TRACK_STATUSES,
 } from '../services/backendSync';
+import { api } from '../services/api';
 // ── [PHASE-2E.1] steel-category → HSN default map (Sweven fabrication master) ──
 //   Falls back to 7216 (angles/shapes/sections) unless the category matches a known steel family.
 function mapCategoryToHSN(category) {
@@ -1936,6 +1937,10 @@ export const ERPProvider = ({ children, }) => {
         if (!pi) return undefined;
 
         const targetItems = invoiceOverrides.items || pi.items || [];
+        if (!targetItems || targetItems.length === 0 || !targetItems.some(it => it.itemId || (it.name && it.name.trim()) || (it.description && it.description.trim()))) {
+            showToast('Cannot generate Invoice: Proforma Invoice has no products.');
+            return undefined;
+        }
         const subtotal = invoiceOverrides.subtotal ?? (targetItems.reduce((sum, item) => sum + (Number(item.amount || 0) || (Number(item.qty || 1) * Number(item.rate || 0))), 0) || pi.subtotal);
         const tax = invoiceOverrides.tax ?? (pi.cgst + pi.sgst + pi.igst || Math.round(subtotal * 0.18 * 100) / 100);
         const grandTotal = invoiceOverrides.total ?? Math.round((subtotal + tax) * 100) / 100;
@@ -2205,6 +2210,8 @@ export const ERPProvider = ({ children, }) => {
         phone: party.phone || '',
         balance: Number(party.balance) || 0,
         paymentTerms: party.paymentTerms || 'Net 30',
+        pmsAdvancePaymentPercentage: party.pmsAdvancePaymentPercentage !== undefined ? Number(party.pmsAdvancePaymentPercentage) : (party.pms_advance_payment_percentage !== undefined ? Number(party.pms_advance_payment_percentage) : 0),
+        pms_advance_payment_percentage: party.pms_advance_payment_percentage !== undefined ? Number(party.pms_advance_payment_percentage) : (party.pmsAdvancePaymentPercentage !== undefined ? Number(party.pmsAdvancePaymentPercentage) : 0),
         status: party.status === 'Inactive' ? 'Inactive' : 'Active',
     });
 
@@ -2228,6 +2235,8 @@ export const ERPProvider = ({ children, }) => {
             ledgerAccount: p.ledgerAccount || (p.type === 'Vendor' ? '2010 - Accounts Payable' : '1210 - Accounts Receivable'),
             creditLimit: p.creditLimit ?? (p.type === 'Vendor' ? 0 : 50000),
             paymentTerms: p.paymentTerms || 'Net 30',
+            pmsAdvancePaymentPercentage: p.pmsAdvancePaymentPercentage !== undefined ? Number(p.pmsAdvancePaymentPercentage) : (p.pms_advance_payment_percentage !== undefined ? Number(p.pms_advance_payment_percentage) : 0),
+            pms_advance_payment_percentage: p.pms_advance_payment_percentage !== undefined ? Number(p.pms_advance_payment_percentage) : (p.pmsAdvancePaymentPercentage !== undefined ? Number(p.pmsAdvancePaymentPercentage) : 0),
             bankAccountNumber: p.bankAccountNumber || '',
             ifscCode: p.ifscCode || '',
             bankName: p.bankName || '',
@@ -2255,6 +2264,8 @@ export const ERPProvider = ({ children, }) => {
                 phone: newParty.phone,
                 balance: newParty.balance,
                 creditLimit: newParty.creditLimit ?? 50000,
+                pmsAdvancePaymentPercentage: newParty.pmsAdvancePaymentPercentage,
+                pms_advance_payment_percentage: newParty.pmsAdvancePaymentPercentage,
                 status: newParty.status === 'Inactive' ? 'On Hold' : 'Active',
             }, { persist: false });
         }
@@ -2411,6 +2422,8 @@ export const ERPProvider = ({ children, }) => {
             phone: cust.phone || '',
             balance: cust.balance ?? 0,
             creditLimit: cust.creditLimit ?? 25000,
+            pmsAdvancePaymentPercentage: cust.pmsAdvancePaymentPercentage !== undefined ? Number(cust.pmsAdvancePaymentPercentage) : (cust.pms_advance_payment_percentage !== undefined ? Number(cust.pms_advance_payment_percentage) : 0),
+            pms_advance_payment_percentage: cust.pms_advance_payment_percentage !== undefined ? Number(cust.pms_advance_payment_percentage) : (cust.pmsAdvancePaymentPercentage !== undefined ? Number(cust.pmsAdvancePaymentPercentage) : 0),
             status: cust.status || 'Active',
         };
         setCustomers((prev) => {
@@ -2429,6 +2442,8 @@ export const ERPProvider = ({ children, }) => {
                     phone: newCust.phone || p.phone,
                     balance: newCust.balance ?? p.balance,
                     creditLimit: newCust.creditLimit ?? p.creditLimit,
+                    pmsAdvancePaymentPercentage: newCust.pmsAdvancePaymentPercentage ?? p.pmsAdvancePaymentPercentage,
+                    pms_advance_payment_percentage: newCust.pmsAdvancePaymentPercentage ?? p.pms_advance_payment_percentage,
                 } : p);
             }
             const newParty = {
@@ -2442,6 +2457,8 @@ export const ERPProvider = ({ children, }) => {
                 phone: newCust.phone,
                 balance: newCust.balance ?? 0,
                 creditLimit: newCust.creditLimit ?? 25000,
+                pmsAdvancePaymentPercentage: newCust.pmsAdvancePaymentPercentage ?? 0,
+                pms_advance_payment_percentage: newCust.pmsAdvancePaymentPercentage ?? 0,
                 status: newCust.status || 'Active',
                 billingAddress: { line1: '', city: '', state: '', pincode: '' },
                 shippingAddress: { line1: '', city: '', state: '', pincode: '' },
@@ -3311,6 +3328,10 @@ export const ERPProvider = ({ children, }) => {
             : (order.lineItems && order.lineItems.length > 0)
                 ? order.lineItems
                 : [];
+        if (srcLines.length === 0 || !srcLines.some(it => it.itemId || (it.name && it.name.trim()) || (it.description && it.description.trim()))) {
+            showToast('Cannot generate Invoice: Sales Order has no products.');
+            return undefined;
+        }
         const totalOrderedQty = srcLines.reduce((s, l) => s + (Number(l.orderedQty ?? l.qty) || 0), 0);
         const totalInvoicedQty = srcLines.reduce((s, l) => s + (Number(l.invoicedQty) || 0), 0);
         const fullyInvoiced = totalOrderedQty > 0 && totalInvoicedQty >= totalOrderedQty - 0.001;
@@ -3851,13 +3872,15 @@ export const ERPProvider = ({ children, }) => {
             showToast(`Recorded Without-Bill Cash Receipt ${cprNum} of ${formatCurrency(payAmt)}`);
 
             // Persisting paymentIns with paymentType="WITHOUT_BILL" creates the cash receipt atomically on the server
-            persistCreate('paymentIns', newPay, setPaymentIns, {
-                onServer: (serverRecord) => {
-                    if (serverRecord?.cashReceipt) {
-                        reconcile(setCashPaymentReceipts, newCashReceipt.id, serverRecord.cashReceipt);
-                    }
-                },
-            });
+            if (!pay.skipSync) {
+                persistCreate('paymentIns', newPay, setPaymentIns, {
+                    onServer: (serverRecord) => {
+                        if (serverRecord?.cashReceipt) {
+                            reconcile(setCashPaymentReceipts, newCashReceipt.id, serverRecord.cashReceipt);
+                        }
+                    },
+                });
+            }
             return newPay;
         }
 
@@ -3932,7 +3955,9 @@ export const ERPProvider = ({ children, }) => {
         };
         setJournalEntries((prev) => [newJe, ...prev]);
         showToast(`Recorded receipt of ${formatCurrency(payAmt)} from ${custName}`);
-        persistCreate('paymentIns', newPay, setPaymentIns);
+        if (!pay.skipSync) {
+            persistCreate('paymentIns', newPay, setPaymentIns);
+        }
         return newPay;
     };
 
@@ -4271,6 +4296,116 @@ export const ERPProvider = ({ children, }) => {
         }
         return true;
     };
+
+    /**
+     * Record dual-stream funds for a party (With-Bill formal payment and/or Without-Bill cash receipt).
+     */
+    const recordPartyFunds = async ({
+        partyId,
+        partyName,
+        formalAmount = 0,
+        cashAmount = 0,
+        formalMode = 'Bank Transfer',
+        cashMode = 'Cash',
+        formalReference = '',
+        cashReference = '',
+        date,
+        invoiceId = null,
+        invoiceNumber = '',
+        description = '',
+        notes = '',
+    } = {}) => {
+        const numFormal = Number(formalAmount) || 0;
+        const numCash = Number(cashAmount) || 0;
+
+        if (numFormal < 0 || numCash < 0) {
+            showToast('Amounts cannot be negative.');
+            return null;
+        }
+
+        if (numFormal === 0 && numCash === 0) {
+            showToast('Please enter at least one amount (Formal Amount or Cash Amount).');
+            return null;
+        }
+
+        const effectiveDate = date || getCurrentISODate();
+
+        let createdFormal = null;
+        if (numFormal > 0) {
+            createdFormal = addPaymentIn({
+                customerId: partyId,
+                customer: partyName || '',
+                amount: numFormal,
+                mode: formalMode || 'Bank Transfer',
+                paymentType: 'WITH_BILL',
+                reference: formalReference || `TXN-FORMAL-${Date.now()}`,
+                date: effectiveDate,
+                invoiceId: invoiceId || null,
+                invoiceNumber: invoiceNumber || '',
+                description: description || 'Dual settlement (Formal stream)',
+                notes: notes || '',
+                skipSync: true,
+            });
+        }
+
+        let createdCash = null;
+        if (numCash > 0) {
+            createdCash = addPaymentIn({
+                customerId: partyId,
+                customer: partyName || '',
+                amount: numCash,
+                mode: cashMode || 'Cash',
+                paymentType: 'WITHOUT_BILL',
+                reference: cashReference || `TXN-CASH-${Date.now()}`,
+                date: effectiveDate,
+                invoiceId: invoiceId || null,
+                invoiceNumber: invoiceNumber || '',
+                description: description || 'Dual settlement (Cash stream)',
+                notes: notes || '',
+                skipSync: true,
+            });
+        }
+
+        let serverRes = null;
+        if (isBackendEnabled() && partyId) {
+            try {
+                serverRes = await api.post(`/parties/${partyId}/record-funds/`, {
+                    formalAmount: String(numFormal),
+                    cashAmount: String(numCash),
+                    formalMode,
+                    cashMode,
+                    formalReference: formalReference || '',
+                    cashReference: cashReference || '',
+                    paymentDate: toISODate(effectiveDate) || effectiveDate,
+                    invoiceId: invoiceId || null,
+                    description,
+                    notes,
+                });
+                if (serverRes?.formalPayment && createdFormal) {
+                    reconcile(setPaymentIns, createdFormal.id, serverRes.formalPayment);
+                }
+                if (serverRes?.cashPayment && createdCash) {
+                    reconcile(setCashPaymentReceipts, createdCash.cashReceipt?.id || createdCash.id, serverRes.cashPayment);
+                }
+            } catch (err) {
+                console.warn('[ERP] could not record party funds on server:', err);
+                showToast(`Saved locally only — ${describeError(err)}`);
+            }
+        }
+
+        const totalAmt = numFormal + numCash;
+        showToast(`Recorded dual funds of ${formatCurrency(totalAmt)} for ${partyName || 'party'}.`);
+
+        return {
+            partyId,
+            partyName,
+            formalPayment: createdFormal,
+            cashPayment: createdCash,
+            totalRecorded: totalAmt,
+            server: serverRes,
+        };
+    };
+
     const addSalesReturn = (ret) => {
         const inv = invoices.find((i) => i.id === ret.invoiceId || i.invoiceNumber === ret.invoiceRef);
         if (inv) {
@@ -4545,7 +4680,7 @@ export const ERPProvider = ({ children, }) => {
         const po = typeof poId === 'object' ? poId : purchaseOrders.find((p) => p.id === poId || p.poNumber === poId);
         if (!po) return { status: 'Draft', totalOrderedQty: 0, totalBilledQty: 0, totalRemainingQty: 0, lines: [], activeBills: [] };
 
-        const activeBills = purchaseBills.filter((b) => (b.purchaseOrderId === po.id || b.poRef === po.poNumber || b.linkedPo === po.poNumber) && b.status !== 'Cancelled');
+        const activeBills = purchaseBills.filter((b) => (b.purchaseOrderId === po.id || b.purchaseOrder === po.id || b.purchase_order === po.id || (po.poNumber && (b.poRef === po.poNumber || b.linkedPo === po.poNumber))) && b.status !== 'Cancelled');
         const poLines = po.items || po.lineItems || [];
 
         let totalOrderedQty = 0;
@@ -4556,8 +4691,14 @@ export const ERPProvider = ({ children, }) => {
             totalOrderedQty += orderedQty;
             const lineSku = line.sku || line.itemSku;
             const billedQty = activeBills.reduce((sum, bill) => {
-                const match = (bill.items || bill.lineItems || []).find((it) => (line.itemId && it.itemId === line.itemId) || (lineSku && (it.sku === lineSku || it.itemSku === lineSku)));
-                return sum + Number(match?.qty || 0);
+                const bLines = bill.items || bill.lineItems || [];
+                const lineMatches = bLines.filter((it) =>
+                    (line.itemId && (it.itemId === line.itemId || it.item_id === line.itemId)) ||
+                    (lineSku && (it.sku === lineSku || it.itemSku === lineSku)) ||
+                    (it.name && line.name && it.name === line.name) ||
+                    (it.description && line.description && it.description === line.description)
+                );
+                return sum + lineMatches.reduce((s, m) => s + Number(m.qty || 0), 0);
             }, 0);
             totalBilledQty += billedQty;
             const remainingQty = Math.max(0, orderedQty - billedQty);
@@ -4593,7 +4734,7 @@ export const ERPProvider = ({ children, }) => {
         if (!po) return { success: false, message: 'Purchase Order not found.' };
         if (po.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
 
-        const activeBill = purchaseBills.find((b) => (b.purchaseOrderId === poId || b.poRef === po.poNumber || b.linkedPo === po.poNumber) && b.status !== 'Cancelled');
+        const activeBill = purchaseBills.find((b) => (b.purchaseOrderId === poId || b.purchaseOrder === poId || b.purchase_order === poId || (po.poNumber && (b.poRef === po.poNumber || b.linkedPo === po.poNumber))) && b.status !== 'Cancelled');
         if (activeBill) {
             showToast(`Cannot cancel PO: active Bill ${activeBill.billNumber} exists. Cancel the bill first.`);
             return { success: false, message: `Active bill ${activeBill.billNumber} exists.` };
@@ -4638,7 +4779,7 @@ export const ERPProvider = ({ children, }) => {
         persistDelete('purchaseOrders', id);
         showToast(`Draft Purchase Order ${po.poNumber || ''} deleted.`);
     };
-    const convertPurchaseOrderToBill = (poId) => {
+    const convertPurchaseOrderToBill = async (poId) => {
         const po = purchaseOrders.find((p) => p.id === poId);
         if (!po)
             return undefined;
@@ -4668,6 +4809,8 @@ export const ERPProvider = ({ children, }) => {
             id: `pb-${Date.now()}`,
             billNumber: `PB-2026-${String(purchaseBills.length + 16).padStart(3, '0')}`,
             purchaseOrderId: po.id,
+            purchaseOrder: po.id,
+            purchase_order: po.id,
             poRef: po.poNumber,
             linkedPo: po.poNumber,
             vendorId: po.vendorId,
@@ -4694,7 +4837,8 @@ export const ERPProvider = ({ children, }) => {
 
         // Update PO status to Partially Billed or Billed
         const willBeFullyBilled = poStatusInfo.totalRemainingQty <= billLines.reduce((s, it) => s + it.qty, 0);
-        setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: willBeFullyBilled ? 'Billed' : 'Partially Billed' } : p));
+        const targetPoStatus = willBeFullyBilled ? 'Billed' : 'Partially Billed';
+        setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: targetPoStatus } : p));
 
         // Increase vendor AP liability across vendors and parties
         syncVendorBalance(po.vendorId, po.vendor, billAmt);
@@ -4711,35 +4855,20 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        // ── [PHASE-2B] Auto-receive on PO→Bill kept only for pre-received (legacy) bills ──
-        // Old code auto-received inventory from every bill line at conversion time.
-        //   Now handled by GoodsReceiptPage (GRN). The block below still runs when the
-        //   bill was explicitly created as already received (goodsReceived: true).
-        // if (billLines.length > 0) {
-        //     billLines.forEach((line) => {
-        //         const targetSku = line.sku || line.itemSku;
-        //         const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
-        //         if (item && item.trackingMode === 'Serial') {
-        //             const serials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
-        //             if (serials.length > 0) {
-        //                 addSerialNumbers(item.id, serials);
-        //             }
-        //         }
-        //         recordMovement({
-        //             itemId: item?.id || line.itemId || `itm-${Date.now()}`,
-        //             itemSku: item?.sku || targetSku || 'GEN-SKU',
-        //             itemName: item?.name || line.name || line.description,
-        //             type: 'PURCHASE',
-        //             quantity: line.qty || 1,
-        //             unitCost: line.rate || item?.costPrice || 0,
-        //             referenceType: 'PurchaseBill',
-        //             referenceId: newBill.id,
-        //             referenceNumber: newBill.billNumber,
-        //             serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
-        //             notes: `Goods received via ${newBill.billNumber}`,
-        //         });
-        //     });
-        // }
+
+        if (isServerId(po.id)) {
+            persistVia(setPurchaseBills, newBill.id, `Bill from ${po.poNumber}`, async () => {
+                const created = await pushConvert('purchaseOrders', po.id, 'convert-to-bill', 'purchaseBills');
+                if (created) {
+                    setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: targetPoStatus } : p));
+                    return created;
+                }
+                return (await pushCreate('purchaseBills', newBill, setPurchaseBills)) || newBill;
+            });
+        } else {
+            persistCreate('purchaseBills', newBill, setPurchaseBills);
+        }
+
         if (newBill.goodsReceived === true && billLines.length > 0) {
             billLines.forEach((line) => {
                 const targetSku = line.sku || line.itemSku;
@@ -4777,7 +4906,9 @@ export const ERPProvider = ({ children, }) => {
             id: bill.id || `pb-${Date.now()}`,
             billNumber: bill.billNumber ||
                 `PB-2026-${String(purchaseBills.length + 16).padStart(3, '0')}`,
-            purchaseOrderId: bill.purchaseOrderId,
+            purchaseOrderId: bill.purchaseOrderId || bill.purchaseOrder || bill.purchase_order,
+            purchaseOrder: bill.purchaseOrder || bill.purchaseOrderId || bill.purchase_order,
+            purchase_order: bill.purchase_order || bill.purchaseOrderId || bill.purchaseOrder,
             poRef: bill.poRef || '',
             linkedPo: bill.linkedPo || bill.poRef || '',
             vendorId: bill.vendorId,
@@ -4806,12 +4937,14 @@ export const ERPProvider = ({ children, }) => {
 
         // If linked to a PO, update PO status to Partially Billed or Billed
         if (newBill.purchaseOrderId || newBill.poRef || newBill.linkedPo) {
-            const targetPo = purchaseOrders.find((p) => p.id === newBill.purchaseOrderId || p.poNumber === newBill.poRef || p.poNumber === newBill.linkedPo);
+            const targetPo = purchaseOrders.find((p) => p.id === newBill.purchaseOrderId || p.id === newBill.purchaseOrder || p.id === newBill.purchase_order || p.poNumber === newBill.poRef || p.poNumber === newBill.linkedPo);
             if (targetPo && targetPo.status !== 'Cancelled') {
                 const poStatusInfo = getPoBilledStatus(targetPo.id);
                 const currentBilledQty = poStatusInfo.totalBilledQty + billLines.reduce((s, it) => s + Number(it.qty || 0), 0);
                 const isFullyBilled = poStatusInfo.totalOrderedQty > 0 && currentBilledQty >= poStatusInfo.totalOrderedQty;
-                setPurchaseOrders((prev) => prev.map((p) => p.id === targetPo.id ? { ...p, status: isFullyBilled ? 'Billed' : 'Partially Billed' } : p));
+                const nextStatus = isFullyBilled ? 'Billed' : 'Partially Billed';
+                setPurchaseOrders((prev) => prev.map((p) => p.id === targetPo.id ? { ...p, status: nextStatus } : p));
+                persistUpdate('purchaseOrders', targetPo.id, { status: nextStatus }, setPurchaseOrders);
             }
         }
 
@@ -6164,6 +6297,7 @@ export const ERPProvider = ({ children, }) => {
             updateDeliveryChallanStatus,
             cancelDeliveryChallan,
             addPaymentIn,
+            recordPartyFunds,
             cancelPaymentIn,
             cancelCashPaymentReceipt,
             voidCashPaymentReceipt,

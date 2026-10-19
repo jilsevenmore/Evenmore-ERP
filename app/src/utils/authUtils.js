@@ -13,7 +13,7 @@ export const SAVED_USER_KEY = 'evenmore_saved_user';
  * Validates whether a token exists and is unexpired.
  * Supports standard JWTs (reads exp claim) and fallback session timestamps.
  */
-export function isTokenValid(token) {
+export function isTokenValid(token, bufferMs = 5000) {
   if (!token || typeof token !== 'string') return false;
 
   // 1. Check JWT format (3 base64url segments separated by dots)
@@ -30,8 +30,8 @@ export function isTokenValid(token) {
       );
       const payload = JSON.parse(jsonPayload);
       if (payload && typeof payload.exp === 'number') {
-        // payload.exp is in seconds; check against current timestamp with 5s grace period
-        return payload.exp * 1000 > Date.now() + 5000;
+        // payload.exp is in seconds; check against current timestamp with buffer
+        return payload.exp * 1000 > Date.now() + bufferMs;
       }
       return true;
     } catch {
@@ -44,7 +44,7 @@ export function isTokenValid(token) {
     const exp = localStorage.getItem(TOKEN_EXPIRES_KEY);
     if (exp) {
       const expNum = Number(exp);
-      if (!Number.isNaN(expNum) && expNum <= Date.now()) {
+      if (!Number.isNaN(expNum) && expNum <= Date.now() + bufferMs) {
         return false;
       }
     }
@@ -55,19 +55,28 @@ export function isTokenValid(token) {
 
 /**
  * Retrieves the stored token if valid.
- * Automatically clears stale or expired tokens from storage.
+ * If the access token has expired but a valid refresh token exists, returns the
+ * current token so route guards and active screens stay alive while the API
+ * client performs silent background refresh.
+ * Automatically clears stale credentials only when both access and refresh tokens expire.
  */
 export function getStoredToken() {
   try {
     const token = localStorage.getItem(EVENMORE_AUTH_TOKEN_KEY);
     if (!token) return null;
 
-    if (!isTokenValid(token)) {
-      clearStoredAuth();
-      return null;
+    if (isTokenValid(token, 0)) {
+      return token;
     }
 
-    return token;
+    // Access token expired; check if refresh token is still viable
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (refreshToken && isTokenValid(refreshToken, 0)) {
+      return token;
+    }
+
+    clearStoredAuth();
+    return null;
   } catch {
     return null;
   }

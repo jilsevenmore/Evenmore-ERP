@@ -47,7 +47,6 @@ const ROUTE_PERMISSIONS = [
   ['/organization', 'view_staff'],
   ['/administration/users', 'view_staff'],
   ['/administration/roles', 'manage_roles'],
-  ['/administration/clients', 'menu_admin'],
   // Customer Tracking is the customer's view of their orders: customers
   // (view_projects) and the people who run projects -- not every employee.
   ['/customer/projects', TRACKING_VIEWERS],

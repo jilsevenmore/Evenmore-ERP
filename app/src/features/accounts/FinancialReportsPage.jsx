@@ -406,7 +406,7 @@ export function FinancialReportsPage() {
           actions={
             <div className="flex-wrap lg:flex-nowrap" style={{ display: 'flex', gap: 10 }}>
               <button type="button" className="btn-outline" onClick={() => setShowPrintModal(true)}>
-                <Printer size={15} /> Download PDF / Print
+                <Printer size={15} /> Print / PDF Document
               </button>
               <button type="button" className="btn-primary" onClick={() => handleExport()}>
                 <Download size={15} /> Export {

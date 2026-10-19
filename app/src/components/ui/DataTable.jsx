@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ArrowUpDown, MoreVertical, Search, Download } from 'lucide-react';
 import Pagination from './Pagination';
 
@@ -26,8 +26,8 @@ export function DataTable({
   emptyTitle = 'No records found',
   emptyDesc = 'There are no records matching your current filter criteria.',
   emptyAction,
-  pageSize: initialPageSize = 5,
-  pageSizeOptions = [5, 10, 20],
+  pageSize: initialPageSize = 10,
+  pageSizeOptions = [10, 20, 50, 100],
   action,
   exportable = true,
   rowClassName,
@@ -83,6 +83,13 @@ export function DataTable({
     const start = (page - 1) * pageSize;
     return sorted.slice(start, start + pageSize);
   }, [sorted, page, pageSize]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(sorted.length / pageSize));
+    if (page > maxPage) {
+      setPage(1);
+    }
+  }, [sorted.length, page, pageSize]);
 
   function getRowKey(row, index) {
     if (typeof keyExtractor === 'function') {
@@ -351,7 +358,7 @@ export function DataTable({
       </div>
 
       {/* Pagination Footer */}
-      {(sorted.length > pageSize || sorted.length > 5) && (
+      {sorted.length > 0 && (
         <div className="border-t border-border bg-card-alt pr-16 sm:pr-20">
           <Pagination
             total={sorted.length}

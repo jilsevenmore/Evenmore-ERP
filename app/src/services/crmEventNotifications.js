@@ -24,14 +24,32 @@ export const NOTIFICATION_CHANNELS = {
 export const NOTIFICATION_EVENT = 'crm:notifications-updated';
 
 const SYNC_EVENT = 'crm:data-updated';
+const LOCAL_STORAGE_KEY = 'crm_inapp_notifications';
+
+function loadStoredFeed() {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredFeed(list) {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify((list || []).slice(0, 100)));
+    }
+  } catch {}
+}
 
 /**
- * The notification feed is the server's (`GET /notifications/`): it is raised
- * from the change itself, so every recipient sees it and it survives a reload.
- * This module keeps the last read in memory for the bell menu to render
- * synchronously, and refreshes it whenever something changes.
+ * The notification feed merges server notifications with in-app dispatched notices
+ * (e.g. newly published HRMS announcements) so they survive reloads and immediately
+ * surface in the notification center.
  */
-let feed = [];
+let feed = loadStoredFeed();
 
 function readStore() {
   return feed;
@@ -39,16 +57,22 @@ function readStore() {
 
 /** `GET /notifications/` — the current feed for the signed-in user. */
 export async function refreshNotifications() {
+  const stored = loadStoredFeed();
   if (!isBackendEnabled()) {
-    feed = [];
+    feed = stored;
     signalUpdate();
     return feed;
   }
   try {
     const body = await api.get('/notifications/', { query: { limit: 100 } });
-    feed = rowsOf(body);
+    const serverRows = rowsOf(body);
+    const serverIds = new Set(serverRows.map((r) => r.id));
+    const localOnly = stored.filter((r) => !serverIds.has(r.id));
+    feed = [...localOnly, ...serverRows];
+    saveStoredFeed(feed);
   } catch (err) {
     console.warn('[CRM] notifications unavailable:', err?.message || err);
+    feed = stored;
   }
   signalUpdate();
   return feed;
@@ -172,9 +196,10 @@ function buildContent(type, payload = {}) {
 const inAppProvider = {
   channel: 'in_app',
   deliver(record) {
-    // The server raises and stores the notification; this only puts it in front
-    // of the viewer straight away, before the next refresh confirms it.
-    feed = [record, ...readStore()];
+    const existing = readStore().filter((r) => r.id !== record.id);
+    feed = [record, ...existing];
+    saveStoredFeed(feed);
+    signalUpdate();
     return { delivered: true, channel: 'in_app', status: 'DELIVERED' };
   },
 };
@@ -212,6 +237,7 @@ export function dispatchNotification(record, channels = ['in_app']) {
       results[channel] = { delivered: false, channel, status: 'FAILED' };
     }
   }
+  signalUpdate();
   return results;
 }
 
@@ -235,6 +261,7 @@ export function markEventNotificationRead(id) {
   feed = feed.map((entry) => (entry.id === id && entry.status !== 'read'
     ? { ...entry, status: 'read', readAt: new Date().toISOString() }
     : entry));
+  saveStoredFeed(feed);
   signalUpdate();
   // Read state belongs to the user, not the tab.
   if (isBackendEnabled()) {
@@ -248,6 +275,7 @@ export function markEventNotificationRead(id) {
 /** `POST /notifications/read-all/` — clears the bell in one go. */
 export function markAllNotificationsRead() {
   feed = feed.map((entry) => ({ ...entry, status: 'read', readAt: entry.readAt || new Date().toISOString() }));
+  saveStoredFeed(feed);
   signalUpdate();
   if (isBackendEnabled()) {
     api.post('/notifications/read-all/', {})

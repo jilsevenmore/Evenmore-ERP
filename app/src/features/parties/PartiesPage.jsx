@@ -142,6 +142,14 @@ export default function PartiesPage() {
                     Dual
                   </span>
                 )}
+                {Number(party?.pmsAdvancePaymentPercentage ?? party?.pms_advance_payment_percentage ?? 0) > 0 && (
+                  <span
+                    className="text-[10px] px-1.5 py-0.2 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 font-bold border border-violet-200 dark:border-violet-800"
+                    title={`Mandatory ${party.pmsAdvancePaymentPercentage || party.pms_advance_payment_percentage}% advance required before converting order to PMS project`}
+                  >
+                    {party.pmsAdvancePaymentPercentage || party.pms_advance_payment_percentage}% PMS Adv
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-muted flex items-center gap-2 mt-0.5">
                 <span className="font-mono font-medium">{partyCode}</span>
@@ -533,6 +541,16 @@ export default function PartiesPage() {
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">IFSC Code</span>
                     <span className="font-mono font-semibold text-slate-800">{viewingParty.ifscCode || '—'}</span>
                   </div>
+                  {(viewingParty.type === 'Customer' || viewingParty.type === 'Both') && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">PMS Advance Required</span>
+                      <span className="font-semibold text-violet-700 dark:text-violet-400">
+                        {Number(viewingParty.pmsAdvancePaymentPercentage ?? viewingParty.pms_advance_payment_percentage ?? 0) > 0
+                          ? `${viewingParty.pmsAdvancePaymentPercentage ?? viewingParty.pms_advance_payment_percentage}% of Order`
+                          : 'None (0%)'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

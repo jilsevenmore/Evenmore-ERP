@@ -1645,7 +1645,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                         {pickerCategory}{pickerTypeCategory ? ` → ${categoryTypeLabel(pickerTypeCategory, itemTypes)}` : ''}
                       </strong>{' '}
                       yet.
-                      <span className="block mt-1">Set this category on the item in Inventory → Item Master, then reopen the picker.</span>
+                      <span className="block mt-1">Set this category on the item in Inventory → Product Master, then reopen the picker.</span>
                     </>
                   ) : (
                     'No inventory items match your search.'

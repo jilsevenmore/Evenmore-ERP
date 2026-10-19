@@ -1,6 +1,7 @@
 import DealDetailView from './DealDetailView';
 import CrmKpiCard from '../common/CrmKpiCard';
 import Modal from '../../../components/ui/Modal';
+import { Pagination } from '../../../components/ui/Pagination';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -36,8 +37,12 @@ import {
   Printer,
   Info,
   ShoppingCart,
+  AlertCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 
+import PartySelector from '../../../components/common/PartySelector';
+import { LineItemEditor } from '../../../components/common/LineItemEditor';
 import { loadDeals, saveDeals, buildDeal, ownerIdFor, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
 import { useCrmStore } from '../../../stores/crmStore';
 import { useERP } from '../../../context/ERPContext';
@@ -150,11 +155,21 @@ function formatStageSummary(totalAmount, count) {
 }
 
 export default function DealsPage() {
-  const { addQuotation, addSalesOrder, customers, items: catalogItems } = useERP() || {};
+  const {
+    estimates = [],
+    addEstimate,
+    updateEstimate,
+    salesOrders = [],
+    addQuotation,
+    addSalesOrder,
+    customers = [],
+    items: catalogItems = [],
+  } = useERP() || {};
   const navigate = useNavigate();
   const storeDeals = useCrmStore((s) => s.deals);
   const teamMembers = useCrmStore((s) => s.teamMembers);
   const storeSources = useCrmStore((s) => s.sources);
+  const crmLeads = useCrmStore((s) => s.leads);
   const currentUserName = useAppStore((s) => s.currentUser?.name);
   const [deals, setDeals] = useState([]);
 
@@ -189,6 +204,8 @@ export default function DealsPage() {
   const [selectedUser, setSelectedUser] = useState('All Users');
   const [dateRange, setDateRange] = useState('All Time');
   const [viewMode, setViewMode] = useState('kanban');
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
 
   const [expandedColumns, setExpandedColumns] = useState({});
   const [openMenuDealId, setOpenMenuDealId] = useState(null);
@@ -202,6 +219,55 @@ export default function DealsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showLearnMoreBanner, setShowLearnMoreBanner] = useState(true);
   const [isLearnMoreOpen, setIsLearnMoreOpen] = useState(false);
+
+  // Modal for Estimate Requirement during stage drag/drop or manual moves
+  const [estimateModalContext, setEstimateModalContext] = useState(null);
+  const [estimatePartyData, setEstimatePartyData] = useState({
+    isOneTimeParty: false,
+    customerId: '',
+    customer: '',
+    partyName: '',
+    partyType: 'Customer',
+    selectedLeadId: '',
+  });
+  const [estimateLineItems, setEstimateLineItems] = useState([]);
+  const [estimateFormError, setEstimateFormError] = useState('');
+  const [isEstimateSubmitting, setIsEstimateSubmitting] = useState(false);
+
+  const getDealEstimate = useCallback((deal) => {
+    if (!deal) return null;
+    return (estimates || []).find((e) =>
+      (deal.leadId && String(e.leadId) === String(deal.leadId)) ||
+      (deal.id && e.dealId && String(e.dealId) === String(deal.id)) ||
+      (deal.client && (
+        String(e.customer || '').trim().toLowerCase() === String(deal.client).trim().toLowerCase() ||
+        String(e.partyName || '').trim().toLowerCase() === String(deal.client).trim().toLowerCase()
+      ))
+    ) || null;
+  }, [estimates]);
+
+  const getDealSalesOrder = useCallback((deal) => {
+    if (!deal) return null;
+    return (salesOrders || []).find((so) =>
+      (deal.leadId && String(so.leadId) === String(deal.leadId)) ||
+      (deal.id && so.dealId && String(so.dealId) === String(deal.id)) ||
+      (deal.client && (
+        String(so.customer || '').trim().toLowerCase() === String(deal.client).trim().toLowerCase() ||
+        String(so.partyName || '').trim().toLowerCase() === String(deal.client).trim().toLowerCase()
+      ))
+    ) || null;
+  }, [salesOrders]);
+
+  const getEffectiveDealPrice = useCallback((deal) => {
+    if (!deal) return 0;
+    const directPrice = Number(deal.price || deal.value) || 0;
+    if (directPrice > 0) return directPrice;
+    const est = getDealEstimate(deal);
+    if (est && Number(est.amount) > 0) return Number(est.amount);
+    const so = getDealSalesOrder(deal);
+    if (so && Number(so.amount || so.totalSalesValue) > 0) return Number(so.amount || so.totalSalesValue);
+    return 0;
+  }, [getDealEstimate, getDealSalesOrder]);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -244,9 +310,18 @@ export default function DealsPage() {
     });
   }, [deals, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
 
+  useEffect(() => {
+    setListPage(1);
+  }, [searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
+
+  const pagedDeals = useMemo(() => {
+    const start = (listPage - 1) * listPageSize;
+    return filteredDeals.slice(start, start + listPageSize);
+  }, [filteredDeals, listPage, listPageSize]);
+
   const stats = useMemo(() => {
     const totalDeals = deals.length;
-    const valueSum = deals.reduce((sum, d) => sum + (Number(d.price) || 0), 0);
+    const valueSum = deals.reduce((sum, d) => sum + getEffectiveDealPrice(d), 0);
     const wonList = deals.filter((d) => d.stage === 'Won');
     const lostDeals = deals.filter((d) => d.stage === 'Lost').length;
     const closedDeals = wonList.length + lostDeals;
@@ -258,10 +333,10 @@ export default function DealsPage() {
       avgDealSize: formatCompactINR(totalDeals ? valueSum / totalDeals : 0),
       conversionRate: `${closedDeals ? Math.round((wonList.length / closedDeals) * 100) : 0}%`,
       openDeals: totalDeals - closedDeals,
-      wonValue: formatCompactINR(wonList.reduce((sum, d) => sum + (Number(d.price) || 0), 0)),
+      wonValue: formatCompactINR(wonList.reduce((sum, d) => sum + getEffectiveDealPrice(d), 0)),
       lostDeals,
     };
-  }, [deals]);
+  }, [deals, getEffectiveDealPrice]);
 
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -301,7 +376,7 @@ export default function DealsPage() {
         <td>${escapeHtml(deal.source)}</td>
         <td>${escapeHtml(deal.assignedUser)}</td>
         <td>${escapeHtml(deal.date)}</td>
-        <td>${escapeHtml(formatPriceINR(deal.price))}</td>
+        <td>${escapeHtml(formatPriceINR(getEffectiveDealPrice(deal)))}</td>
       </tr>
     `).join('');
 
@@ -314,7 +389,7 @@ export default function DealsPage() {
       dateRange !== 'All Time' ? `Date Range: ${dateRange}` : '',
       searchQuery.trim() ? `Search: ${searchQuery.trim()}` : '',
     ].filter(Boolean);
-    const summaryValue = filteredDeals.reduce((sum, deal) => sum + (Number(deal.price) || 0), 0);
+    const summaryValue = filteredDeals.reduce((sum, deal) => sum + getEffectiveDealPrice(deal), 0);
 
     const reportHtml = `
       <!doctype html>
@@ -491,7 +566,253 @@ export default function DealsPage() {
   // refuses anyone else too.
   const isAdmin = sessionCan('menu_admin');
 
-  const handleMoveStage = (dealId, targetStage, message) => {
+  const openMakeEstimateModal = (deal, targetStage, message, title) => {
+    const matchedCustomer = (customers || []).find((c) =>
+      c.name?.toLowerCase() === deal.client?.toLowerCase() ||
+      c.company?.toLowerCase() === deal.client?.toLowerCase()
+    );
+
+    const initialPartyData = {
+      isOneTimeParty: !matchedCustomer && !deal.leadId,
+      customerId: matchedCustomer?.id || deal.customerId || '',
+      customer: deal.client || matchedCustomer?.name || '',
+      partyName: deal.client || matchedCustomer?.name || '',
+      partyType: matchedCustomer ? 'Customer' : (deal.leadId ? 'Lead' : 'Walk-in'),
+      selectedLeadId: deal.leadId ? String(deal.leadId) : '',
+      partyPhone: deal.phone || matchedCustomer?.phone || '',
+      partyEmail: deal.email || matchedCustomer?.email || '',
+    };
+
+    let initialLines = [];
+    if (Array.isArray(deal.products) && deal.products.length > 0) {
+      initialLines = deal.products.map((p, idx) => ({
+        id: `li-${Date.now()}-${idx}`,
+        name: p.name || p.description || deal.product || 'Product Item',
+        description: p.description || p.name || '',
+        qty: Number(p.qty) || 1,
+        rate: Number(p.rate) || Number(deal.price) || 0,
+        amount: Number(p.amount) || ((Number(p.qty) || 1) * (Number(p.rate) || Number(deal.price) || 0)),
+        uom: p.uom || p.unit || 'Nos',
+        lineKind: 'Custom',
+        isCustomManual: true,
+      }));
+    } else {
+      const dealAmount = Number(deal.price || deal.value) || 0;
+      initialLines = [
+        {
+          id: `li-${Date.now()}-1`,
+          name: deal.product || deal.name || 'Sales Product / Fabrication',
+          description: `Estimate item for ${deal.name}`,
+          qty: 1,
+          rate: dealAmount,
+          amount: dealAmount,
+          uom: 'Nos',
+          lineKind: 'Custom',
+          isCustomManual: true,
+        },
+      ];
+    }
+
+    setEstimatePartyData(initialPartyData);
+    setEstimateLineItems(initialLines);
+    setEstimateFormError('');
+    setOpenMenuDealId(null);
+    setEstimateModalContext({
+      deal,
+      targetStage,
+      title: title || 'Create Estimate to Proceed',
+      message: message || `An estimate must be created before moving this deal to ${targetStage}.`,
+    });
+  };
+
+  const handleSaveEstimateFromModal = async (e) => {
+    if (e) e.preventDefault();
+    if (!estimateModalContext) return;
+    const { deal, targetStage } = estimateModalContext;
+
+    if (!estimatePartyData.customer && !estimatePartyData.partyName) {
+      setEstimateFormError('Customer or Party name is required.');
+      return;
+    }
+
+    const validItems = (estimateLineItems || []).filter(
+      (it) => (it.name || it.description) && (Number(it.qty) > 0 || Number(it.rate) > 0)
+    );
+    if (validItems.length === 0) {
+      setEstimateFormError('Please add at least one line item with a description and rate/quantity.');
+      return;
+    }
+
+    const computedTotal = validItems.reduce(
+      (sum, it) => sum + (Number(it.amount) || ((Number(it.qty) || 1) * (Number(it.rate) || 0))),
+      0
+    );
+
+    if (computedTotal <= 0) {
+      setEstimateFormError('Estimate total amount must be greater than zero.');
+      return;
+    }
+
+    setIsEstimateSubmitting(true);
+    setEstimateFormError('');
+
+    try {
+      const partyDisplayName = estimatePartyData.partyName || estimatePartyData.customer || deal.client;
+      const newEstimateNumber = `EST-2026-${String((estimates || []).length + 1).padStart(3, '0')}`;
+      const estimateRecord = {
+        id: `est-${Date.now()}`,
+        estimateNumber: newEstimateNumber,
+        isOneTimeParty: Boolean(estimatePartyData.isOneTimeParty),
+        customerId: estimatePartyData.customerId || deal.customerId || '',
+        customer: partyDisplayName,
+        partyName: partyDisplayName,
+        partyType: estimatePartyData.partyType || 'Customer',
+        partyPhone: estimatePartyData.partyPhone || deal.phone || '',
+        partyEmail: estimatePartyData.partyEmail || deal.email || '',
+        leadId: estimatePartyData.selectedLeadId || deal.leadId || '',
+        leadName: estimatePartyData.selectedLeadId ? partyDisplayName : (deal.client || ''),
+        dealId: deal.id,
+        amount: computedTotal,
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        items: validItems,
+        status: targetStage === 'Sent' ? 'Sent' : 'Draft',
+      };
+
+      if (typeof addEstimate === 'function') {
+        addEstimate(estimateRecord);
+      }
+
+      const nextTag = targetStage === 'Won' ? 'Won' : targetStage === 'Lost' ? 'Lost' : deal.tag;
+      const dealUpdates = {
+        stage: targetStage,
+        tag: nextTag,
+        price: computedTotal,
+        value: computedTotal,
+        product: validItems[0]?.name || deal.product,
+        products: validItems,
+      };
+
+      setDeals((prev) =>
+        prev.map((d) => (d.id === deal.id ? { ...d, ...dealUpdates } : d))
+      );
+
+      await useCrmStore.getState().updateRecord('deals', deal.id, {
+        stage: targetStage,
+        tag: nextTag,
+        price: computedTotal,
+        value: computedTotal,
+        product: validItems[0]?.name || deal.product,
+        lineItems: validItems,
+      });
+
+      if (deal.leadId) {
+        useCrmStore.getState().refresh('leads').catch(() => {});
+      }
+
+      showNotification(`Estimate ${newEstimateNumber} generated (₹ ${computedTotal.toLocaleString('en-IN')})! Deal moved to ${targetStage}.`);
+      setEstimateModalContext(null);
+    } catch (err) {
+      console.error('[CRM Deals] Estimate creation error:', err);
+      setEstimateFormError(err?.message || 'Could not save estimate and update deal.');
+    } finally {
+      setIsEstimateSubmitting(false);
+    }
+  };
+
+  const handleStageDrop = (dealId, targetStage) => {
+    const current = deals.find((d) => d.id === dealId);
+    if (!current || current.stage === targetStage) {
+      setOpenMenuDealId(null);
+      return;
+    }
+
+    if (current.stage === 'Lost' && !isAdmin) {
+      setOpenMenuDealId(null);
+      showNotification('Only an admin can reopen a lost deal.');
+      return;
+    }
+
+    const est = getDealEstimate(current);
+    const so = getDealSalesOrder(current);
+    const hasValidEstimate = Boolean(
+      (est && (est.items?.length > 0 || Number(est.amount) > 0)) ||
+      (Number(current.price) > 0 && current.products?.length > 0)
+    );
+    const hasValidSalesOrder = Boolean(
+      so && (so.items?.length > 0 || Number(so.amount || so.totalSalesValue) > 0)
+    );
+    const isEstimateRejected = Boolean(
+      est && (est.status === 'Rejected' || est.status === 'Declined' || est.status === 'Need Improvement')
+    );
+
+    // Rule 1: Draft -> Sent: If estimate is not done, show make estimate form
+    if (current.stage === 'Draft' && targetStage === 'Sent') {
+      if (!hasValidEstimate) {
+        openMakeEstimateModal(
+          current,
+          'Sent',
+          'Estimate is not done yet. Please create an estimate to move this deal to Sent.',
+          'Create Estimate to Move to Sent'
+        );
+        return;
+      }
+    }
+
+    // Rule 2: Draft -> Open: Estimate or sales order must be present
+    if (current.stage === 'Draft' && targetStage === 'Open') {
+      if (!hasValidEstimate && !hasValidSalesOrder) {
+        openMakeEstimateModal(
+          current,
+          'Open',
+          'An estimate or sales order must be present before moving a deal from Draft to Open.',
+          'Create Estimate to Move to Open'
+        );
+        return;
+      }
+    }
+
+    // Rule 3: Direct to Won: Must present order like product and its sales order or estimate
+    if (targetStage === 'Won') {
+      const hasProducts = Boolean(
+        (current.products?.length > 0) || (est?.items?.length > 0) || (so?.items?.length > 0)
+      );
+      const hasOrderOrEstimate = (hasValidEstimate || hasValidSalesOrder) && (Number(current.price) > 0 || est?.amount > 0 || so?.amount > 0);
+
+      if (!hasProducts || !hasOrderOrEstimate) {
+        openMakeEstimateModal(
+          current,
+          'Won',
+          'Cannot mark deal as Won without product details and an estimate or sales order. Please create an estimate first.',
+          'Create Estimate to Mark Deal as Won'
+        );
+        return;
+      }
+    }
+
+    // Sync effective amount from estimate or sales order if current deal price is 0
+    const effectiveAmount = getEffectiveDealPrice(current);
+    const extraUpdates = {};
+    if ((!current.price || Number(current.price) === 0) && effectiveAmount > 0) {
+      extraUpdates.price = effectiveAmount;
+      extraUpdates.value = effectiveAmount;
+    }
+    if ((!current.products || current.products.length === 0) && est?.items?.length > 0) {
+      extraUpdates.products = est.items;
+    }
+
+    let successMessage = `Deal moved to ${targetStage}`;
+    if (current.stage === 'Sent' && targetStage === 'Open') {
+      if (isEstimateRejected) {
+        successMessage = 'Estimate was rejected by client; deal moved to Open for revision';
+      } else {
+        successMessage = 'Deal moved to Open';
+      }
+    }
+
+    handleMoveStage(dealId, targetStage, successMessage, extraUpdates);
+  };
+
+  const handleMoveStage = (dealId, targetStage, message, extraUpdates = {}) => {
     const current = deals.find((d) => d.id === dealId);
     if (!current || current.stage === targetStage) {
       setOpenMenuDealId(null);
@@ -502,19 +823,28 @@ export default function DealsPage() {
       showNotification('Only an admin can reopen a lost deal.');
       return;
     }
+
+    const nextTag = targetStage === 'Won' ? 'Won' : targetStage === 'Lost' ? 'Lost' : current.tag === 'Won' || current.tag === 'Lost' ? '' : current.tag;
+    const updatedRecord = {
+      ...current,
+      ...extraUpdates,
+      stage: targetStage,
+      tag: nextTag,
+    };
+
     setDeals((prev) =>
-      prev.map((d) =>
-        d.id === dealId
-          ? {
-              ...d,
-              stage: targetStage,
-              tag: targetStage === 'Won' ? 'Won' : targetStage === 'Lost' ? 'Lost' : d.tag === 'Won' || d.tag === 'Lost' ? '' : d.tag,
-            }
-          : d
-      )
+      prev.map((d) => (d.id === dealId ? updatedRecord : d))
     );
     setOpenMenuDealId(null);
-    useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage })
+
+    const payload = {
+      stage: targetStage,
+      tag: nextTag,
+      ...(extraUpdates.price !== undefined ? { price: extraUpdates.price, value: extraUpdates.price } : {}),
+      ...(extraUpdates.products ? { lineItems: extraUpdates.products } : {}),
+    };
+
+    useCrmStore.getState().updateRecord('deals', dealId, payload)
       // The deal's lead follows Won / Lost / reopened on the server.
       .then(() => { if (current.leadId) return useCrmStore.getState().refresh('leads'); return null; })
       .catch((err) => {
@@ -903,7 +1233,7 @@ export default function DealsPage() {
             const items = filteredDeals.filter((d) => d.stage === st);
             const stageStyle = STAGE_STYLES[st] || STAGE_STYLES.Draft;
             const StageIcon = stageStyle.icon;
-            const totalStageAmount = items.reduce((sum, d) => sum + (Number(d.price) || 0), 0);
+            const totalStageAmount = items.reduce((sum, d) => sum + getEffectiveDealPrice(d), 0);
             const isDragOver = dragOverStage === st;
             const isExpanded = Boolean(expandedColumns[st]);
             const visibleItems = isExpanded ? items : items.slice(0, 3);
@@ -922,7 +1252,7 @@ export default function DealsPage() {
                   setDragOverStage(null);
                   const droppedId = e.dataTransfer.getData('text/plain');
                   if (droppedId) {
-                    handleMoveStage(droppedId, st);
+                    handleStageDrop(droppedId, st);
                   }
                 }}
                 className={`min-w-[280px] max-w-[320px] shrink-0 lg:shrink snap-start lg:min-w-auto lg:max-w-none border rounded-2xl p-3.5 flex flex-col space-y-3 transition-all duration-200 shadow-2xs relative ${
@@ -971,6 +1301,10 @@ export default function DealsPage() {
                   ) : (
                     visibleItems.map((deal) => {
                       const isMenuOpen = openMenuDealId === deal.id;
+                      const effectivePrice = getEffectiveDealPrice(deal);
+                      const dealEst = getDealEstimate(deal);
+                      const dealSo = getDealSalesOrder(deal);
+
                       return (
                         <div
                           key={deal.id}
@@ -999,8 +1333,8 @@ export default function DealsPage() {
                               <button
                                 type="button"
                                 onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuDealId((prev) => (prev === deal.id ? null : deal.id));
+                                   e.stopPropagation();
+                                   setOpenMenuDealId((prev) => (prev === deal.id ? null : deal.id));
                                 }}
                                 className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
                                   isMenuOpen
@@ -1025,7 +1359,7 @@ export default function DealsPage() {
                                   {deal.stage === 'Lost' && isAdmin && (
                                     <button
                                       type="button"
-                                      onClick={() => handleMoveStage(deal.id, 'Open', deal.leadId ? 'Lead reopened' : 'Deal reopened')}
+                                      onClick={() => handleStageDrop(deal.id, 'Open')}
                                       className="w-full px-3.5 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2.5 cursor-pointer"
                                     >
                                       <RotateCcw size={13} className="text-emerald-600" />
@@ -1047,7 +1381,7 @@ export default function DealsPage() {
                                       <button
                                         key={s}
                                         type="button"
-                                        onClick={() => handleMoveStage(deal.id, s)}
+                                        onClick={() => handleStageDrop(deal.id, s)}
                                         className="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 rounded text-left truncate cursor-pointer"
                                       >
                                         → {s}
@@ -1058,8 +1392,16 @@ export default function DealsPage() {
                                   )}
 
                                   <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
-                                    ERP Conversion
+                                    ERP Documents
                                   </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => openMakeEstimateModal(deal, deal.stage, 'Create or revise an estimate for this deal', 'Create Deal Estimate')}
+                                    className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-indigo-700 hover:bg-indigo-50 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <FileText size={12} className="text-indigo-600" />
+                                    <span>Create Estimate</span>
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => handleCreateErpQuotation(deal)}
@@ -1098,7 +1440,7 @@ export default function DealsPage() {
                           {/* Deal Value & Status Tag */}
                           <div className="flex items-center justify-between">
                             <span className="text-base font-bold text-slate-900 tracking-tight">
-                              {formatPriceINR(deal.price)}
+                              {formatPriceINR(effectivePrice)}
                             </span>
 
                             {deal.tag && (
@@ -1115,6 +1457,36 @@ export default function DealsPage() {
                               </span>
                             )}
                           </div>
+
+                          {/* Estimate / Sales Order Badges */}
+                          {dealEst && (
+                            <div className="flex flex-wrap gap-1">
+                              {dealEst.status === 'Rejected' || dealEst.status === 'Declined' || dealEst.status === 'Need Improvement' ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.5" title="Estimate was rejected by client; deal is in Open stage for revision">
+                                  <XCircle size={10} className="text-rose-600" /> Estimate Rejected ({dealEst.estimateNumber || 'EST'})
+                                </span>
+                              ) : dealEst.status === 'Sent' ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5">
+                                  <Send size={10} className="text-purple-600" /> Estimate Sent ({dealEst.estimateNumber || 'EST'})
+                                </span>
+                              ) : dealEst.status === 'Accepted' || dealEst.status === 'Converted' ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                                  <CheckCircle2 size={10} className="text-emerald-600" /> Estimate Won ({dealEst.estimateNumber || 'EST'})
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5">
+                                  <FileText size={10} className="text-slate-500" /> Estimate Draft ({dealEst.estimateNumber || 'EST'})
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {dealSo && !dealEst && (
+                            <div className="flex flex-wrap gap-1">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
+                                <ShoppingCart size={10} className="text-indigo-600" /> SO: {dealSo.orderNumber || ''}
+                              </span>
+                            </div>
+                          )}
 
                           {/* Product Pill */}
                           {deal.product && (
@@ -1181,7 +1553,7 @@ export default function DealsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredDeals.map((deal) => (
+                {pagedDeals.map((deal) => (
                   <tr key={deal.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-900"><Link to={`?deal=${encodeURIComponent(deal.id)}`} className="hover:text-blue-600 hover:underline">{deal.name}</Link></td>
                     <td className="py-3.5 px-4">
@@ -1207,11 +1579,20 @@ export default function DealsPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                      {formatPriceINR(deal.price)}
+                      {formatPriceINR(getEffectiveDealPrice(deal))}
                     </td>
                     <td className="py-3.5 px-4 text-slate-500">{deal.date}</td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openMakeEstimateModal(deal, 'Sent', `Create an estimate for ${deal.name} before sending to client.`)}
+                          className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg border border-amber-200 cursor-pointer"
+                          title="Create / Link Estimate"
+                          aria-label={`Make estimate for ${deal.name}`}
+                        >
+                          <FileSpreadsheet size={13} />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleCreateErpQuotation(deal)}
@@ -1252,6 +1633,21 @@ export default function DealsPage() {
               </tbody>
             </table>
           </div>
+          {filteredDeals.length > 0 && (
+            <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+              <Pagination
+                total={filteredDeals.length}
+                page={listPage}
+                pageSize={listPageSize}
+                pageSizeOptions={[10, 20, 50, 100]}
+                onPageSizeChange={(newSize) => {
+                  setListPageSize(newSize);
+                  setListPage(1);
+                }}
+                onChange={setListPage}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -1479,6 +1875,119 @@ export default function DealsPage() {
                 Yes, Delete Deal
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {estimateModalContext && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-slate-200 my-8 overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <FileSpreadsheet size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {estimateModalContext.title || 'Create Estimate'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Deal: <span className="font-semibold text-slate-700">{estimateModalContext.deal?.name}</span>
+                    {estimateModalContext.targetStage && (
+                      <> &bull; Moving to stage <span className="font-semibold text-blue-600">{estimateModalContext.targetStage}</span></>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEstimateModalContext(null)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Instruction Banner */}
+            {estimateModalContext.message && (
+              <div className="mx-5 mt-4 p-3 bg-amber-50/80 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-start gap-2.5">
+                <AlertCircle size={15} className="text-amber-600 mt-0.5 shrink-0" />
+                <span className="leading-relaxed">{estimateModalContext.message}</span>
+              </div>
+            )}
+
+            {estimateFormError && (
+              <div className="mx-5 mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{estimateFormError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEstimateFromModal} className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+              {/* Customer / Party Selection */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-2">Customer & Contact Information</label>
+                <PartySelector
+                  value={estimatePartyData}
+                  onChange={setEstimatePartyData}
+                  customers={customers}
+                  leads={crmLeads}
+                />
+              </div>
+
+              {/* Line Items Section */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="font-bold text-slate-700">Estimate Line Items & Pricing</label>
+                  <span className="text-xs text-slate-500">
+                    Total: <strong className="text-slate-900 text-sm">
+                      {formatPriceINR(
+                        (estimateLineItems || []).reduce(
+                          (sum, it) => sum + (Number(it.amount) || ((Number(it.qty) || 1) * (Number(it.rate) || 0))),
+                          0
+                        )
+                      )}
+                    </strong>
+                  </span>
+                </div>
+                <LineItemEditor
+                  allowCustomLines
+                  items={estimateLineItems}
+                  onChange={setEstimateLineItems}
+                  type="sales"
+                />
+              </div>
+
+              {/* Actions Footer */}
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEstimateModalContext(null)}
+                  className="btn-outline"
+                  disabled={isEstimateSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isEstimateSubmitting}
+                  className="px-5 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs active:scale-[0.99] transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isEstimateSubmitting ? (
+                    <>
+                      <RotateCcw size={13} className="animate-spin" />
+                      <span>Saving Estimate...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet size={13} />
+                      <span>Create Estimate & Move Deal</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

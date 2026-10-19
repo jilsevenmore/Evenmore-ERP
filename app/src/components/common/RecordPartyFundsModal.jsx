@@ -9,7 +9,7 @@ export const RecordPartyFundsModal = ({ isOpen, onClose, party, onSaved }) => {
         recordPartyFunds,
         getInvoiceOutstanding,
         formatCurrency,
-        getCurrentDateFormatted,
+        getCurrentISODate,
     } = useERP();
 
     const [formalAmount, setFormalAmount] = useState('');
@@ -21,7 +21,7 @@ export const RecordPartyFundsModal = ({ isOpen, onClose, party, onSaved }) => {
     const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
     const [description, setDescription] = useState('');
     const [notes, setNotes] = useState('');
-    const [paymentDate, setPaymentDate] = useState(getCurrentDateFormatted());
+    const [paymentDate, setPaymentDate] = useState(() => (getCurrentISODate ? getCurrentISODate() : new Date().toISOString().split('T')[0]));
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
 

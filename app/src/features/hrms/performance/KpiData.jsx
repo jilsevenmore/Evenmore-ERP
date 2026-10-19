@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { usePerformanceStore } from "../../../stores/performanceStore";
 import { DataTable } from "../../../components/hrms/DataTable";
@@ -7,15 +7,56 @@ import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
-import { Eye, Pencil, Trash2, Target, Award, Layers } from "lucide-react";
+import { SearchableSelect } from "../../../components/hrms/SearchableSelect";
+import { Eye, Pencil, Trash2, Target, Award, Layers, ChevronDown } from "lucide-react";
 import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { hrmsSync } from "../../../services/hrmsSync";
+
+const DEFAULT_DEPARTMENTS = [
+  "Accounts & Finance",
+  "Engineering",
+  "General",
+  "Human Resources",
+  "Management & Administration",
+  "Marketing",
+  "Operations",
+  "Production & Fabrication",
+  "Quality Assurance",
+  "Sales",
+];
+
+const DEFAULT_DESIGNATIONS = [
+  "Accounts Executive",
+  "Accounts Manager",
+  "Assembly Technician",
+  "Fabrication Technician",
+  "General Manager",
+  "HR Executive",
+  "HR Manager",
+  "Operations Manager",
+  "Production Supervisor",
+  "Quality Inspector",
+  "Software Engineer",
+];
 
 export default function KpiData() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees) || [];
 
-  const { kpis, addKpi, updateKpi, deleteKpi } = usePerformanceStore();
+  const { kpis = [], indicators = [], addKpi, updateKpi, deleteKpi } = usePerformanceStore();
+
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [designationsList, setDesignationsList] = useState([]);
+
+  useEffect(() => {
+    hrmsSync.pull("departments").then((deps) => {
+      if (Array.isArray(deps)) setDepartmentsList(deps);
+    }).catch(() => {});
+    hrmsSync.pull("designations").then((desigs) => {
+      if (Array.isArray(desigs)) setDesignationsList(desigs);
+    }).catch(() => {});
+  }, []);
 
   const [search, setSearch] = useState("");
   const [empFilter, setEmpFilter] = useState("All");
@@ -197,18 +238,48 @@ export default function KpiData() {
     },
   ];
 
+  const uniqueEmployeeNames = useMemo(() => {
+    return [...new Set(employees.map((e) => (e.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  }, [employees]);
+
   const empOpts = [
     { value: "All", label: "All Employees" },
-    ...employees.map((e) => ({ value: e.name, label: e.name })),
+    ...uniqueEmployeeNames.map((name) => ({ value: name, label: name })),
   ];
+
+  const allDepartments = useMemo(() => {
+    return [
+      ...new Set([
+        ...DEFAULT_DEPARTMENTS,
+        ...departmentsList.map((d) => d.name || d.title).filter(Boolean),
+        ...employees.map((e) => e.department).filter(Boolean),
+        ...indicators.map((r) => r.department).filter(Boolean),
+        ...kpis.map((r) => r.department).filter(Boolean),
+        form.department,
+      ].filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b));
+  }, [departmentsList, employees, indicators, kpis, form.department]);
+
+  const allDesignations = useMemo(() => {
+    return [
+      ...new Set([
+        ...DEFAULT_DESIGNATIONS,
+        ...designationsList.map((d) => d.name || d.title).filter(Boolean),
+        ...employees.map((e) => e.designation || e.role).filter(Boolean),
+        ...indicators.map((r) => r.designation).filter(Boolean),
+        ...kpis.map((r) => r.designation).filter(Boolean),
+        form.designation,
+      ].filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b));
+  }, [designationsList, employees, indicators, kpis, form.designation]);
 
   const deptOpts = [
     { value: "All", label: "All Departments" },
-    ...[...new Set([...employees.map((e) => e.department), ...kpis.map((r) => r.department)].filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
+    ...allDepartments.map((v) => ({ value: v, label: v })),
   ];
   const desigOpts = [
     { value: "All", label: "All Designations" },
-    ...[...new Set([...employees.map((e) => e.designation || e.role), ...kpis.map((r) => r.designation)].filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
+    ...allDesignations.map((v) => ({ value: v, label: v })),
   ];
   const statusOpts = [
     { value: "All", label: "All Statuses" },
@@ -217,123 +288,199 @@ export default function KpiData() {
     { value: "Draft", label: "Draft" },
   ];
 
+  const assignedEmployeeOpts = useMemo(() => {
+    let list = employees;
+    if (form.department) {
+      const match = list.filter((e) => (e.department || "").toLowerCase() === form.department.toLowerCase());
+      if (match.length > 0) list = match;
+    }
+    if (form.designation) {
+      const match = list.filter((e) => (e.designation || e.role || "").toLowerCase() === form.designation.toLowerCase());
+      if (match.length > 0) list = match;
+    }
+    const names = [...new Set(list.map((e) => (e.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    if (form.assignedEmployee && form.assignedEmployee !== "All in Department" && !names.includes(form.assignedEmployee)) {
+      names.unshift(form.assignedEmployee);
+    }
+    return [
+      { value: "All in Department", label: "All in Department" },
+      ...names.map((name) => ({ value: name, label: name })),
+    ];
+  }, [employees, form.department, form.designation, form.assignedEmployee]);
+
   function FormFields() {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="sm:col-span-2 flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">KPI Name *</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+        {/* KPI Name */}
+        <label className="sm:col-span-2 flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            KPI Name <span className="text-red-500 font-bold">*</span>
+          </span>
           <input
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            onChange={(e) => {
+              setForm({ ...form, name: e.target.value });
+              if (errors.name) setErrors((err) => ({ ...err, name: "" }));
+            }}
             placeholder="e.g. Sprint Velocity Stability"
-            className={`h-9 px-3 bg-white border rounded-xl text-[13px] ${
-              errors.name ? "border-red-500" : "border-[#e2e8f0]"
+            className={`w-full h-10 px-3.5 bg-slate-50/70 border rounded-xl text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+              errors.name ? "border-red-500" : "border-slate-200"
             }`}
           />
-          {errors.name && <span className="text-[11px] text-red-500">{errors.name}</span>}
+          {errors.name && <span className="text-[11px] text-red-500 font-medium">{errors.name}</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Department *</span>
-          <input
-            list="kpi-dept-options"
-            value={form.department}
-            onChange={(e) => setForm({ ...form, department: e.target.value })}
-            placeholder="Enter department"
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          />
-          <datalist id="kpi-dept-options">
-            {deptOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value} />
-            ))}
-          </datalist>
+        {/* Department */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Department <span className="text-red-500 font-bold">*</span>
+          </span>
+          <div className="relative">
+            <select
+              value={form.department}
+              onChange={(e) => {
+                setForm({ ...form, department: e.target.value });
+                if (errors.department) setErrors((err) => ({ ...err, department: "" }));
+              }}
+              className={`w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border rounded-xl text-[13px] appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+                errors.department ? "border-red-500" : "border-slate-200"
+              } ${!form.department ? "text-slate-400" : "text-slate-800 font-medium"}`}
+            >
+              <option value="">Select department</option>
+              {allDepartments.map((d) => (
+                <option key={d} value={d} className="text-slate-800">
+                  {d}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+          {errors.department && <span className="text-[11px] text-red-500 font-medium">{errors.department}</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Designation *</span>
-          <input
-            list="kpi-desig-options"
-            value={form.designation}
-            onChange={(e) => setForm({ ...form, designation: e.target.value })}
-            placeholder="Enter designation"
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          />
-          <datalist id="kpi-desig-options">
-            {desigOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value} />
-            ))}
-          </datalist>
+        {/* Designation */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Designation <span className="text-red-500 font-bold">*</span>
+          </span>
+          <div className="relative">
+            <select
+              value={form.designation}
+              onChange={(e) => {
+                setForm({ ...form, designation: e.target.value });
+                if (errors.designation) setErrors((err) => ({ ...err, designation: "" }));
+              }}
+              className={`w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border rounded-xl text-[13px] appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+                errors.designation ? "border-red-500" : "border-slate-200"
+              } ${!form.designation ? "text-slate-400" : "text-slate-800 font-medium"}`}
+            >
+              <option value="">Select designation</option>
+              {allDesignations.map((d) => (
+                <option key={d} value={d} className="text-slate-800">
+                  {d}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+          {errors.designation && <span className="text-[11px] text-red-500 font-medium">{errors.designation}</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Employee Assignment</span>
-          <select
-            value={form.assignedEmployee}
-            onChange={(e) => setForm({ ...form, assignedEmployee: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            <option value="All in Department">All in Department</option>
-            {employees.map((e) => (
-              <option key={e.id || e.name} value={e.name}>
-                {e.name}
-              </option>
-            ))}
-          </select>
+        {/* Employee Assignment */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700">Employee Assignment</span>
+          <div className="relative">
+            <select
+              value={form.assignedEmployee}
+              onChange={(e) => setForm({ ...form, assignedEmployee: e.target.value })}
+              className="w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border border-slate-200 rounded-xl text-[13px] text-slate-800 font-medium appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
+            >
+              {assignedEmployeeOpts.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Target *</span>
+        {/* Target */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Target <span className="text-red-500 font-bold">*</span>
+          </span>
           <input
             value={form.target}
-            onChange={(e) => setForm({ ...form, target: e.target.value })}
+            onChange={(e) => {
+              setForm({ ...form, target: e.target.value });
+              if (errors.target) setErrors((err) => ({ ...err, target: "" }));
+            }}
             placeholder="e.g. ≥ 42 pts or ±3%"
-            className={`h-9 px-3 bg-white border rounded-xl text-[13px] ${
-              errors.target ? "border-red-500" : "border-[#e2e8f0]"
+            className={`w-full h-10 px-3.5 bg-slate-50/70 border rounded-xl text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+              errors.target ? "border-red-500" : "border-slate-200"
             }`}
           />
-          {errors.target && <span className="text-[11px] text-red-500">{errors.target}</span>}
+          {errors.target && <span className="text-[11px] text-red-500 font-medium">{errors.target}</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Measurement Type</span>
-          <select
-            value={form.measurementType}
-            onChange={(e) => setForm({ ...form, measurementType: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            <option>Percentage</option>
-            <option>Numeric Score</option>
-            <option>Rating Score</option>
-            <option>Milestone / SLA</option>
-          </select>
+        {/* Measurement Type */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700">Measurement Type</span>
+          <div className="relative">
+            <select
+              value={form.measurementType}
+              onChange={(e) => setForm({ ...form, measurementType: e.target.value })}
+              className="w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border border-slate-200 rounded-xl text-[13px] text-slate-800 font-medium appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
+            >
+              <option>Percentage</option>
+              <option>Numeric Score</option>
+              <option>Rating Score</option>
+              <option>Milestone / SLA</option>
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Weightage (%) *</span>
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={form.weight}
-            onChange={(e) => setForm({ ...form, weight: Number(e.target.value) })}
-            className={`h-9 px-3 bg-white border rounded-xl text-[13px] ${
-              errors.weight ? "border-red-500" : "border-[#e2e8f0]"
-            }`}
-          />
-          {errors.weight && <span className="text-[11px] text-red-500">{errors.weight}</span>}
+        {/* Weightage (%) */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Weightage (%) <span className="text-red-500 font-bold">*</span>
+          </span>
+          <div className="relative flex items-center">
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={form.weight}
+              onChange={(e) => {
+                setForm({ ...form, weight: Number(e.target.value) });
+                if (errors.weight) setErrors((err) => ({ ...err, weight: "" }));
+              }}
+              className={`w-full h-10 pl-3.5 pr-8 bg-slate-50/70 border rounded-xl text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+                errors.weight ? "border-red-500" : "border-slate-200"
+              }`}
+            />
+            <span className="absolute right-3.5 text-xs font-semibold text-slate-400 pointer-events-none">%</span>
+          </div>
+          {errors.weight && <span className="text-[11px] text-red-500 font-medium">{errors.weight}</span>}
         </label>
 
-        <label className="flex flex-col gap-1 sm:col-span-2">
-          <span className="text-[11px] font-medium text-slate-500">Status</span>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            <option>Active</option>
-            <option>Inactive</option>
-            <option>Draft</option>
-          </select>
+        {/* Status */}
+        <label className="flex flex-col gap-1.5 sm:col-span-2">
+          <span className="text-[12px] font-semibold text-slate-700">Status</span>
+          <div className="relative">
+            <select
+              value={form.status}
+              onChange={(e) => setForm({ ...form, status: e.target.value })}
+              className="w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border border-slate-200 rounded-xl text-[13px] text-slate-800 font-medium appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
+            >
+              <option>Active</option>
+              <option>Inactive</option>
+              <option>Draft</option>
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
         </label>
       </div>
     );
@@ -388,6 +535,7 @@ export default function KpiData() {
         isOpen={addOpen}
         onClose={() => setAddOpen(false)}
         title="Add Key Performance Indicator"
+        size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setAddOpen(false)}>
@@ -405,6 +553,7 @@ export default function KpiData() {
         isOpen={!!editRow}
         onClose={() => setEditRow(null)}
         title="Edit Key Performance Indicator"
+        size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditRow(null)}>

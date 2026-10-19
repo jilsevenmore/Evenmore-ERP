@@ -42,9 +42,13 @@ import {
 } from "./salaryCalculations";
 import { Badge } from "../../../components/hrms/Badge";
 import PageInfoButton from "../../../components/common/PageInfoButton";
+import UserInitials from "../../../components/common/UserInitials";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { useERP } from "../../../context/ERPContext";
 import { downloadPayslipPdf as renderPayslipPdf, printPayslip as renderPrintPayslip } from "./payslipDocument";
+import { fetchEmployeeAwards } from "../../../services/upgradeService";
+import { NOTIFICATION_EVENT } from "../../../services/crmEventNotifications";
 
 function recentPeriods(count = 6) {
   const now = new Date();
@@ -104,10 +108,12 @@ export default function Payroll() {
   const [selectedTab, setActiveTab] = useState("overall");
   const activeTab = canManagePayroll ? selectedTab : "own";
 
-  // Filters for Employee-wise tab
+  // Filters & Pagination for Employee-wise tab
   const [empSearch, setEmpSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [empPage, setEmpPage] = useState(1);
+  const [empPageSize, setEmpPageSize] = useState(10);
 
   // Modals state
   const [selectedPayslip, setSelectedPayslip] = useState(null);
@@ -141,6 +147,25 @@ export default function Payroll() {
   // Switcher for Own Salary perspective
   const [activeOwnUser, setActiveOwnUser] = useState(currentUser?.name || "");
 
+  // Employee Awards Integration for Payslips
+  const [employeeAwards, setEmployeeAwards] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    const loadAwards = () => {
+      fetchEmployeeAwards().then((res) => {
+        if (cancelled) return;
+        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setEmployeeAwards(list);
+      }).catch(() => {});
+    };
+    loadAwards();
+    window.addEventListener(NOTIFICATION_EVENT, loadAwards);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NOTIFICATION_EVENT, loadAwards);
+    };
+  }, []);
+
   const periodOptions = useMemo(() => {
     const list = recentPeriods(6);
     return currentPeriod && !list.includes(currentPeriod) ? [currentPeriod, ...list] : list;
@@ -170,12 +195,27 @@ export default function Payroll() {
       const totalHours = Number(p.totalHours) || (totalDays * dailyHours);
       const hourlyRate = Number(p.hourlyRate) || (totalHours > 0 ? Math.round(Number(p.standardSalary || 0) / totalHours) : 0);
 
+      const empAwards = employeeAwards.filter((a) => {
+        const empIdTarget = String(p.id ?? p.empId ?? '').toLowerCase();
+        const empCodeTarget = String(p.empId ?? p.employeeCode ?? '').toLowerCase();
+        const empNameTarget = String(p.name ?? '').toLowerCase();
+        const aId = String(a.employeeId ?? a.employee ?? '').toLowerCase();
+        const aCode = String(a.employeeCode ?? '').toLowerCase();
+        const aName = String(a.employeeName ?? '').toLowerCase();
+        return (
+          (aId && (aId === empIdTarget || aId === empCodeTarget)) ||
+          (aCode && (aCode === empCodeTarget || aCode === empIdTarget)) ||
+          (aName && aName === empNameTarget)
+        );
+      });
+      const awardBonus = empAwards.reduce((sum, a) => sum + (Number(a.gift_amount || a.cash_reward || 0)), 0);
+
       const empApprovedEncashments = storeEncashments.filter(
         (enc) => enc.employee?.toLowerCase() === p.name?.toLowerCase() && enc.status === "Approved"
       );
       const encashmentBonus = empApprovedEncashments.reduce((sum, enc) => sum + (Number(enc.amount) || 0), 0);
       const baseEarnings = p.additionalEarnings !== undefined ? p.additionalEarnings : (p.overtime || 0);
-      const effectiveEarnings = baseEarnings + encashmentBonus;
+      const effectiveEarnings = baseEarnings + encashmentBonus + awardBonus;
 
       // Calculation matrix from reusable engine
       const calc = calculateSalaryComponents({
@@ -199,9 +239,10 @@ export default function Payroll() {
         totalHours,
         hourlyRate,
         encashmentBonus,
+        awardBonus,
       };
     });
-  }, [payrollEmployees, storeLeaves, storeEncashments, defaultWorkingDays, departmentWorkingHours]);
+  }, [payrollEmployees, storeLeaves, storeEncashments, employeeAwards, defaultWorkingDays, departmentWorkingHours]);
 
   // Selected employee for generate payslip modal
   const slipSelectedEmp = useMemo(() => {
@@ -281,6 +322,21 @@ export default function Payroll() {
       return matchSearch && matchDept && matchStatus;
     });
   }, [computedEmployeePayrolls, empSearch, deptFilter, statusFilter]);
+  useEffect(() => {
+    setEmpPage(1);
+  }, [empSearch, deptFilter, statusFilter]);
+
+  const totalEmpPages = Math.max(1, Math.ceil(filteredEmployees.length / empPageSize));
+  useEffect(() => {
+    if (empPage > totalEmpPages) {
+      setEmpPage(1);
+    }
+  }, [totalEmpPages, empPage]);
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (empPage - 1) * empPageSize;
+    return filteredEmployees.slice(start, start + empPageSize);
+  }, [filteredEmployees, empPage, empPageSize]);
 
   // Own Salary Record — matched by employee record, never "the first payslip
   // in the list", so nobody is shown a colleague's salary as their own. A
@@ -1061,7 +1117,7 @@ export default function Payroll() {
                       </td>
                     </tr>
                   ) : (
-                    filteredEmployees.map((p) => {
+                    paginatedEmployees.map((p) => {
                       const std = Number(p.standardSalary || 0);
                       const tDays = Number(p.totalDays) || 24;
                       const dHours = Number(p.dailyHours) || getDepartmentHours(departmentWorkingHours, p.department) || 8;
@@ -1074,11 +1130,7 @@ export default function Payroll() {
                         {/* Employee Details */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
-                            <img
-                              src={p.avatar}
-                              alt={p.name}
-                              className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                            />
+                            <UserInitials name={p.name} className="w-8 h-8 text-xs shrink-0" />
                             <div>
                               <div className="font-semibold text-slate-900 flex items-center gap-1.5">
                                 <span>{p.name}</span>
@@ -1251,6 +1303,22 @@ export default function Payroll() {
                 </tbody>
               </table>
             </div>
+
+            {filteredEmployees.length > 0 && (
+              <div className="border-t border-bdr bg-slate-50/50">
+                <Pagination
+                  total={filteredEmployees.length}
+                  page={empPage}
+                  pageSize={empPageSize}
+                  pageSizeOptions={[10, 20, 50, 100]}
+                  onPageSizeChange={(newSize) => {
+                    setEmpPageSize(newSize);
+                    setEmpPage(1);
+                  }}
+                  onChange={setEmpPage}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1477,9 +1545,15 @@ export default function Payroll() {
                     </span>
                     <span className="font-semibold text-blue-900">{formatINR(ownRecord.earnedSalary)}</span>
                   </div>
+                  {ownRecord.awardBonus > 0 && (
+                    <div className="flex justify-between py-1 border-b border-slate-50 bg-amber-50/60 px-2 rounded-lg">
+                      <span className="text-amber-800 font-medium">Performance Award / Cash Reward (+)</span>
+                      <span className="font-bold text-amber-700">+{formatINR(ownRecord.awardBonus)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between py-1 border-b border-slate-50">
                     <span className="text-slate-500">Overtime &amp; Incentives</span>
-                    <span className="font-semibold text-emerald-700">+{formatINR(ownRecord.additionalEarnings)}</span>
+                    <span className="font-semibold text-emerald-700">+{formatINR(ownRecord.additionalEarnings - (ownRecord.awardBonus || 0))}</span>
                   </div>
                 </div>
               </div>
@@ -1636,11 +1710,7 @@ export default function Payroll() {
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div className="flex items-center gap-3">
-                <img
-                  src={selectedPayslip.avatar}
-                  alt={selectedPayslip.name}
-                  className="w-10 h-10 rounded-full object-cover border border-slate-200"
-                />
+                <UserInitials name={selectedPayslip.name} className="w-10 h-10 text-sm shrink-0" />
                 <div>
                   <h3 className="font-bold text-[16px] text-slate-900 leading-tight">
                     {selectedPayslip.name}
@@ -1697,6 +1767,14 @@ export default function Payroll() {
                   {formatINR(selectedPayslip.earnedSalary)}
                 </span>
               </div>
+              {selectedPayslip.awardBonus > 0 && (
+                <div className="flex justify-between py-1 border-b border-slate-100 bg-amber-50/60 px-2 rounded-lg">
+                  <span className="text-amber-800 font-medium">Performance Award / Cash Reward (+)</span>
+                  <span className="font-bold text-amber-700">
+                    +{formatINR(selectedPayslip.awardBonus)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Additional Earnings (+)</span>
                 <span className="font-medium text-emerald-700">
@@ -1752,7 +1830,7 @@ export default function Payroll() {
               )}
             </div>
 
-            <div className="flex gap-2.5 mt-2">
+            <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => {
@@ -1760,15 +1838,27 @@ export default function Payroll() {
                   showToast(`Downloaded PDF Payslip for ${selectedPayslip.name}`);
                   setSelectedPayslip(null);
                 }}
-                className="flex-1 bg-navy hover:bg-navy/90 text-white rounded-xl py-2.5 font-semibold text-[13px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-2.5 font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.99]"
+                title="Download PDF directly to Downloads folder"
               >
                 <Download size={14} />
-                Download PDF Payslip
+                <span>Download PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  printPayslip(selectedPayslip);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 px-4 bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 rounded-xl py-2.5 font-semibold text-xs transition cursor-pointer active:scale-[0.99]"
+                title="Print document"
+              >
+                <Printer size={14} />
+                <span>Print</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedPayslip(null)}
-                className="px-4 bg-off border border-bdr text-slate-700 hover:bg-slate-100 rounded-xl py-2.5 font-medium text-[13px] transition cursor-pointer"
+                className="px-4 border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-xl py-2.5 font-semibold text-xs transition cursor-pointer"
               >
                 Close
               </button>
@@ -2300,11 +2390,7 @@ export default function Payroll() {
                   className="w-full flex items-center justify-between p-2.5 bg-slate-50/90 hover:bg-slate-100/80 border border-slate-300 rounded-xl transition cursor-pointer text-left focus:outline-none focus:border-navy"
                 >
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                    <img
-                      src={slipSelectedEmp?.avatar}
-                      alt={slipSelectedEmp?.name}
-                      className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
-                    />
+                    <UserInitials name={slipSelectedEmp?.name} className="w-8 h-8 text-xs shrink-0" />
                     <div className="min-w-0">
                       <div className="font-bold text-[13px] text-slate-900 truncate">
                         {slipSelectedEmp?.name}
@@ -2386,11 +2472,7 @@ export default function Payroll() {
                                 }`}
                               >
                                 <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                  <img
-                                    src={emp.avatar}
-                                    alt={emp.name}
-                                    className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
-                                  />
+                                  <UserInitials name={emp.name} className="w-7 h-7 text-[10px] shrink-0" />
                                   <div className="min-w-0 truncate">
                                     <div className="text-[12.5px] font-medium text-slate-900 truncate">
                                       {emp.name}
@@ -2425,11 +2507,7 @@ export default function Payroll() {
               <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/70 space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={slipSelectedEmp.avatar}
-                      alt={slipSelectedEmp.name}
-                      className="w-10 h-10 rounded-full object-cover border border-slate-200"
-                    />
+                    <UserInitials name={slipSelectedEmp.name} className="w-10 h-10 text-sm shrink-0" />
                     <div>
                       <h4 className="font-bold text-[14.5px] text-slate-900">
                         {slipSelectedEmp.name}
@@ -2494,7 +2572,7 @@ export default function Payroll() {
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => {
@@ -2503,10 +2581,11 @@ export default function Payroll() {
                     showToast(`Downloaded PDF Payslip for ${slipSelectedEmp.name}`);
                   }
                 }}
-                className="flex-1 bg-navy hover:bg-navy/90 text-white rounded-xl py-2.5 font-semibold text-[13px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-2.5 font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.99]"
+                title="Download PDF directly to Downloads folder"
               >
-                <Download size={15} />
-                <span>Download PDF Slip</span>
+                <Download size={14} />
+                <span>Download PDF</span>
               </button>
 
               <button
@@ -2516,19 +2595,19 @@ export default function Payroll() {
                     printPayslip(slipSelectedEmp);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-4 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl py-2.5 font-semibold text-[13px] transition cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 px-4 bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 rounded-xl py-2.5 font-semibold text-xs transition cursor-pointer active:scale-[0.99]"
+                title="Print document"
               >
-                <Printer size={15} />
-                <span>Print / Save PDF</span>
+                <Printer size={14} />
+                <span>Print</span>
               </button>
 
               <button
                 type="button"
-                onClick={handleBatchDownloadSlips}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-[12.5px] font-medium transition cursor-pointer"
+                onClick={() => setShowGenerateSlipModal(false)}
+                className="px-4 border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-xl py-2.5 font-semibold text-xs transition cursor-pointer"
               >
-                <Download size={13} className="text-emerald-700" />
-                <span>Download All {computedEmployeePayrolls.length} Payslips (Batch)</span>
+                Close
               </button>
             </div>
           </div>
