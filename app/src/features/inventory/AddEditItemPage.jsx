@@ -67,6 +67,7 @@ export const AddEditItemPage = () => {
   // Form state
   const [sku, setSku] = useState('');
   const [status, setStatus] = useState('Optimal');
+  const [itemLifecycle, setItemLifecycle] = useState('Active');
   // Original: const [itemKind, setItemKind] = useState(queryKind === 'Machine' ? 'Machine' : (queryKind === 'Part' ? 'Part' : 'Standalone'));
   const [itemKind, setItemKind] = useState(queryKind === 'Part' ? 'Part' : (queryKind === 'Raw Material' ? 'Raw Material' : 'Standalone'));
   const [name, setName] = useState('');

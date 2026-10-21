@@ -2,7 +2,7 @@ import DealDetailView from './DealDetailView';
 import CrmKpiCard from '../common/CrmKpiCard';
 import Modal from '../../../components/ui/Modal';
 import { Pagination } from '../../../components/ui/Pagination';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,

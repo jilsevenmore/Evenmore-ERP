@@ -174,8 +174,8 @@ const OrgTreeView = forwardRef(function OrgTreeView(
     const paddingY = 48;
     const containerW = el.clientWidth - paddingX;
     const containerH = el.clientHeight - paddingY;
-    const treeW = treeEl.offsetWidth;
-    const treeH = treeEl.offsetHeight;
+    const treeW = treeEl.offsetWidth || size.width;
+    const treeH = treeEl.offsetHeight || size.height;
 
     if (containerW > 0 && treeW > 0) {
       const scaleX = containerW / treeW;
@@ -186,11 +186,12 @@ const OrgTreeView = forwardRef(function OrgTreeView(
       if (setZoom) {
         setZoom(targetZoom);
       }
+      centerView();
       setTimeout(() => {
         centerView();
       }, 50);
     }
-  }, [setZoom, centerView]);
+  }, [setZoom, centerView, size.width, size.height]);
 
   useImperativeHandle(ref, () => ({
     getTreeElement: () => innerRef.current,
@@ -203,14 +204,14 @@ const OrgTreeView = forwardRef(function OrgTreeView(
     if (centerSignal > 1) {
       setTimeout(fitToScreen, 50);
     }
-  }, [centerSignal, zoom, fitToScreen]);
+  }, [centerSignal, fitToScreen]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !pendingCenter.current || !size.width) return;
     pendingCenter.current = false;
     centerView();
-  }, [size, centerSignal, zoom, centerView]);
+  }, [size, centerSignal, centerView]);
 
   useLayoutEffect(() => {
     const el = innerRef.current;

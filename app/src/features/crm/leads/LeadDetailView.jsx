@@ -59,6 +59,7 @@ import { exportToCSV } from '../../../services/exportUtils';
 import { useEstimates, estimateMatchesLead, addEstimate } from '../../../services/estimateStore';
 import { useCrmStore } from '../../../stores/crmStore';
 import { generateProductSku } from './leadSubResources';
+import { resolveFileUrl } from '../../../services/api';
 import {
   activeLeadForm, allCustomLeadFields, customLeadFields, formatCustomValue, missingRequiredField,
 } from '../../../services/leadFormFields';
@@ -1788,17 +1789,24 @@ function GeneralTab({ lead, activities = [] }) {
 function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   const initialState = useLeadDetailState(lead);
   const { users, products } = initialState;
+  const { items = [] } = useERP() || {};
   const teamMembers = useCrmStore((s) => s.teamMembers);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [isCustomProduct, setIsCustomProduct] = useState(false);
+  const [isEditCustomProduct, setIsEditCustomProduct] = useState(false);
   const [skuTouched, setSkuTouched] = useState(false);
-  const [productDraft, setProductDraft] = useState({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+  const [productDraft, setProductDraft] = useState({ itemId: '', name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
   const [editingProduct, setEditingProduct] = useState(null);
   const [userSearch, setUserSearch] = useState('');
   const [userFilter, setUserFilter] = useState('All Users');
   const [productSearch, setProductSearch] = useState('');
   const [productFilter, setProductFilter] = useState('All Products');
+
+  const sortedInventoryItems = useMemo(() => {
+    return [...items].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [items]);
 
   const filteredUsers = useMemo(() => users.filter((u) => {
     if (userFilter !== 'All Users' && u.status !== userFilter) return false;
@@ -1855,29 +1863,35 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   function addProduct() {
     if (!productDraft.name.trim() || !productDraft.sku.trim() || !productDraft.price || Number(productDraft.qty) < 1) return;
     const added = {
+      itemId: productDraft.itemId || undefined,
       name: productDraft.name.trim(),
       sku: productDraft.sku.trim().toUpperCase(),
       price: Number(productDraft.price),
       qty: Number(productDraft.qty),
       status: productDraft.status,
+      image: productDraft.image || undefined,
     };
     leadDetailWrite(lead.id, 'add', 'products', added, onActivity).then((saved) => {
       if (saved) onActivity?.(`Product "${added.name}" added`, '#ec4899');
     });
-    setProductDraft({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+    setProductDraft({ itemId: '', name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+    setIsCustomProduct(false);
     setSkuTouched(false);
     setIsAddProductOpen(false);
   }
 
   function openEditProduct(product) {
+    const matchedItem = items.find((i) => (product.itemId && String(i.id) === String(product.itemId)) || (i.name && i.name.toLowerCase() === (product.name || '').toLowerCase()));
+    setIsEditCustomProduct(!matchedItem && !!product.name);
     setEditingProduct({
       id: product.id,
+      itemId: product.itemId || matchedItem?.id || '',
       name: product.name || '',
-      sku: product.sku || '',
-      price: String(product.price || '').replace(/[^0-9]/g, '') || '',
+      sku: product.sku || matchedItem?.sku || '',
+      price: String(product.price || '').replace(/[^0-9.]/g, '') || (matchedItem?.sellingPrice ? String(matchedItem.sellingPrice) : ''),
       qty: product.qty || 1,
       status: product.status || 'Active',
-      image: product.image || '',
+      image: product.image || matchedItem?.image || matchedItem?.imageUrl || '',
     });
   }
 
@@ -1886,11 +1900,13 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
     if (!editingProduct.name.trim() || !editingProduct.sku.trim() || !editingProduct.price || Number(editingProduct.qty) < 1) return;
     const changes = {
       id: editingProduct.id,
+      itemId: editingProduct.itemId || undefined,
       name: editingProduct.name.trim(),
       sku: editingProduct.sku.trim().toUpperCase(),
       price: Number(editingProduct.price),
       qty: Number(editingProduct.qty),
       status: editingProduct.status,
+      image: editingProduct.image || undefined,
     };
     leadDetailWrite(lead.id, 'update', 'products', changes, onActivity).then((saved) => {
       if (saved) onActivity?.(`Product "${changes.name}" updated`, '#3b82f6');
@@ -2074,7 +2090,8 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
           <button
             type="button"
             onClick={() => {
-              setProductDraft({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+              setProductDraft({ itemId: '', name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+              setIsCustomProduct(false);
               setSkuTouched(false);
               setIsAddProductOpen(true);
             }}
@@ -2095,34 +2112,121 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                 <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsAddProductOpen(false)} aria-label="Close add product dialog">×</button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
-                  Product Name
-                  <input
-                    type="text"
-                    value={productDraft.name}
-                    onChange={(event) => {
-                      const newName = event.target.value;
-                      setProductDraft((current) => ({
-                        ...current,
-                        name: newName,
-                        sku: skuTouched ? current.sku : generateProductSku(newName, products),
-                      }));
-                    }}
-                    placeholder="Enter product name"
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
-                    autoFocus
-                  />
-                </label>
-                <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
-                  Product Image
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Product Name</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomProduct((prev) => !prev)}
+                      className="text-[11px] text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
+                    >
+                      {isCustomProduct ? '← Choose from inventory' : '+ Enter custom product'}
+                    </button>
+                  </div>
+                  {!isCustomProduct ? (
+                    <select
+                      value={productDraft.itemId || ''}
+                      onChange={(event) => {
+                        const val = event.target.value;
+                        if (val === '__custom__') {
+                          setIsCustomProduct(true);
+                          return;
+                        }
+                        const item = items.find((i) => String(i.id) === String(val));
+                        if (item) {
+                          const itemImg = item.image || item.imageUrl || '';
+                          const rawPrice = item.sellingPrice ?? item.selling_price ?? item.price ?? item.costPrice ?? item.cost_price ?? '';
+                          setProductDraft((current) => ({
+                            ...current,
+                            itemId: item.id,
+                            name: item.name,
+                            sku: item.sku || current.sku,
+                            price: rawPrice !== '' && rawPrice != null ? String(rawPrice) : current.price,
+                            image: itemImg || current.image,
+                          }));
+                          setSkuTouched(true);
+                        } else {
+                          setProductDraft((current) => ({
+                            ...current,
+                            itemId: '',
+                            name: '',
+                            sku: '',
+                            price: '',
+                            image: '',
+                          }));
+                        }
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer"
+                      autoFocus
+                    >
+                      <option value="">Select a product from inventory...</option>
+                      {sortedInventoryItems.map((it) => (
+                        <option key={it.id} value={it.id}>
+                          {it.name} {it.sku ? `(${it.sku})` : ''} {it.sellingPrice ? `- ₹${Number(it.sellingPrice).toLocaleString('en-IN')}` : ''}
+                        </option>
+                      ))}
+                      <option value="__custom__">+ Enter custom product...</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={productDraft.name}
+                      onChange={(event) => {
+                        const newName = event.target.value;
+                        setProductDraft((current) => ({
+                          ...current,
+                          name: newName,
+                          itemId: '',
+                          sku: skuTouched ? current.sku : generateProductSku(newName, products),
+                        }));
+                      }}
+                      placeholder="Enter product name"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                      autoFocus
+                    />
+                  )}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Product Image</label>
+                    {productDraft.image && (
+                      <button
+                        type="button"
+                        onClick={() => setProductDraft((current) => ({ ...current, image: '' }))}
+                        className="text-[11px] text-rose-500 hover:text-rose-600 font-normal cursor-pointer"
+                      >
+                        Remove Image
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleProductImageChange}
-                    className="mt-2 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-blue-700"
+                    className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-blue-700"
                   />
-                  {productDraft.image && <img src={productDraft.image} alt="Product preview" className="mt-3 h-16 w-16 rounded-lg border border-slate-200 object-cover" />}
-                </label>
+                  {productDraft.image && (
+                    <div className="mt-3 flex items-center gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <img
+                        src={resolveFileUrl(productDraft.image)}
+                        alt="Product preview"
+                        className="h-16 w-16 rounded-lg border border-slate-200 object-cover bg-white shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        {productDraft.itemId ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            ✓ Automatically fetched from inventory
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-600 font-medium">Custom image selected</span>
+                        )}
+                        <p className="text-[11px] text-slate-400 mt-1">Choose a file to replace or click Remove Image.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <label className="text-xs font-semibold text-slate-700">
                   SKU
                   <input
@@ -2197,27 +2301,103 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                 <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setEditingProduct(null)} aria-label="Close edit product dialog">×</button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
-                  Product Name
-                  <input
-                    type="text"
-                    value={editingProduct.name}
-                    onChange={(event) => setEditingProduct((current) => (current ? { ...current, name: event.target.value } : current))}
-                    placeholder="Enter product name"
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
-                    autoFocus
-                  />
-                </label>
-                <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
-                  Product Image
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Product Name</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditCustomProduct((prev) => !prev)}
+                      className="text-[11px] text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
+                    >
+                      {isEditCustomProduct ? '← Choose from inventory' : '+ Enter custom product'}
+                    </button>
+                  </div>
+                  {!isEditCustomProduct ? (
+                    <select
+                      value={editingProduct.itemId || ''}
+                      onChange={(event) => {
+                        const val = event.target.value;
+                        if (val === '__custom__') {
+                          setIsEditCustomProduct(true);
+                          return;
+                        }
+                        const item = items.find((i) => String(i.id) === String(val));
+                        if (item) {
+                          const itemImg = item.image || item.imageUrl || '';
+                          const rawPrice = item.sellingPrice ?? item.selling_price ?? item.price ?? item.costPrice ?? item.cost_price ?? '';
+                          setEditingProduct((current) => (current ? {
+                            ...current,
+                            itemId: item.id,
+                            name: item.name,
+                            sku: item.sku || current.sku,
+                            price: rawPrice !== '' && rawPrice != null ? String(rawPrice) : current.price,
+                            image: itemImg || current.image,
+                          } : current));
+                        }
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer"
+                      autoFocus
+                    >
+                      <option value="">Select a product from inventory...</option>
+                      {sortedInventoryItems.map((it) => (
+                        <option key={it.id} value={it.id}>
+                          {it.name} {it.sku ? `(${it.sku})` : ''} {it.sellingPrice ? `- ₹${Number(it.sellingPrice).toLocaleString('en-IN')}` : ''}
+                        </option>
+                      ))}
+                      <option value="__custom__">+ Enter custom product...</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={editingProduct.name}
+                      onChange={(event) => setEditingProduct((current) => (current ? { ...current, name: event.target.value } : current))}
+                      placeholder="Enter product name"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                      autoFocus
+                    />
+                  )}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Product Image</label>
+                    {editingProduct.image && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingProduct((current) => (current ? { ...current, image: '' } : current))}
+                        className="text-[11px] text-rose-500 hover:text-rose-600 font-normal cursor-pointer"
+                      >
+                        Remove Image
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleEditProductImageChange}
-                    className="mt-2 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-blue-700"
+                    className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-blue-700"
                   />
-                  {editingProduct.image && <img src={editingProduct.image} alt="Product preview" className="mt-3 h-16 w-16 rounded-lg border border-slate-200 object-cover" />}
-                </label>
+                  {editingProduct.image && (
+                    <div className="mt-3 flex items-center gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <img
+                        src={resolveFileUrl(editingProduct.image)}
+                        alt="Product preview"
+                        className="h-16 w-16 rounded-lg border border-slate-200 object-cover bg-white shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        {editingProduct.itemId ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            ✓ Automatically fetched from inventory
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-600 font-medium">Custom image selected</span>
+                        )}
+                        <p className="text-[11px] text-slate-400 mt-1">Choose a file to replace or click Remove Image.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <label className="text-xs font-semibold text-slate-700">
                   SKU
                   <input
@@ -2319,17 +2499,29 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredProducts.map((p, idx) => (
-                <tr key={p.id} className="hover:bg-slate-50/70 transition">
-                  <td className="py-3 px-2 text-slate-400 font-normal">{idx + 1}</td>
-                  <td className="py-3 px-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-md bg-blue-100/70 border border-blue-200/50 flex items-center justify-center shrink-0 overflow-hidden">
-                        {p.image ? <img src={p.image} alt="" className="w-full h-full object-cover" /> : <div className="w-2.5 h-2.5 bg-slate-700 rounded-[2px]" />}
+              {filteredProducts.map((p, idx) => {
+                const matchedInv = items.find(
+                  (it) =>
+                    (p.itemId && String(it.id) === String(p.itemId)) ||
+                    (p.sku && String(it.sku).toLowerCase() === String(p.sku).toLowerCase()) ||
+                    (p.name && String(it.name).toLowerCase() === String(p.name).toLowerCase())
+                );
+                const displayImage = p.image || matchedInv?.image || matchedInv?.imageUrl;
+                return (
+                  <tr key={p.id} className="hover:bg-slate-50/70 transition">
+                    <td className="py-3 px-2 text-slate-400 font-normal">{idx + 1}</td>
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-md bg-blue-100/70 border border-blue-200/50 flex items-center justify-center shrink-0 overflow-hidden">
+                          {displayImage ? (
+                            <img src={resolveFileUrl(displayImage)} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-2.5 h-2.5 bg-slate-700 rounded-[2px]" />
+                          )}
+                        </div>
+                        <span className="font-semibold text-slate-900">{p.name}</span>
                       </div>
-                      <span className="font-semibold text-slate-900">{p.name}</span>
-                    </div>
-                  </td>
+                    </td>
                   <td className="py-3 px-2 text-slate-500 font-mono text-[11px]">{p.sku}</td>
                   <td className="py-3 px-2 text-slate-600 font-medium">{p.price}</td>
                   <td className="py-3 px-2 text-slate-700">{p.qty}</td>
@@ -2365,7 +2557,8 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+            })}
             </tbody>
           </table>
         </div>
@@ -2479,6 +2672,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
   function openEditLead() {
     const source = viewLead ?? lead;
     if (!source) return;
+    if (!storeStages || storeStages.length === 0) {
+      useCrmStore.getState().hydrate();
+    }
     setEditForm({
       name: source.name ?? '',
       company: source.company ?? '',
@@ -2514,13 +2710,29 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       showToast?.('Lead name is required.');
       return;
     }
+
+    const trimmedEmail = String(editForm.email ?? '').trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      showToast?.('Please enter a valid email address (e.g. name@example.com).');
+      return;
+    }
+
+    const trimmedPhone = String(editForm.phone ?? '').trim();
+    if (trimmedPhone) {
+      const digits = trimmedPhone.replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 15) {
+        showToast?.('Phone number must contain between 10 and 15 digits.');
+        return;
+      }
+    }
+
     const updates = {
       name: trimmedName,
       company: String(editForm.company ?? '').trim(),
-      email: String(editForm.email ?? '').trim(),
-      phone: String(editForm.phone ?? '').trim(),
+      email: trimmedEmail,
+      phone: trimmedPhone,
       source: String(editForm.source ?? '').trim(),
-      status: String(editForm.status ?? '').trim() || viewLead?.status,
+      status: String(editForm.status ?? '').trim() || viewLead?.status || lead?.status,
       owner: String(editForm.owner ?? '').trim(),
       jobTitle: String(editForm.jobTitle ?? '').trim(),
       industry: String(editForm.industry ?? '').trim(),
@@ -2539,33 +2751,53 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       return;
     }
     const prevStatus = viewLead?.status ?? lead?.status;
-    // The server keys everything by id: the stage (which runs the stage
-    // automation), the source and the owner. Names are what the form shows.
-    const byName = (rows, name) => rows.find((r) => String(r.name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase());
-    const stage = updates.status !== 'Converted' ? byName(storeStages, updates.status) : null;
-    if (stage) updates.stageId = stage.id;
-    const source = byName(storeSources, updates.source);
-    if (source) updates.sourceId = source.id;
-    const owner = byName(storeMembers, updates.owner);
-    if (owner) updates.ownerId = owner.id;
+    const allStages = storeStages?.length ? storeStages : (useCrmStore.getState().stages || []);
+    const allSources = storeSources?.length ? storeSources : (useCrmStore.getState().sources || []);
+    const allMembers = storeMembers?.length ? storeMembers : (useCrmStore.getState().teamMembers || []);
+
+    const byName = (rows, name) => (rows || []).find((r) => String(r.name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase());
+    const stage = updates.status !== 'Converted' ? byName(allStages, updates.status) : null;
+    if (stage) {
+      updates.stageId = stage.id;
+    } else if (updates.status !== 'Converted' && (viewLead?.stageId || lead?.stageId)) {
+      updates.stageId = viewLead?.stageId || lead?.stageId;
+    }
+
+    if (updates.source) {
+      const src = byName(allSources, updates.source);
+      if (src) updates.sourceId = src.id;
+    } else {
+      updates.sourceId = null;
+    }
+
+    if (updates.owner) {
+      const own = byName(allMembers, updates.owner);
+      if (own) updates.ownerId = own.id;
+    } else {
+      updates.ownerId = null;
+    }
     const stageChanged = Boolean(stage) && updates.status !== prevStatus;
 
-    setViewLead((current) => ({ ...(current ?? lead), ...updates }));
     useCrmStore.getState().updateLead(targetId, updates)
-      .then(() => {
-        // The server generated this stage's tasks during the save; read them now.
-        if (stageChanged) runLeadStageAutomation({ ...(viewLead ?? lead), ...updates }, updates.status, { previousStage: prevStatus });
+      .then((saved) => {
+        setViewLead((current) => ({ ...(current ?? lead), ...updates, ...(saved || {}) }));
+        if (stageChanged) {
+          runLeadStageAutomation({ ...(viewLead ?? lead), ...updates, ...(saved || {}) }, updates.status, { previousStage: prevStatus });
+        }
+        if (updates.status === 'Converted') {
+          setIsConverted(true);
+        } else if (isConverted && updates.status !== 'Converted') {
+          setIsConverted(false);
+        }
+        setIsEditOpen(false);
+        setEditForm(null);
+        logActivity(`Lead information updated`, '#10b981');
+        showToast?.(`Lead "${updates.name}" updated.`);
       })
-      .catch((err) => showToast?.(`Lead not saved — ${err?.message || err}`));
-    if (updates.status === 'Converted') {
-      setIsConverted(true);
-    } else if (isConverted && updates.status !== 'Converted') {
-      setIsConverted(false);
-    }
-    setIsEditOpen(false);
-    setEditForm(null);
-    logActivity(`Lead information updated`, '#10b981');
-    showToast?.(`Lead "${updates.name}" updated.`);
+      .catch((err) => {
+        console.error('[CRM Lead Edit] Failed to save lead:', err);
+        showToast?.(`Lead not saved — ${describeError(err)}`);
+      });
   }
 
   function exportLead(format) {
@@ -2844,7 +3076,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Lead Number
-                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.leadNumber} onChange={(e) => updateEditField('leadNumber', e.target.value)} placeholder="L00000185" />
+                <input readOnly disabled className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-500 bg-slate-50 cursor-not-allowed outline-none" value={editForm.leadNumber} placeholder="Auto-generated" />
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 City
@@ -2880,7 +3112,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 sm:col-span-2">
                 Created On
-                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.createdOn} onChange={(e) => updateEditField('createdOn', e.target.value)} placeholder="27/08/2026" />
+                <input readOnly disabled className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-500 bg-slate-50 cursor-not-allowed outline-none" value={editForm.createdOn} placeholder="Auto-generated" />
               </label>
             </div>
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-xl">

@@ -48,6 +48,7 @@ export const SECTION_MAPPERS = {
   },
   products: {
     toApi: (row) => ({
+      itemId: row.itemId || undefined,
       name: row.name,
       sku: row.sku || undefined,
       price: row.price !== undefined && row.price !== '' ? num(row.price) : undefined,
@@ -56,11 +57,13 @@ export const SECTION_MAPPERS = {
     }),
     fromApi: (row) => ({
       ...row,
+      itemId: row.itemId || row.item || null,
       name: row.name || row.productName || '',
       sku: row.sku || '',
       price: row.price != null ? `Rs. ${Number(row.price).toLocaleString('en-IN')}` : '',
       qty: Number(row.qty) || 1,
       status: row.status || 'Active',
+      image: row.image || row.imageUrl || '',
     }),
   },
   sources: {

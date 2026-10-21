@@ -26,13 +26,16 @@ function Empty({ children }) { return <p className="deal-detail-empty">{children
 
 export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDuplicate, onDelete }) {
   const navigate = useNavigate();
-  const { quotations, customers } = useERP();
+  const { quotations, customers, estimates, items = [] } = useERP();
+  const leads = useCrmStore((state) => state.leads) || [];
+  const sourceLead = leads.find((l) => String(l.id) === String(deal?.leadId)) || null;
   const currentUser = useAppStore((state) => state.currentUser);
   const [tab, setTab] = useState('Overview');
   const [tasks, setTasks] = useState(loadCrmTasks);
   const [editor, setEditor] = useState(null);
   const [error, setError] = useState('');
   const [removal, setRemoval] = useState(null);
+  const [isCustomProduct, setIsCustomProduct] = useState(false);
   // The floating "Menu" button drives the app-wide mobile navigation drawer
   // (backdrop, Escape and route-change dismissal live in MainLayout).
   const navigationOpen = useAppStore((state) => state.mobileSidebarOpen);
@@ -54,14 +57,161 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
   const teamMembers = useCrmStore((state) => state.teamMembers);
   if (!deal) return <div className="card p-8"><h1 className="text-xl font-bold mb-4">Deal not found</h1><Link to="/crm/deals" className="btn-outline">Back to Deals</Link></div>;
 
-  const products = Array.isArray(deal.products) ? deal.products.map((item, index) => ({ ...item, id: item.id || `product-${index}`, name: item.name || item.description || item.product || item.id, qty: item.qty ?? item.quantity ?? 1, rate: item.rate ?? item.price ?? 0 })) : deal.product ? [{ id: 'legacy-product', name: deal.product, qty: deal.quantity || 1, unit: 'Qty', rate: Number(deal.price || 0) / (deal.quantity || 1) }] : [];
+  const customer = (customers || []).find((item) => String(item.id) === String(deal.customerId || deal.partyId) || item.name === deal.client);
+
+  const contactPerson = deal.contactPerson || sourceLead?.contactPerson || sourceLead?.contactName || customer?.contactPerson || customer?.contact_person || (deal.client !== sourceLead?.name ? sourceLead?.name : '') || '';
+  const email = deal.email || sourceLead?.email || customer?.email || '';
+  const phone = deal.phone || sourceLead?.phone || customer?.phone || '';
+  const source = deal.source || sourceLead?.source || '';
+  const team = deal.team || sourceLead?.team || '';
+  const expectedCloseDate = deal.expectedCloseDate || deal.date || sourceLead?.expectedCloseDate || sourceLead?.targetCloseDate || '';
+  const customerName = (customer?.name || (deal.client && !deal.client.toLowerCase().startsWith('inbound enquiry') ? deal.client : (sourceLead?.company || sourceLead?.name || deal.client))) || deal.client || 'Not specified';
+
+  const linkedEstimate = (estimates || []).find((e) =>
+    (deal.leadId && String(e.leadId) === String(deal.leadId)) ||
+    (deal.id && e.dealId && String(e.dealId) === String(deal.id)) ||
+    (customerName && (
+      String(e.customer || '').trim().toLowerCase() === String(customerName).trim().toLowerCase() ||
+      String(e.partyName || '').trim().toLowerCase() === String(customerName).trim().toLowerCase()
+    ))
+  );
+
+  let rawProducts = [];
+  if (Array.isArray(deal.products) && deal.products.length > 0) {
+    rawProducts = deal.products;
+  } else if (deal.product) {
+    rawProducts = [{ id: 'legacy-product', name: deal.product, qty: deal.quantity || 1, unit: 'Qty', rate: Number(deal.price || 0) / (deal.quantity || 1) }];
+  } else if (Array.isArray(sourceLead?.products) && sourceLead.products.length > 0) {
+    rawProducts = sourceLead.products.map((item, index) => ({
+      id: item.id || `lead-product-${index}`,
+      name: typeof item === 'string' ? item : (item.name || item.product || item.description || `Product ${index + 1}`),
+      description: item.description || '',
+      qty: Number(item.qty || item.quantity || 1),
+      rate: Number(item.rate || item.price || 0),
+      unit: item.unit || 'Qty',
+    }));
+  } else if (Array.isArray(linkedEstimate?.items) && linkedEstimate.items.length > 0) {
+    rawProducts = linkedEstimate.items.map((item, index) => ({
+      id: item.id || `est-item-${index}`,
+      name: item.name || item.description || `Item ${index + 1}`,
+      description: item.description || '',
+      qty: Number(item.qty || item.quantity || 1),
+      rate: Number(item.rate || item.price || 0),
+      unit: item.unit || 'Pcs',
+    }));
+  } else if (Number(deal.price || deal.value) > 0) {
+    rawProducts = [{
+      id: 'deal-value-item',
+      name: deal.title || deal.name || 'Deal Scope',
+      description: deal.description || 'Estimated deal scope',
+      qty: 1,
+      unit: 'Qty',
+      rate: Number(deal.price || deal.value),
+    }];
+  }
+
+  const products = rawProducts.map((item, index) => ({
+    ...item,
+    id: item.id || `product-${index}`,
+    name: item.name || item.description || item.product || item.id,
+    qty: item.qty ?? item.quantity ?? 1,
+    rate: item.rate ?? item.price ?? 0,
+  }));
   const documents = deal.documents || [];
   const contracts = allContracts.filter((contract) => String(contract.dealId) === String(deal.id));
   const linkedTasks = tasks.filter((task) => String(task.dealId) === String(deal.id));
   const linkedQuotes = quotations.filter((quote) => String(quote.dealId) === String(deal.id) || quote.dealReference === (deal.dealNumber || deal.id));
-  const customer = customers.find((item) => String(item.id) === String(deal.customerId || deal.partyId) || item.name === deal.client);
   const actor = currentUser?.name || currentUser?.fullName || 'CRM User';
-  const openEditor = (type, values = {}) => { setError(''); setEditor({ type, ...values }); };
+  const productOptions = useMemo(() => {
+    const options = [];
+    const seenNames = new Set();
+
+    (items || []).forEach((item) => {
+      if (!item?.name) return;
+      const nameLower = item.name.trim().toLowerCase();
+      seenNames.add(nameLower);
+      const rawPrice = item.sellingPrice ?? item.selling_price ?? item.price ?? item.costPrice ?? item.cost_price;
+      const rate = rawPrice !== undefined && rawPrice !== null && !Number.isNaN(Number(rawPrice)) ? Number(rawPrice) : 0;
+      options.push({
+        key: `item-${item.id}`,
+        value: `item-${item.id}`,
+        itemId: item.id,
+        name: item.name,
+        label: `${item.name}${item.sku ? ` (${item.sku})` : ''}${rate > 0 ? ` — ₹${rate.toLocaleString('en-IN')}` : ''}`,
+        description: item.description || '',
+        rate,
+        unit: item.unit || item.uom || 'Qty',
+      });
+    });
+
+    if (Array.isArray(sourceLead?.products)) {
+      sourceLead.products.forEach((p, index) => {
+        const pName = typeof p === 'string' ? p : (p.name || p.product || p.description);
+        if (!pName) return;
+        const nameLower = pName.trim().toLowerCase();
+        if (!seenNames.has(nameLower)) {
+          seenNames.add(nameLower);
+          const rate = Number(p.rate || p.price || 0);
+          options.push({
+            key: `lead-${p.id || index}`,
+            value: `lead-${p.id || index}`,
+            itemId: p.id,
+            name: pName,
+            label: `${pName}${rate > 0 ? ` — ₹${rate.toLocaleString('en-IN')}` : ''}`,
+            description: p.description || '',
+            rate,
+            unit: p.unit || 'Qty',
+          });
+        }
+      });
+    }
+
+    (leads || []).forEach((lead) => {
+      if (Array.isArray(lead?.products)) {
+        lead.products.forEach((p, idx) => {
+          const pName = typeof p === 'string' ? p : (p.name || p.product);
+          if (!pName) return;
+          const nameLower = pName.trim().toLowerCase();
+          if (!seenNames.has(nameLower)) {
+            seenNames.add(nameLower);
+            const rate = Number(p.rate || p.price || 0);
+            options.push({
+              key: `other-lead-${lead.id}-${idx}`,
+              value: `other-lead-${lead.id}-${idx}`,
+              name: pName,
+              label: `${pName}${rate > 0 ? ` — ₹${rate.toLocaleString('en-IN')}` : ''}`,
+              description: p.description || '',
+              rate,
+              unit: p.unit || 'Qty',
+            });
+          }
+        });
+      }
+    });
+
+    return options.sort((a, b) => a.name.localeCompare(b.name));
+  }, [items, sourceLead, leads]);
+
+  const selectedProductValue = useMemo(() => {
+    if (!editor || editor.type !== 'Product') return '';
+    const match = productOptions.find((p) =>
+      (editor.itemId && p.itemId && String(p.itemId) === String(editor.itemId)) ||
+      (editor.title && p.name && p.name.trim().toLowerCase() === editor.title.trim().toLowerCase())
+    );
+    return match ? match.value : '';
+  }, [editor, productOptions]);
+
+  const openEditor = (type, values = {}) => {
+    setError('');
+    if (type === 'Product') {
+      const isExistingCustom = values.title && !productOptions.some((p) =>
+        (values.itemId && p.itemId && String(p.itemId) === String(values.itemId)) ||
+        p.name.trim().toLowerCase() === values.title.trim().toLowerCase()
+      );
+      setIsCustomProduct(Boolean(isExistingCustom));
+    }
+    setEditor({ type, ...values });
+  };
   const notifyFailure = (failure) => onNotify(describeError(failure) || 'Unable to save changes.');
   const memberId = (name) => teamMembers.find((m) => String(m.name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase())?.id;
   /** Save fields on the deal row and log what changed on its activity feed. */
@@ -88,7 +238,7 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
         return;
       }
       const title = editor.title?.trim();
-      if (!title) throw new Error('Enter a title.');
+      if (!title) throw new Error(editor.type === 'Product' ? 'Select or enter a product name.' : 'Enter a title.');
       if (editor.type === 'Task') {
         const existing = loadCrmTasks();
         const owner = editor.owner || deal.assignedUser || '';
@@ -165,15 +315,15 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
     <button type="button" className="deal-mobile-menu btn-outline btn-sm" aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navigationOpen} onClick={toggleNavigation}>{navigationOpen ? <X size={16} /> : <Menu size={16} />}Menu</button>
     <DealProjectHandoff deal={deal} onNotify={onNotify} renderTrigger={({ open, project, referenceError }) => {
       const projectAction = project ? <Link className="btn-primary btn-sm" to={`/crm/projects/${encodeURIComponent(project.id)}`}><FolderPlus size={15} />View Project</Link> : <button className="btn-primary btn-sm" disabled={deal.stage !== 'Won' || Boolean(referenceError)} title={deal.stage !== 'Won' ? 'Save this deal as Won to create a project' : undefined} onClick={open}><FolderPlus size={15} />Create Project</button>;
-      const related = <><dl className="deal-info-list"><div><dt>Source Lead</dt><dd>{deal.leadId != null ? <Link to={`/crm/leads/${encodeURIComponent(deal.leadId)}`}>{deal.leadNumber || deal.leadId}</Link> : 'No source lead linked'}</dd></div><div><dt>Project</dt><dd>{project ? <Link to={`/crm/projects/${encodeURIComponent(project.id)}`}>{project.projectNumber} <span className="deal-stage">{project.status}</span></Link> : 'Not created'}</dd></div><div><dt>Created On</dt><dd>{date(deal.createdAt)}</dd></div></dl>{referenceError && <p role="alert" className="text-rose-600 text-xs">{referenceError}</p>}{project && <><div className="deal-linked-note"><Link2 size={20} /><div><strong>Project Linked</strong><p>This deal has been converted to a project.</p><Link to={`/crm/projects/${encodeURIComponent(project.id)}`}>Open {project.projectNumber} <ArrowRight size={12} /></Link></div></div><div className="deal-handoff-complete"><CheckCircle2 size={22} /><div><strong>Project hand-off complete</strong><p>Project created and deal linked. Customer, owner and available team information transferred.</p></div></div></>}</>;
+      const related = <><dl className="deal-info-list"><div><dt>Source Lead</dt><dd>{deal.leadId != null ? <Link to={`/crm/leads/${encodeURIComponent(deal.leadId)}`}>{sourceLead?.leadNumber || deal.leadNumber || deal.leadId}</Link> : 'No source lead linked'}</dd></div><div><dt>Project</dt><dd>{project ? <Link to={`/crm/projects/${encodeURIComponent(project.id)}`}>{project.projectNumber} <span className="deal-stage">{project.status}</span></Link> : 'Not created'}</dd></div><div><dt>Created On</dt><dd>{date(deal.createdAt)}</dd></div></dl>{referenceError && <p role="alert" className="text-rose-600 text-xs">{referenceError}</p>}{project && <><div className="deal-linked-note"><Link2 size={20} /><div><strong>Project Linked</strong><p>This deal has been converted to a project.</p><Link to={`/crm/projects/${encodeURIComponent(project.id)}`}>Open {project.projectNumber} <ArrowRight size={12} /></Link></div></div><div className="deal-handoff-complete"><CheckCircle2 size={22} /><div><strong>Project hand-off complete</strong><p>Project created and deal linked. Customer, owner and available team information transferred.</p></div></div></>}</>;
       return <>
-        <header className="deal-detail-header"><nav aria-label="Breadcrumb"><Link to="/crm/deals">CRM</Link><span> / </span><Link to="/crm/deals">Deals</Link><span> / {deal.dealNumber || deal.id}</span></nav><div className="deal-detail-heading"><div><p className="deal-eyebrow">Deal Detail</p><h1>{deal.name}</h1><div className="deal-detail-subtitle"><span>{deal.dealNumber || deal.id}</span><span className="deal-stage" data-won={deal.stage === 'Won'}>{deal.stage}</span>{deal.stage === 'Won' && <Trophy size={18} className="text-amber-500" />}<span>{deal.client}</span></div></div><div className="deal-header-actions"><button className="btn-outline btn-sm" onClick={() => onEdit(deal)}><Pencil size={14} />Edit</button><button className="btn-outline btn-sm" onClick={() => { try { onDuplicate(deal); } catch (failure) { notifyFailure(failure); } }}><Copy size={14} />Duplicate</button>{projectAction}<details className="deal-more"><summary className="btn-outline btn-sm"><MoreHorizontal size={15} />More</summary><div><Link to="/crm/deals"><ArrowLeft size={14} />Back to Deals</Link><button disabled={Boolean(project) || Boolean(referenceError)} title={project ? 'Linked projects must retain their source deal' : undefined} onClick={() => onDelete(deal)}>Delete Deal</button></div></details></div></div></header>
+        <header className="deal-detail-header"><nav aria-label="Breadcrumb"><Link to="/crm/deals">CRM</Link><span> / </span><Link to="/crm/deals">Deals</Link><span> / {deal.dealNumber || deal.id}</span></nav><div className="deal-detail-heading"><div><p className="deal-eyebrow">Deal Detail</p><h1>{deal.name}</h1><div className="deal-detail-subtitle"><span>{deal.dealNumber || deal.id}</span><span className="deal-stage" data-won={deal.stage === 'Won'}>{deal.stage}</span>{deal.stage === 'Won' && <Trophy size={18} className="text-amber-500" />}<span>{customerName}</span></div></div><div className="deal-header-actions"><Link to="/crm/deals" className="btn-outline btn-sm"><ArrowLeft size={14} />Back to Deals</Link><button className="btn-outline btn-sm" onClick={() => onEdit(deal)}><Pencil size={14} />Edit</button><button className="btn-outline btn-sm" onClick={() => { try { onDuplicate(deal); } catch (failure) { notifyFailure(failure); } }}><Copy size={14} />Duplicate</button>{projectAction}<details className="deal-more"><summary className="btn-outline btn-sm"><MoreHorizontal size={15} />More</summary><div><Link to="/crm/deals"><ArrowLeft size={14} />Back to Deals</Link><button disabled={Boolean(project) || Boolean(referenceError)} title={project ? 'Linked projects must retain their source deal' : undefined} onClick={() => onDelete(deal)}>Delete Deal</button></div></details></div></div></header>
         <div className="deal-detail-tabs" role="tablist" aria-label="Deal sections">{['Overview', 'Products', 'Activities', 'Documents', 'Quotations', 'Tasks', 'Related'].map((name) => {
           const count = { Products: products.length, Activities: activities.length, Documents: documents.length, Quotations: linkedQuotes.length, Tasks: linkedTasks.length, Related: contracts.length + Number(Boolean(project)) + Number(deal.leadId != null) + Number(Boolean(customer || deal.client)) }[name];
           return <button key={name} id={`deal-tab-${name}`} role="tab" aria-selected={tab === name} aria-controls="deal-tab-panel" tabIndex={tab === name ? 0 : -1} onKeyDown={(event) => { if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; event.preventDefault(); const buttons = [...event.currentTarget.parentElement.children]; const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (buttons.indexOf(event.currentTarget) + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length; buttons[next].focus(); buttons[next].click(); }} onClick={() => setTab(name)}>{name}{count != null && <span>{count}</span>}</button>;
         })}</div>
         <div role="tabpanel" id="deal-tab-panel" aria-labelledby={`deal-tab-${tab}`}>
-          {tab === 'Overview' && <div className="deal-overview-grid"><Panel title="Deal Information"><dl className="deal-info-list">{[['Customer', deal.client], ['Contact Person', deal.contactPerson], ['Email', deal.email ? <a href={`mailto:${deal.email}`}>{deal.email}</a> : null], ['Phone', deal.phone ? <a href={`tel:${deal.phone}`}>{deal.phone}</a> : null], ['Deal Value', money(deal.price)], ['Expected Close Date', date(deal.expectedCloseDate || deal.date)], ['Source', deal.source], ['Owner', deal.assignedUser || deal.owner], ['Team', deal.team], ['Stage', deal.stage]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not specified'}</dd></div>)}</dl></Panel><div className="deal-detail-stack"><Panel title="Summary" action={<button aria-label="Edit summary" onClick={() => openEditor('Summary', { title: deal.description || deal.notes || '' })}><Pencil size={14} /></button>}><p className="deal-summary-text">{deal.description || deal.notes || 'Add a summary of the customer requirements and next steps.'}</p></Panel><Panel title={`Products (${products.length})`} action={<button className="deal-text-action" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add</button>}>{productTable}</Panel></div><div className="deal-detail-stack"><Panel title="Quick Actions"><div className="deal-quick-actions">{projectAction}<button className="btn-outline btn-sm" onClick={createQuote}><FileText size={16} />Create Quotation</button><button className="btn-outline btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract`, contractType: 'Other' })}><FileText size={16} />Create Contract</button><button className="btn-outline btn-sm" onClick={() => openEditor('Task', { owner: deal.assignedUser })}><Plus size={16} />Add Task</button></div>{deal.stage !== 'Won' && !project && <p className="deal-action-hint">Project creation is available when the deal is Won.</p>}</Panel><Panel title="Related Information">{related}</Panel></div></div>}
+          {tab === 'Overview' && <div className="deal-overview-grid"><Panel title="Deal Information"><dl className="deal-info-list">{[['Customer', customerName], ['Contact Person', contactPerson], ['Email', email ? <a href={`mailto:${email}`}>{email}</a> : null], ['Phone', phone ? <a href={`tel:${phone}`}>{phone}</a> : null], ['Deal Value', money(deal.price || deal.value)], ['Expected Close Date', date(expectedCloseDate)], ['Source', source], ['Owner', deal.assignedUser || deal.owner], ['Team', team], ['Stage', deal.stage]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not specified'}</dd></div>)}</dl></Panel><div className="deal-detail-stack"><Panel title="Summary" action={<button aria-label="Edit summary" onClick={() => openEditor('Summary', { title: deal.description || deal.notes || '' })}><Pencil size={14} /></button>}><p className="deal-summary-text">{deal.description || deal.notes || 'Add a summary of the customer requirements and next steps.'}</p></Panel><Panel title={`Products (${products.length})`} action={<button className="deal-text-action" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add</button>}>{productTable}</Panel></div><div className="deal-detail-stack"><Panel title="Quick Actions"><div className="deal-quick-actions">{projectAction}<button className="btn-outline btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract`, contractType: 'Other' })}><FileText size={16} />Create Contract</button><button className="btn-outline btn-sm" onClick={() => openEditor('Task', { owner: deal.assignedUser })}><Plus size={16} />Add Task</button></div>{deal.stage !== 'Won' && !project && <p className="deal-action-hint">Project creation is available when the deal is Won.</p>}</Panel><Panel title="Related Information">{related}</Panel></div></div>}
           {tab === 'Products' && <Panel title={`Products (${products.length})`} action={<button className="btn-primary btn-sm" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add Product</button>}>{productTable}</Panel>}
           {tab === 'Activities' && <Panel title="Activities" action={<button className="btn-primary btn-sm" onClick={() => openEditor('Activity')}><Plus size={14} />Add Activity</button>}><ActivitiesTimeline activities={activities} /></Panel>}
           {tab === 'Documents' && <Panel title={`Documents (${documents.length})`} action={<label className="btn-primary btn-sm cursor-pointer"><Upload size={14} />Upload Document<input aria-label="Upload document" type="file" className="sr-only" onChange={upload} /></label>}><DocumentsTable documents={documents} onRemove={(item) => setRemoval({ type: 'Document', item })} /><p className="deal-action-hint">Maximum file size: 25 MB.</p></Panel>}
@@ -185,8 +335,96 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
     }} />
     <Modal isOpen={Boolean(removal)} onClose={() => setRemoval(null)} title={`Remove ${removal?.type || 'record'}`} footer={<><button className="btn-outline btn-sm" onClick={() => setRemoval(null)}>Cancel</button><button className="btn-primary btn-sm" onClick={removeRecord}>Remove</button></>}><p className="text-sm">Remove {removal?.item.name || removal?.item.title} from this deal?</p></Modal>
     <Modal isOpen={Boolean(editor)} onClose={() => setEditor(null)} title={editor ? `${editor.type === 'Summary' || editor.id ? 'Edit' : 'Add'} ${editor.type}` : ''}>
-      {editor && <form onSubmit={submit} className="deal-detail-form">{editor.type !== 'Pricing' && <label>{editor.type === 'Product' ? 'Product name' : editor.type === 'Summary' ? 'Summary' : 'Title'} *{['Activity', 'Summary'].includes(editor.type) ? <textarea autoFocus required rows={4} value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /> : <input autoFocus required value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />}</label>}
-        {editor.type === 'Product' && <><label>Description<textarea rows={2} value={editor.description || ''} onChange={(event) => setEditor({ ...editor, description: event.target.value })} /></label><div className="deal-form-grid">{[['qty', 'Quantity', 'number'], ['rate', 'Rate (₹)', 'number'], ['unit', 'Unit', 'text']].map(([key, label, type]) => <label key={key}>{label}<input required={key !== 'unit'} type={type} min={key === 'qty' ? '0.001' : '0'} step="any" value={editor[key] ?? ''} onChange={(event) => setEditor({ ...editor, [key]: event.target.value })} /></label>)}</div></>}
+      {editor && <form onSubmit={submit} className="deal-detail-form">
+        {editor.type === 'Product' ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label style={{ margin: 0, fontWeight: 600 }}>Product name *</label>
+              <button
+                type="button"
+                onClick={() => setIsCustomProduct((prev) => !prev)}
+                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+              >
+                {isCustomProduct ? '← Choose from product list' : '+ Enter custom product'}
+              </button>
+            </div>
+            {!isCustomProduct ? (
+              <select
+                autoFocus
+                required
+                value={selectedProductValue}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  if (val === '__custom__') {
+                    setIsCustomProduct(true);
+                    return;
+                  }
+                  if (!val) {
+                    setEditor((current) => ({ ...current, title: '', itemId: undefined }));
+                    return;
+                  }
+                  const matched = productOptions.find((p) => p.value === val);
+                  if (matched) {
+                    setEditor((current) => ({
+                      ...current,
+                      title: matched.name,
+                      itemId: matched.itemId || undefined,
+                      description: current.description || matched.description || '',
+                      rate: matched.rate !== undefined && matched.rate !== null ? matched.rate : current.rate,
+                      unit: matched.unit || current.unit || 'Qty',
+                    }));
+                  }
+                }}
+                className="cursor-pointer"
+              >
+                <option value="">Select a product from inventory...</option>
+                {productOptions.map((opt) => (
+                  <option key={opt.key} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+                <option value="__custom__">+ Enter custom product...</option>
+              </select>
+            ) : (
+              <input
+                autoFocus
+                required
+                placeholder="Enter custom product name"
+                value={editor.title || ''}
+                onChange={(event) => setEditor((current) => ({ ...current, title: event.target.value }))}
+              />
+            )}
+          </div>
+        ) : editor.type !== 'Pricing' ? (
+          <label>
+            {editor.type === 'Summary' ? 'Summary' : 'Title'} *
+            {['Activity', 'Summary'].includes(editor.type) ? (
+              <textarea autoFocus required rows={4} value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />
+            ) : (
+              <input autoFocus required value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />
+            )}
+          </label>
+        ) : null}
+        {editor.type === 'Product' && (
+          <>
+            <label>Description<textarea rows={2} value={editor.description || ''} onChange={(event) => setEditor({ ...editor, description: event.target.value })} /></label>
+            <div className="deal-form-grid">
+              {[['qty', 'Quantity', 'number'], ['rate', 'Rate (₹)', 'number'], ['unit', 'Unit', 'text']].map(([key, label, type]) => (
+                <label key={key}>
+                  {label}
+                  <input
+                    required={key !== 'unit'}
+                    type={type}
+                    min={key === 'qty' ? '0.001' : '0'}
+                    step="any"
+                    value={editor[key] ?? ''}
+                    onChange={(event) => setEditor({ ...editor, [key]: event.target.value })}
+                  />
+                </label>
+              ))}
+            </div>
+          </>
+        )}
         {editor.type === 'Task' && <><label>Assigned to<input value={editor.owner || ''} onChange={(event) => setEditor({ ...editor, owner: event.target.value })} /></label><div className="deal-form-grid"><label>Due date *<input required type="date" value={editor.dueDate || ''} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label><label>Priority<select value={editor.priority || 'Medium'} onChange={(event) => setEditor({ ...editor, priority: event.target.value })}>{['Low', 'Medium', 'High', 'Urgent'].map((priority) => <option key={priority}>{priority}</option>)}</select></label></div><label>Status<select value={editor.status || 'Open'} onChange={(event) => setEditor({ ...editor, status: event.target.value })}>{['Open', 'In Progress', 'Waiting', 'Completed'].map((status) => <option key={status}>{status}</option>)}</select></label></>}
         {editor.type === 'Pricing' && <div className="deal-form-grid"><label>Discount (₹)<input aria-label="Discount" type="number" min="0" step="0.01" value={editor.discount} onChange={(event) => setEditor({ ...editor, discount: event.target.value })} /></label><label>Tax (%)<input aria-label="Tax rate" type="number" min="0" max="100" step="0.01" value={editor.taxRate} onChange={(event) => setEditor({ ...editor, taxRate: event.target.value })} /></label></div>}
         {editor.type === 'Activity' && <><label>Activity type<select value={editor.activityType || 'Note Added'} onChange={(event) => setEditor({ ...editor, activityType: event.target.value })}>{['Note Added', 'Call Completed', 'Meeting', 'Follow-up', 'Email'].map((type) => <option key={type}>{type}</option>)}</select></label><label>Details<textarea rows={3} value={editor.description || ''} onChange={(event) => setEditor({ ...editor, description: event.target.value })} /></label></>}

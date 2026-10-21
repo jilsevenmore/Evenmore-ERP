@@ -15,6 +15,7 @@ import { describeError, pullDealActivities } from '../../../services/crmSync';
 import { uploadFileToBackend } from '../../../services/fileUploadService';
 import { resolveFileUrl } from '../../../services/api';
 import { useCrmStore } from '../../../stores/crmStore';
+import { useERP } from '../../../context/ERPContext';
 import {
   captureContractSignature,
   updateContractWorkflowStatus,
@@ -99,6 +100,7 @@ export default function ContractDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const currentUser = useAppStore((state) => state.currentUser);
+  const { customers: erpCustomers = [] } = useERP();
   const actor = currentUser?.name || currentUser?.fullName || 'CRM User';
   const [record, setRecord] = useState({ contract: null, deal: null, loading: true });
   const [project, setProject] = useState(null);
@@ -360,6 +362,19 @@ export default function ContractDetailPage() {
     return list;
   }, [dealActivities, contract]);
   const relatedCount = Number(Boolean(contract?.customer)) + Number(Boolean(deal)) + Number(deal?.leadId != null) + Number(Boolean(project));
+
+  const availableCustomers = useMemo(() => {
+    const map = new Map();
+    (erpCustomers || []).forEach((c) => {
+      const name = c.name || c.companyName || c.company || '';
+      if (name) map.set(name.toLowerCase(), { id: c.id, name, code: c.code || c.customerCode || '' });
+    });
+    const cName = record?.contract?.customer || form?.customer || '';
+    if (cName && !map.has(cName.toLowerCase())) {
+      map.set(cName.toLowerCase(), { id: record?.contract?.customerId || '', name: cName, code: '' });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [erpCustomers, record, form?.customer]);
 
   const tabs = useMemo(() => [
     { name: 'Overview' },
@@ -927,23 +942,30 @@ export default function ContractDetailPage() {
             </label>
             <label className="space-y-1.5 font-semibold text-slate-600">
               Customer *
-              <input required value={form.customer || ''} onChange={(e) => setForm({ ...form, customer: e.target.value })}
-                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              <select required value={form.customerId || form.customer || ''} onChange={(e) => {
+                const val = e.target.value;
+                const found = availableCustomers.find((c) => String(c.id) === val || c.name === val);
+                setForm({ ...form, customer: found ? found.name : val, customerId: found ? found.id : (form.customerId || '') });
+              }} className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 bg-white">
+                <option value="">Select customer</option>
+                {availableCustomers.map((cust) => <option key={cust.id || cust.name} value={cust.id || cust.name}>{cust.name}{cust.code ? ` (${cust.code})` : ''}</option>)}
+              </select>
+
             </label>
             <label className="space-y-1.5 font-semibold text-slate-600">
               Contract Value *
-              <input type="number" required min="0" step="0.01" value={form.amount ?? ''} onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              <input type="number" required min="0" step="0.01" value={form.amount ?? ''} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+
             </label>
             <label className="space-y-1.5 font-semibold text-slate-600">
               Start Date *
-              <input type="date" required value={form.startDate || ''} onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              <input type="date" required value={form.startDate || ''} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+
             </label>
             <label className="space-y-1.5 font-semibold text-slate-600">
               End Date *
-              <input type="date" required value={form.endDate || ''} onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              <input type="date" required value={form.endDate || ''} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+
             </label>
             <label className="space-y-1.5 font-semibold text-slate-600 sm:col-span-2">
               Template
@@ -977,13 +999,13 @@ export default function ContractDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="space-y-1.5 font-semibold text-slate-600">
               New Start Date *
-              <input type="date" required value={renew.startDate} onChange={(e) => setRenew({ ...renew, startDate: e.target.value })}
-                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              <input type="date" required value={renew.startDate} onChange={(e) => setRenew({ ...renew, startDate: e.target.value })} className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+
             </label>
             <label className="space-y-1.5 font-semibold text-slate-600">
               New End Date *
-              <input type="date" required value={renew.endDate} onChange={(e) => setRenew({ ...renew, endDate: e.target.value })}
-                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              <input type="date" required value={renew.endDate} onChange={(e) => setRenew({ ...renew, endDate: e.target.value })} className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+
             </label>
           </div>
           <label className="block space-y-1.5 font-semibold text-slate-600">
@@ -1110,13 +1132,13 @@ export default function ContractDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="space-y-1 font-semibold text-slate-600">
               Signatory Full Name *
-              <input required value={sigName} onChange={(e) => setSigName(e.target.value)} placeholder="e.g. John Doe"
-                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              <input required value={sigName} onChange={(e) => setSigName(e.target.value)} placeholder="e.g. John Doe" className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+
             </label>
             <label className="space-y-1 font-semibold text-slate-600">
               Signatory Email
-              <input type="email" value={sigEmail} onChange={(e) => setSigEmail(e.target.value)} placeholder="e.g. john@company.com"
-                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              <input type="email" value={sigEmail} onChange={(e) => setSigEmail(e.target.value)} placeholder="e.g. john@company.com" className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+
             </label>
           </div>
 
