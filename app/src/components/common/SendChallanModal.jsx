@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Mail, FileText, Award, CheckCircle2, ShieldCheck, Eye, Paperclip } from 'lucide-react';
+import { X, Send, Mail, FileText, Award, CheckCircle2, ShieldCheck, Eye, Paperclip, AlertCircle } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { validateEmail } from '../../utils/validators';
 
 export const SendChallanModal = ({
     isOpen,
@@ -29,6 +30,7 @@ export const SendChallanModal = ({
     const [attachChallan, setAttachChallan] = useState(true);
     const [attachWarranty, setAttachWarranty] = useState(Boolean(warrantyCard));
     const [isSending, setIsSending] = useState(false);
+    const [emailError, setEmailError] = useState('');
 
     useEffect(() => {
         if (!isOpen) return;
@@ -61,6 +63,19 @@ export const SendChallanModal = ({
 
     const handleSend = (e) => {
         e.preventDefault();
+        const toRes = validateEmail(recipientEmail, true);
+        if (!toRes.isValid) {
+            setEmailError(toRes.message);
+            return;
+        }
+        if (ccEmail?.trim()) {
+            const ccRes = validateEmail(ccEmail, false);
+            if (!ccRes.isValid) {
+                setEmailError(`CC: ${ccRes.message}`);
+                return;
+            }
+        }
+        setEmailError('');
         setIsSending(true);
 
         setTimeout(() => {
@@ -113,6 +128,12 @@ export const SendChallanModal = ({
 
                 {/* Form */}
                 <form onSubmit={handleSend} className="p-4 sm:p-6 space-y-4 text-xs">
+                    {emailError && (
+                        <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-2">
+                            <AlertCircle size={15} className="shrink-0" />
+                            <span>{emailError}</span>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="font-semibold text-slate-700 block mb-1">

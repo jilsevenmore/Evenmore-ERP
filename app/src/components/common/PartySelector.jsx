@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { UserCheck, UserPlus, Building, Phone, Mail, MapPin, FileText, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { validateEmail, validatePhone, validatePincode } from '../../utils/validators';
 
 const PARTY_TYPES = ['Walk-in', 'Contractor', 'Individual', 'Business'];
 
@@ -392,11 +393,16 @@ export default function PartySelector({
                             <input
                                 disabled={disabled}
                                 type="text"
-                                placeholder="10-digit mobile"
+                                placeholder="+91 98765 43210"
                                 value={value.partyPhone || ''}
                                 onChange={(e) => handleOneTimeFieldChange('partyPhone', e.target.value)}
-                                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-medium"
+                                className={`w-full p-2 border rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-medium ${
+                                    value.partyPhone && !validatePhone(value.partyPhone, false).isValid ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300 dark:border-slate-600'
+                                }`}
                             />
+                            {value.partyPhone && !validatePhone(value.partyPhone, false).isValid && (
+                                <p className="text-[10px] text-rose-500 mt-0.5">{validatePhone(value.partyPhone, false).message}</p>
+                            )}
                         </div>
 
                         <div>
@@ -409,8 +415,13 @@ export default function PartySelector({
                                 placeholder="party@example.com"
                                 value={value.partyEmail || ''}
                                 onChange={(e) => handleOneTimeFieldChange('partyEmail', e.target.value)}
-                                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-medium"
+                                className={`w-full p-2 border rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-medium ${
+                                    value.partyEmail && !validateEmail(value.partyEmail, false).isValid ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300 dark:border-slate-600'
+                                }`}
                             />
+                            {value.partyEmail && !validateEmail(value.partyEmail, false).isValid && (
+                                <p className="text-[10px] text-rose-500 mt-0.5">{validateEmail(value.partyEmail, false).message}</p>
+                            )}
                         </div>
 
                         <div>
@@ -487,10 +498,14 @@ export default function PartySelector({
                                         />
                                         <input
                                             type="text"
+                                            inputMode="numeric"
+                                            maxLength={6}
                                             placeholder="Pincode"
                                             value={value.billingAddress?.pincode || ''}
-                                            onChange={(e) => handleAddressChange('billingAddress', 'pincode', e.target.value)}
-                                            className="w-full p-1.5 border border-slate-300 dark:border-slate-600 rounded text-xs"
+                                            onChange={(e) => handleAddressChange('billingAddress', 'pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            className={`w-full p-1.5 border rounded text-xs ${
+                                                value.billingAddress?.pincode && !validatePincode(value.billingAddress.pincode, false).isValid ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300 dark:border-slate-600'
+                                            }`}
                                         />
                                     </div>
                                 </div>
@@ -538,10 +553,14 @@ export default function PartySelector({
                                                 />
                                                 <input
                                                     type="text"
+                                                    inputMode="numeric"
+                                                    maxLength={6}
                                                     placeholder="Pincode"
                                                     value={value.shippingAddress?.pincode || ''}
-                                                    onChange={(e) => handleAddressChange('shippingAddress', 'pincode', e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 dark:border-slate-600 rounded text-xs"
+                                                    onChange={(e) => handleAddressChange('shippingAddress', 'pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                                    className={`w-full p-1.5 border rounded text-xs ${
+                                                        value.shippingAddress?.pincode && !validatePincode(value.shippingAddress.pincode, false).isValid ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300 dark:border-slate-600'
+                                                    }`}
                                                 />
                                             </div>
                                         </>

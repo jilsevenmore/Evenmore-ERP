@@ -31,6 +31,7 @@ import {
 import OfferLetterModal from "../organization/OfferLetterModal";
 import { CandidatePipeline } from "../../../components/hrms/CandidatePipeline";
 import UserInitials from "../../../components/common/UserInitials";
+import { validateEmail, validatePhone } from "../../../utils/validators";
 
 const CANDIDATES_GUIDE = {
   title: "Candidate Directory & Pipeline",
@@ -205,8 +206,18 @@ export default function Candidates() {
   }
 
   async function save() {
-    if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
-      showToast("Name, Email, Phone required");
+    if (!form.name.trim()) {
+      showToast("Candidate name is required", "error");
+      return;
+    }
+    const emailRes = validateEmail(form.email, true);
+    if (!emailRes.isValid) {
+      showToast(emailRes.message, "error");
+      return;
+    }
+    const phoneRes = validatePhone(form.phone, true);
+    if (!phoneRes.isValid) {
+      showToast(phoneRes.message, "error");
       return;
     }
 

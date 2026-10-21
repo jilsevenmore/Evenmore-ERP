@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { Badge } from '../../components/hrms/Badge';
 import Modal from '../../components/ui/Modal';
 import PageInfoButton from '../../components/common/PageInfoButton';
+import Pagination from '../../components/ui/Pagination';
 import { hrmsGuides } from '../../data/hrms/hrmsGuides';
 import { formatCurrency } from '../../utils/currencyUtils';
 import { Building2, Plus, Search, LayoutList, LayoutGrid, Edit2, Trash2 } from 'lucide-react';
@@ -56,6 +57,18 @@ export function DepartmentsPage() {
   const filtered = departments.filter((d) =>
     !term || [d.name, d.code, d.head].some((v) => String(v ?? '').toLowerCase().includes(term))
   );
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, pageSize]);
+
+  const paginatedDepts = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   function openForm(dept) {
     setEditing(dept || {});
@@ -134,6 +147,16 @@ export function DepartmentsPage() {
             </button>
           ))}
         </div>
+        <div className="bg-white border border-bdr rounded-xl overflow-hidden">
+          <Pagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            onChange={setPage}
+          />
+        </div>
       </div>
 
       {view === 'table' ? (
@@ -158,7 +181,7 @@ export function DepartmentsPage() {
                     <td colSpan={8} className="py-10 px-5 text-center text-muted text-[13px]">{emptyText}</td>
                   </tr>
                 )}
-                {filtered.map((d) => (
+                {paginatedDepts.map((d) => (
                   <tr key={d.id} className="hover:bg-off/60 transition-colors">
                     <td className="py-4 px-5">
                       <div className="font-semibold text-slate-900 flex items-center gap-2">
@@ -185,13 +208,24 @@ export function DepartmentsPage() {
               </tbody>
             </table>
           </div>
+          <div className="border-t border-bdr bg-white">
+            <Pagination
+              total={filtered.length}
+              page={page}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+              onChange={setPage}
+            />
+          </div>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.length === 0 && (
             <div className="col-span-full bg-white border border-bdr rounded-xl p-8 text-center text-muted text-[13px]">{emptyText}</div>
           )}
-          {filtered.map((d) => (
+          {paginatedDepts.map((d) => (
             <div key={d.id} className="bg-white border border-bdr rounded-xl p-5 shadow-xs hover:border-slate-400 transition-all flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-start gap-2">
@@ -211,6 +245,17 @@ export function DepartmentsPage() {
               </div>
             </div>
           ))}
+        </div>
+        <div className="bg-white border border-bdr rounded-xl overflow-hidden">
+          <Pagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            onChange={setPage}
+          />
+        </div>
         </div>
       )}
 

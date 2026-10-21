@@ -16,6 +16,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { bulkAttendance, isBackendEnabled, hrmsSync } from "../../../services/hrmsSync";
 import { UserInitials } from "../../../components/common/UserInitials";
@@ -312,6 +313,18 @@ export default function BulkAttendance() {
       return true;
     });
   }, [employees, dept, location, shift, statusFilter, searchQuery]);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, dept, shift, statusFilter, date, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   const allSelected = filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id));
 
@@ -676,7 +689,7 @@ export default function BulkAttendance() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e) => (
+              {paginatedRows.map((e) => (
                 <tr key={e.id}>
                   <td style={{ paddingLeft: 20 }}>
                     <input
@@ -736,6 +749,16 @@ export default function BulkAttendance() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-100 bg-white">
+          <Pagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            onChange={setPage}
+          />
         </div>
       </div>
 

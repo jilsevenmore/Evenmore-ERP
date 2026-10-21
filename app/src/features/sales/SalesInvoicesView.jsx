@@ -15,7 +15,7 @@ import { FormSection } from '../../components/common/FormSection';
 import { Pagination } from '../../components/ui/Pagination';
 import PartySelector from '../../components/common/PartySelector';
 import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
-import { validateLineProducts } from '../../utils/validators';
+import { validateLineProducts, validateEmail, validatePhone, validatePincode } from '../../utils/validators';
 
 const invoiceGuide = {
     title: 'Sales Invoices & Receivables',
@@ -341,6 +341,41 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const resolvedPartyName = isOneTime
             ? (partyData.partyName || partyData.customer || 'Walk-in Customer')
             : (cust?.name || partyData.partyName || partyData.customer || '');
+
+        if (isOneTime) {
+            if (partyData?.partyPhone) {
+                const phoneRes = validatePhone(partyData.partyPhone, false);
+                if (!phoneRes.isValid) {
+                    setErrorMessage(`Party phone: ${phoneRes.message}`);
+                    showToast?.(phoneRes.message);
+                    return;
+                }
+            }
+            if (partyData?.partyEmail) {
+                const emailRes = validateEmail(partyData.partyEmail, false);
+                if (!emailRes.isValid) {
+                    setErrorMessage(`Party email: ${emailRes.message}`);
+                    showToast?.(emailRes.message);
+                    return;
+                }
+            }
+        }
+        if (billingAddress?.pincode) {
+            const pinRes = validatePincode(billingAddress.pincode, false);
+            if (!pinRes.isValid) {
+                setErrorMessage(`Billing Address: ${pinRes.message}`);
+                showToast?.(pinRes.message);
+                return;
+            }
+        }
+        if (!sameAsBilling && shippingAddress?.pincode) {
+            const pinRes = validatePincode(shippingAddress.pincode, false);
+            if (!pinRes.isValid) {
+                setErrorMessage(`Shipping Address: ${pinRes.message}`);
+                showToast?.(pinRes.message);
+                return;
+            }
+        }
 
         const pos = partyData?.placeOfSupply || party?.placeOfSupply || cust?.placeOfSupply || '';
         const homeStateCode = companyProfile?.stateCode || '';
@@ -1073,14 +1108,16 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             />
                                             <input
                                                 type="text"
+                                                inputMode="numeric"
+                                                maxLength={6}
                                                 placeholder="Pincode"
                                                 value={billingAddress.pincode || ''}
                                                 onChange={(e) => {
-                                                    const updated = { ...billingAddress, pincode: e.target.value };
+                                                    const updated = { ...billingAddress, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) };
                                                     setBillingAddress(updated);
                                                     if (sameAsBilling) setShippingAddress(updated);
                                                 }}
-                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs font-mono"
                                             />
                                         </div>
                                     </div>
@@ -1115,11 +1152,13 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             />
                                             <input
                                                 type="text"
+                                                inputMode="numeric"
+                                                maxLength={6}
                                                 placeholder="Pincode"
                                                 disabled={sameAsBilling}
                                                 value={sameAsBilling ? billingAddress.pincode : (shippingAddress.pincode || '')}
-                                                onChange={(e) => setShippingAddress({ ...shippingAddress, pincode: e.target.value })}
-                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs disabled:bg-slate-100 disabled:text-slate-500"
+                                                onChange={(e) => setShippingAddress({ ...shippingAddress, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs font-mono disabled:bg-slate-100 disabled:text-slate-500"
                                             />
                                         </div>
                                     </div>

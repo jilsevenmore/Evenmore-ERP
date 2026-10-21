@@ -8,10 +8,7 @@ import {
   EyeOff,
   ArrowRight,
   ShieldCheck,
-  Sparkles,
   Sun,
-  Moon,
-  TreePine,
   CheckCircle2,
   AlertCircle,
   KeyRound,
@@ -20,6 +17,7 @@ import {
   Layers,
   HelpCircle,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { login as loginRequest } from '../../services/authService';
@@ -28,13 +26,6 @@ import { describeError } from '../../services/resourceSync';
 import { getStoredToken } from '../../utils/authUtils';
 import { api } from '../../services/api';
 import ForgotPasswordModal from './ForgotPasswordModal';
-
-const THEMES = [
-  { id: 'light', name: 'Light', icon: Sun },
-  { id: 'dark', name: 'Dark', icon: Moon },
-  { id: 'midnight', name: 'Midnight', icon: Sparkles },
-  { id: 'emerald', name: 'Emerald', icon: TreePine },
-];
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -211,27 +202,7 @@ export default function LoginPage() {
             <span>Systems Normal</span>
           </div>
 
-          <div className="flex items-center bg-[var(--soft)] p-0.5 rounded-xl border border-[var(--border)]">
-            {THEMES.map((t) => {
-              const Icon = t.icon;
-              const isSelected = theme === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTheme(t.id)}
-                  title={`Switch to ${t.name} theme`}
-                  className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${
-                    isSelected
-                      ? 'bg-[var(--card)] text-blue-600 font-bold shadow-2xs'
-                      : 'text-[var(--muted)] hover:text-[var(--text)]'
-                  }`}
-                >
-                  <Icon size={14} />
-                </button>
-              );
-            })}
-          </div>
+
         </div>
       </header>
 

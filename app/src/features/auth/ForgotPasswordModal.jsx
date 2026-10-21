@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { forgotPassword, resetPassword, verifyOtp } from '../../services/authService';
 import { describeError } from '../../services/resourceSync';
+import { validateEmail } from '../../utils/validators';
 
 export default function ForgotPasswordModal({
   isOpen,
@@ -80,8 +81,9 @@ export default function ForgotPasswordModal({
   const handleRequestOtp = async (e) => {
     e?.preventDefault();
     const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      setError('Please enter your email address.');
+    const emailRes = validateEmail(cleanEmail, true);
+    if (!emailRes.isValid) {
+      setError(emailRes.message);
       return;
     }
 

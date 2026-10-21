@@ -18,6 +18,7 @@ import { api } from '../../services/api';
 import { updateProfile } from '../../services/authService';
 import { useAppStore } from '../../stores/appStore';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { validatePhone } from '../../utils/validators';
 
 /** `XXXX1234` — the full number stays off screen. */
 function masked(value, visible = 4) {
@@ -87,6 +88,11 @@ export default function MyProfilePage() {
   useEffect(() => { load(); }, [load, currentUser?.id]);
 
   async function savePhone() {
+    const phoneRes = validatePhone(phoneDraft.trim(), true);
+    if (!phoneRes.isValid) {
+      showToast?.(phoneRes.message);
+      return;
+    }
     setSavingPhone(true);
     try {
       const user = await updateProfile({ phone: phoneDraft.trim() });

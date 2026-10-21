@@ -8,9 +8,11 @@ import {
 import Modal from '../../../components/ui/Modal';
 import KpiCard from '../../../components/ui/KpiCard';
 import PageHeader from '../../../components/ui/PageHeader';
+import Pagination from '../../../components/ui/Pagination';
 import { loadDeals } from '../../../services/dealService';
 import { describeError } from '../../../services/crmSync';
 import { useCrmStore } from '../../../stores/crmStore';
+import { useERP } from '../../../context/ERPContext';
 import {
   CONTRACT_TYPES,
   CONTRACT_TEMPLATES,
@@ -21,9 +23,9 @@ import {
   getContractDisplayStatus,
 } from '../../../services/contractService';
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 const EMPTY_FORM = {
-  dealId: '', customer: '', contractType: '', amount: '',
+  dealId: '', customer: '', customerId: '', contractType: '', amount: '',
   startDate: '', endDate: '', template: '', description: '', terms: '', status: 'Active',
   notifyCustomer: false,
 };
@@ -36,7 +38,7 @@ function statusTone(status) {
   return 'bg-slate-100 text-slate-600 border border-slate-200';
 }
 
-function ContractForm({ form, setForm, deals }) {
+function ContractForm({ form, setForm, deals, availableCustomers = [] }) {
   return (
     <div className="space-y-4 text-xs">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -54,20 +56,30 @@ function ContractForm({ form, setForm, deals }) {
         </label>
         <label className="space-y-1.5 font-semibold text-slate-600">
           Customer *
-          <input required value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })}
-            placeholder="Customer name"
-            className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+          <select required value={form.customerId || form.customer || ''} onChange={(e) => {
+            const val = e.target.value;
+            const found = availableCustomers.find((c) => String(c.id) === val || c.name === val);
+            const customerName = found ? found.name : val;
+            const customerId = found ? found.id : '';
+            const matchingDeal = deals.find((d) => (customerId && String(d.customerId) === String(customerId)) || (customerName && String(d.client || '').trim().toLowerCase() === customerName.trim().toLowerCase()));
+            setForm((current) => ({ ...current, customer: customerName, customerId: customerId, dealId: current.dealId || matchingDeal?.id || '', amount: current.amount || matchingDeal?.price || matchingDeal?.value || '' }));
+          }}
+            className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 bg-white">
+            <option value="">Select customer</option>
+            {availableCustomers.map((cust) => <option key={cust.id || cust.name} value={cust.id || cust.name}>{cust.name}{cust.code ? ` (${cust.code})` : ''}</option>)}
+          </select>
+
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="space-y-1.5 font-semibold text-slate-600">
             Start Date *
-            <input type="date" required value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-              className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+            <input type="date" required value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+  
           </label>
           <label className="space-y-1.5 font-semibold text-slate-600">
             End Date *
-            <input type="date" required value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-              className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+            <input type="date" required value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+  
           </label>
         </div>
         <label className="space-y-1.5 font-semibold text-slate-600">
@@ -75,7 +87,8 @@ function ContractForm({ form, setForm, deals }) {
           <select required value={form.dealId} onChange={(e) => {
             const dealId = e.target.value;
             const deal = deals.find((item) => String(item.id) === dealId);
-            setForm((current) => ({ ...current, dealId, customer: current.customer || deal?.client || '' }));
+            const dealCustomer = deal ? (availableCustomers.find((c) => (deal.customerId && String(c.id) === String(deal.customerId)) || (deal.client && c.name.toLowerCase() === deal.client.toLowerCase())) || { id: deal.customerId || '', name: deal.client || '' }) : null;
+            setForm((current) => ({ ...current, dealId, customer: dealCustomer?.name || current.customer || '', customerId: dealCustomer?.id || current.customerId || '', amount: current.amount || deal?.price || deal?.value || '' }));
           }}
             className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 bg-white">
             <option value="">Select a deal</option>
@@ -85,8 +98,8 @@ function ContractForm({ form, setForm, deals }) {
         <label className="space-y-1.5 font-semibold text-slate-600">
           Contract Value *
           <input type="number" required min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            placeholder="12,00,000"
             className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+
         </label>
         <label className="space-y-1.5 font-semibold text-slate-600 sm:col-span-2">
           Template
@@ -118,6 +131,7 @@ function ContractForm({ form, setForm, deals }) {
 }
 
 export default function ContractsPage() {
+  const { customers: erpCustomers = [] } = useERP();
   const [contracts, setContracts] = useState([]);
   const [deals, setDeals] = useState([]);
   const [error, setError] = useState('');
@@ -129,6 +143,7 @@ export default function ContractsPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
@@ -150,9 +165,47 @@ export default function ContractsPage() {
   // list is re-read from it whenever the page opens.
   useEffect(() => { useCrmStore.getState().refresh('contracts').catch(() => {}); }, []);
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter, customerFilter, fromDate, toDate]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter, customerFilter, fromDate, toDate, pageSize]);
 
   const customers = useMemo(() => [...new Set(contracts.map((contract) => contract.customer).filter(Boolean))].sort(), [contracts]);
+
+  const availableCustomers = useMemo(() => {
+    const map = new Map();
+    (erpCustomers || []).forEach((c) => {
+      const name = c.name || c.companyName || c.company || '';
+      if (name) {
+        map.set(name.toLowerCase(), {
+          id: c.id,
+          name: name,
+          code: c.code || c.customerCode || '',
+        });
+      }
+    });
+
+    (deals || []).forEach((d) => {
+      const name = d.client || d.customerName || '';
+      if (name && !map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), {
+          id: d.customerId || d.partyId || `deal-${d.id}`,
+          name: name,
+          code: '',
+        });
+      }
+    });
+
+    (contracts || []).forEach((c) => {
+      const name = c.customer || '';
+      if (name && !map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), {
+          id: c.customerId || `contract-${c.id}`,
+          name: name,
+          code: '',
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [erpCustomers, deals, contracts]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -176,9 +229,9 @@ export default function ContractsPage() {
     value: contracts.reduce((sum, contract) => sum + (Number(contract.amount) || 0), 0),
   }), [contracts]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function resetFilters() {
     setSearch('');
@@ -282,7 +335,7 @@ export default function ContractsPage() {
               <tbody>
                 {pageRows.map((contract, index) => (
                   <tr key={contract.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                    <td className="px-3 py-3 text-slate-400">{(safePage - 1) * PAGE_SIZE + index + 1}</td>
+                    <td className="px-3 py-3 text-slate-400">{(safePage - 1) * pageSize + index + 1}</td>
                     <td className="px-3 py-3">
                       <Link className="font-bold text-blue-600 hover:underline whitespace-nowrap" to={`/crm/contracts/${encodeURIComponent(contract.id)}`}>
                         {contract.contractNumber}
@@ -321,28 +374,22 @@ export default function ContractsPage() {
         )}
 
         {filtered.length > 0 && (
-          <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-            <p>Showing {(safePage - 1) * PAGE_SIZE + 1} to {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} contracts</p>
-            <div className="flex flex-wrap lg:flex-nowrap items-center justify-center gap-1.5">
-              <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}
-                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-100" aria-label="Previous page"><ChevronLeft size={14} /></button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 7).map((number) => (
-                <button key={number} type="button" onClick={() => setPage(number)}
-                  className={`min-w-[32px] h-8 rounded-lg border text-xs font-semibold ${number === safePage ? 'bg-primary text-white border-primary' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
-                  {number}
-                </button>
-              ))}
-              <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)}
-                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-100" aria-label="Next page"><ChevronRight size={14} /></button>
-              <span className="ml-2 border border-slate-200 rounded-lg px-2 py-1.5">{PAGE_SIZE} / page</span>
-            </div>
+          <div className="border-t border-slate-100 mt-3 pt-1">
+            <Pagination
+              total={filtered.length}
+              page={safePage}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+              onChange={setPage}
+            />
           </div>
         )}
       </div>
 
       <Modal isOpen={createOpen} onClose={() => !busy && setCreateOpen(false)} title="Create Contract" subtitle="Fill in the contract details" size="lg">
         <form onSubmit={submitCreate} className="space-y-4">
-          <ContractForm form={form} setForm={setForm} deals={deals} />
+          <ContractForm form={form} setForm={setForm} deals={deals} availableCustomers={availableCustomers} />
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" disabled={busy} onClick={() => setCreateOpen(false)}>Cancel</button>

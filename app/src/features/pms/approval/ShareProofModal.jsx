@@ -8,6 +8,7 @@ import { Button } from '../../../components/ui/Button';
 import { usePmsStore } from '../../../stores/pmsStore';
 import { useProofShareStore, shareUrlFor, DEFAULT_VALIDITY_DAYS } from '../../../stores/proofShareStore';
 import { formatCurrency } from '../../../utils/currencyUtils';
+import { validateEmail } from '../../../utils/validators';
 
 /**
  * ShareProofModal — issue a client-facing approval link for one proof version.
@@ -111,8 +112,11 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
     e.preventDefault();
     const found = {};
     if (!recipientName.trim()) found.recipientName = 'Name the person who will sign off.';
-    if (recipientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
-      found.recipientEmail = 'That does not look like an email address.';
+    if (recipientEmail.trim()) {
+      const emailRes = validateEmail(recipientEmail.trim());
+      if (!emailRes.isValid) {
+        found.recipientEmail = emailRes.message;
+      }
     }
     setErrors(found);
     if (Object.keys(found).length > 0 || generating) return;

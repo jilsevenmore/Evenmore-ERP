@@ -8,11 +8,6 @@ import {
   Settings,
   ChevronDown,
   Command,
-  Sun,
-  Moon,
-  Sparkles,
-  TreePine,
-  Check,
   CheckCircle2,
   AlertTriangle,
   Building,
@@ -66,13 +61,6 @@ function notificationModule(n) {
   return NOTIF_MODULES.some((m) => m.id === n.category) ? n.category : 'system';
 }
 
-const THEMES = [
-  { id: 'light', name: 'Enterprise Light', icon: Sun, desc: 'Clean high-contrast corporate palette', color: '#1f6bff' },
-  { id: 'dark', name: 'Onyx Dark', icon: Moon, desc: 'Deep slate eye-comfort dark mode', color: '#3b82f6' },
-  { id: 'midnight', name: 'Midnight Nebula', icon: Sparkles, desc: 'Indigo violet executive gradient', color: '#818cf8' },
-  { id: 'emerald', name: 'Emerald Executive', icon: TreePine, desc: 'Fintech forest & gold prestige', color: '#10b981' },
-];
-
 const QUICK_ACTIONS = [
   // `permission` is the create right the target form needs; the page itself
   // must also be open to the role (navAccess.canOpenPath).
@@ -92,15 +80,11 @@ export default function Topbar() {
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
   const mobileSidebarOpen = useAppStore((s) => s.mobileSidebarOpen);
   const toggleMobileSidebar = useAppStore((s) => s.toggleMobileSidebar);
-  const theme = useAppStore((s) => s.theme) || 'light';
-  const setTheme = useAppStore((s) => s.setTheme);
 
-  const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isPunchOpen, setIsPunchOpen] = useState(false);
 
-  const themeRef = useRef(null);
   const quickAddRef = useRef(null);
   const notifRef = useRef(null);
   const punchRef = useRef(null);
@@ -335,7 +319,6 @@ export default function Topbar() {
   // Close popovers on click outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (themeRef.current && !themeRef.current.contains(event.target)) setIsThemeOpen(false);
       if (quickAddRef.current && !quickAddRef.current.contains(event.target)) setIsQuickAddOpen(false);
       if (punchRef.current && !punchRef.current.contains(event.target)) setIsPunchOpen(false);
       if (notifRef.current && !notifRef.current.contains(event.target)) {
@@ -350,8 +333,7 @@ export default function Topbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const activeThemeObj = THEMES.find((t) => t.id === theme) || THEMES[0];
-  const ActiveThemeIcon = activeThemeObj.icon;
+
 
   return (
     <header className="topbar">
@@ -397,67 +379,6 @@ export default function Topbar() {
 
       {/* Right Actions Cluster */}
       <div className="top-actions flex items-center gap-2 shrink-0">
-        {/* Theme Switcher Button & Dropdown */}
-        <div className="relative" ref={themeRef}>
-          <button
-            type="button"
-            onClick={() => {
-              setIsThemeOpen(!isThemeOpen);
-              setIsQuickAddOpen(false);
-              setIsNotifOpen(false);
-            }}
-            className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-soft text-text flex items-center gap-2 text-xs font-semibold shadow-2xs transition cursor-pointer"
-            title="Switch Visual Theme"
-          >
-            <ActiveThemeIcon size={15} style={{ color: activeThemeObj.color }} />
-            <span className="hidden md:inline text-xs font-medium">{activeThemeObj.name}</span>
-            <ChevronDown size={13} className="text-muted" />
-          </button>
-
-          {isThemeOpen && (
-            <div className="top-dropdown-menu w-64 p-2 animate-in fade-in zoom-in-95 duration-150 shadow-xl">
-              <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">
-                Select Theme Palette
-              </div>
-              <div className="space-y-1">
-                {THEMES.map((t) => {
-                  const Icon = t.icon;
-                  const isSelected = theme === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => {
-                        setTheme(t.id);
-                        setIsThemeOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer"
-                      style={{
-                        background: isSelected ? 'var(--primary-subtle)' : 'transparent',
-                        color: isSelected ? 'var(--primary)' : 'var(--text)',
-                        fontWeight: isSelected ? 700 : 500,
-                      }}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0"
-                          style={{ background: t.color }}
-                        >
-                          <Icon size={14} />
-                        </div>
-                        <div>
-                          <div className="text-xs font-semibold">{t.name}</div>
-                          <div className="text-[10px] text-muted">{t.desc}</div>
-                        </div>
-                      </div>
-                      {isSelected && <Check size={14} className="text-primary shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Quick Add Menu — only the create actions this role can use */}
         {quickActions.length > 0 && (
@@ -466,7 +387,6 @@ export default function Topbar() {
             type="button"
             onClick={() => {
               setIsQuickAddOpen(!isQuickAddOpen);
-              setIsThemeOpen(false);
               setIsNotifOpen(false);
             }}
             className="h-9 px-3 rounded-xl bg-primary hover:bg-primary-hover text-white flex items-center gap-1.5 text-xs font-bold shadow-xs transition cursor-pointer"
@@ -516,8 +436,7 @@ export default function Topbar() {
               type="button"
               onClick={() => {
                 setIsNotifOpen(!isNotifOpen);
-                setIsThemeOpen(false);
-                setIsQuickAddOpen(false);
+                  setIsQuickAddOpen(false);
                 setIsModuleMenuOpen(false);
               }}
               className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text flex items-center justify-center transition cursor-pointer relative shadow-2xs"

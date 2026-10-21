@@ -4,6 +4,7 @@ import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { adminSync, describeError } from '../../services/adminSync';
+import { validateEmail, validatePhone } from '../../utils/validators';
 import {
   Users,
   UserCheck,
@@ -1082,10 +1083,21 @@ function CreateEditClientModal({ client, onClose, onSave }) {
       setErrorMsg('Please enter a valid client name.');
       return;
     }
-    if (!email.trim()) {
-      setErrorMsg('Please enter a valid email address.');
+    const emailRes = validateEmail(email, true);
+    if (!emailRes.isValid) {
+      setErrorMsg(emailRes.message);
       return;
     }
+
+    const fullPhone = phoneNumber ? `${countryCode} ${phoneNumber.trim()}` : '';
+    if (fullPhone && phoneNumber.trim()) {
+      const phoneRes = validatePhone(fullPhone, false);
+      if (!phoneRes.isValid) {
+        setErrorMsg(phoneRes.message);
+        return;
+      }
+    }
+
     if (loginEnabled && !client && password !== confirmPassword) {
       setErrorMsg('Passwords do not match.');
       return;
@@ -1096,11 +1108,9 @@ function CreateEditClientModal({ client, onClose, onSave }) {
       .map((t) => t.trim())
       .filter(Boolean);
 
-    const fullPhone = phoneNumber ? `${countryCode} ${phoneNumber.trim()}` : '';
-
     onSave({
       name: name.trim(),
-      email: email.trim(),
+      email: emailRes.cleanValue || email.trim(),
       phone: fullPhone,
       company: company.trim(),
       location: location.trim(),

@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, Pencil, Trash2, ArrowLeft } from "lucide-react";
 import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { validateEmail, validatePhone } from "../../../utils/validators";
 
 export default function Trainers({ embedded = false, onBack }) {
   const showToast = useAppStore((s) => s.showToast);
@@ -34,9 +35,21 @@ export default function Trainers({ embedded = false, onBack }) {
   }), [trainers, search, spec, status]);
 
   function save() {
-    if (!form.name.trim() || !form.email.trim()) {
-      showToast("Name and Email required");
+    if (!form.name.trim()) {
+      showToast("Trainer name is required", "error");
       return;
+    }
+    const emailRes = validateEmail(form.email, true);
+    if (!emailRes.isValid) {
+      showToast(emailRes.message, "error");
+      return;
+    }
+    if (form.phone?.trim()) {
+      const phoneRes = validatePhone(form.phone, false);
+      if (!phoneRes.isValid) {
+        showToast(phoneRes.message, "error");
+        return;
+      }
     }
     if (editRow) {
       updateTrainer(editRow.id, { ...form, programs: Number(form.programs) });

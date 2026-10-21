@@ -6,6 +6,7 @@ import { pullIndividualAttendance, HRMS_RESOURCES, isServerId } from "../../../s
 import { api } from "../../../services/api";
 import Modal from "../../../components/ui/Modal";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { UserInitials } from "../../../components/common/UserInitials";
 
@@ -381,6 +382,29 @@ export default function IndividualAttendance() {
 
     return rows;
   }, [selectedMonth, selectedYear, records, recordsByDay]);
+
+  const [recPage, setRecPage] = useState(1);
+  const [recPageSize, setRecPageSize] = useState(10);
+  const [dailyPage, setDailyPage] = useState(1);
+  const [dailyPageSize, setDailyPageSize] = useState(10);
+
+  useEffect(() => {
+    setRecPage(1);
+  }, [selectedYear, recPageSize]);
+
+  useEffect(() => {
+    setDailyPage(1);
+  }, [selectedMonth, selectedYear, dailyPageSize]);
+
+  const paginatedRecords = useMemo(() => {
+    const start = (recPage - 1) * recPageSize;
+    return records.slice(start, start + recPageSize);
+  }, [records, recPage, recPageSize]);
+
+  const paginatedDaily = useMemo(() => {
+    const start = (dailyPage - 1) * dailyPageSize;
+    return monthDailyRows.slice(start, start + dailyPageSize);
+  }, [monthDailyRows, dailyPage, dailyPageSize]);
 
   const calendarDays = useMemo(() => {
     const curMonthIdx = new Date().getMonth();
@@ -900,6 +924,7 @@ export default function IndividualAttendance() {
                 </table>
               </div>
             ) : (
+              <>
               <div style={{ overflowX: "auto" }}>
                 <table className="ind-table">
                   <thead>
@@ -923,7 +948,7 @@ export default function IndividualAttendance() {
                         </td>
                       </tr>
                     ) : (
-                      records.map((r) => (
+                      paginatedRecords.map((r) => (
                         <tr key={r.key}>
                           <td className="ind-date">{r.date}</td>
                           <td style={{ color: "#374151" }}>{r.day}</td>
@@ -952,6 +977,17 @@ export default function IndividualAttendance() {
                   </tbody>
                 </table>
               </div>
+              <div className="border-t border-slate-100 bg-white">
+                <Pagination
+                  total={records.length}
+                  page={recPage}
+                  pageSize={recPageSize}
+                  pageSizeOptions={[10, 20, 50, 100]}
+                  onPageSizeChange={(sz) => { setRecPageSize(sz); setRecPage(1); }}
+                  onChange={setRecPage}
+                />
+              </div>
+              </>
             )}
           </div>
         ) : (
@@ -992,7 +1028,7 @@ export default function IndividualAttendance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {monthDailyRows.map((r) => {
+                  {paginatedDaily.map((r) => {
                     const rowStyle = statusStyles[r.status] || { background: "#f8fafc", color: "#64748b", border: "#e2e8f0" };
                     return (
                       <tr key={r.key} style={r.isToday ? { background: "#f8fbff" } : {}}>
@@ -1054,6 +1090,16 @@ export default function IndividualAttendance() {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="border-t border-slate-100 bg-white">
+              <Pagination
+                total={monthDailyRows.length}
+                page={dailyPage}
+                pageSize={dailyPageSize}
+                pageSizeOptions={[10, 15, 31]}
+                onPageSizeChange={(sz) => { setDailyPageSize(sz); setDailyPage(1); }}
+                onChange={setDailyPage}
+              />
             </div>
           </div>
         )

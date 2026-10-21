@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, TrendingUp, AlertTriangle, ArrowRightLeft, Plus, X, Calendar, FileText, Briefcase, Search, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
+import Pagination from "../../../components/ui/Pagination";
 import { useAppStore } from "../../../stores/appStore";
 import { useRecruitmentStore, syncCandidateToEmployee } from "../../../stores/recruitmentStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
@@ -25,7 +26,7 @@ import { dispatchNotification } from "../../../services/crmEventNotifications";
 import PerformanceReportModal from "../performance/PerformanceReportModal";
 import { validateEmail, validatePhone } from "../../../utils/validators";
 
-const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
+const EMPTY_FORM = { name: "", email: "", phone: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
 const STATUSES = ["All Active", "Active", "On Leave", "Probation", "Notice Period", "Resigned", "Terminated", "All Records"];
 
@@ -75,7 +76,11 @@ export default function Employees() {
   const [viewMode, setViewMode] = useState("Table");
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 5;
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, dept, status, pageSize]);
 
   // Performance Report Modal State
   const [perfReportOpen, setPerfReportOpen] = useState(false);
@@ -264,6 +269,48 @@ export default function Employees() {
     [departmentsList, employees]
   );
 
+  const allDesignationOptions = useMemo(() => {
+    const set = new Set();
+    designationsList.forEach((d) => {
+      const val = d.name || d.title || (typeof d === "string" ? d : "");
+      if (val) set.add(val.trim());
+    });
+    employees.forEach((e) => {
+      if (e.designation?.trim()) set.add(e.designation.trim());
+    });
+    if (set.size === 0) {
+      [
+        "Accounts Executive",
+        "Accounts Manager",
+        "Assembly Technician",
+        "Fabrication Technician",
+        "General Manager",
+        "HR Executive",
+        "HR Manager",
+        "Operations Manager",
+        "Production Supervisor",
+        "Quality Inspector",
+        "Software Engineer",
+      ].forEach((d) => set.add(d));
+    }
+    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [designationsList, employees]);
+
+  const allLocationOptions = useMemo(() => {
+    const set = new Set();
+    locationsList.forEach((l) => {
+      const val = l.name || l.city || (typeof l === "string" ? l : "");
+      if (val) set.add(val.trim());
+    });
+    employees.forEach((e) => {
+      if (e.location?.trim()) set.add(e.location.trim());
+    });
+    if (set.size === 0) {
+      ["Headquarters", "Main Branch", "Plant 1", "Regional Office"].forEach((l) => set.add(l));
+    }
+    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [locationsList, employees]);
+
   const filtered = useMemo(() => {
     return employees.filter((e) => {
       if (dept !== "All" && e.department !== dept) return false;
@@ -293,10 +340,23 @@ export default function Employees() {
   }, [filtered, currentPage, pageSize]);
 
   async function handleAdd() {
-    if (!form.name || !form.email) return setToast("Name and email are required.", "error");
+    if (!form.name?.trim()) return setToast("Full Name is required.", "error");
+    if (!form.email?.trim()) return setToast("Email is required.", "error");
 
     const emailRes = validateEmail(form.email, true);
     if (!emailRes.isValid) return setToast(emailRes.message, "error");
+
+    if (!form.phone?.trim()) return setToast("Phone number is required.", "error");
+    const phoneRes = validatePhone(form.phone);
+    if (!phoneRes.isValid) return setToast(phoneRes.message, "error");
+
+    if (!form.dept?.trim()) return setToast("Department is required.", "error");
+    if (!form.designation?.trim()) return setToast("Position / Designation is required.", "error");
+
+    if (form.createUserAccount !== false) {
+      if (!form.password?.trim()) return setToast("Password is required for user account.", "error");
+      if (form.password.trim().length < 6) return setToast("Password must be at least 6 characters.", "error");
+    }
 
     const matchedDept = departmentsList.find((d) => d.name?.toLowerCase() === form.dept?.trim().toLowerCase());
     const matchedDesig = designationsList.find((d) => d.name?.toLowerCase() === form.designation?.trim().toLowerCase());
@@ -305,6 +365,7 @@ export default function Employees() {
     const next = {
       name: form.name.trim(),
       email: form.email.trim(),
+      phone: form.phone.trim(),
       designation: form.designation?.trim() || "",
       designationId: matchedDesig?.id || undefined,
       department: form.dept?.trim() || "",
@@ -699,31 +760,15 @@ export default function Employees() {
         )}
 
         {/* Pagination Footer */}
-        <div className="emp-footer">
-          <span style={{ fontSize: "13px", color: "#6b7280" }}>
-            Showing {paginatedEmployees.length} of {filtered.length}
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="emp-page-btn"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="emp-page-indicator">
-              {currentPage}/{totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="emp-page-btn"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
+        <div className="border-t border-slate-100 bg-white">
+          <Pagination
+            total={filtered.length}
+            page={currentPage}
+            pageSize={pageSize}
+            pageSizeOptions={[5, 10, 20, 50]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+            onChange={setCurrentPage}
+          />
         </div>
       </div>
 
@@ -754,6 +799,7 @@ export default function Employees() {
                 placeholder="Enter full name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
               />
             </div>
             <div className="form-group">
@@ -766,55 +812,86 @@ export default function Employees() {
                 placeholder="Enter email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
               />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Department</label>
+              <label className="form-label">
+                Phone Number <span className="required">*</span>
+              </label>
               <input
                 className="form-input"
-                list="emp-dept-options"
-                placeholder="Enter department"
-                value={form.dept}
-                onChange={(e) => setForm({ ...form, dept: e.target.value })}
+                type="tel"
+                placeholder="e.g. +91 98765 43210"
+                value={form.phone || ""}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                required
               />
-              <datalist id="emp-dept-options">
-                {DEPARTMENTS.slice(1).map((d) => (
-                  <option key={d} value={d} />
-                ))}
-              </datalist>
             </div>
             <div className="form-group">
-              <label className="form-label">Designation</label>
-              <input
-                className="form-input"
-                list="emp-desig-options"
-                placeholder="Enter designation"
-                value={form.designation}
-                onChange={(e) => setForm({ ...form, designation: e.target.value })}
-              />
-              <datalist id="emp-desig-options">
-                {designationsList.map((d) => (
-                  <option key={d.id || d.name} value={d.name} />
+              <label className="form-label">
+                Department <span className="required">*</span>
+              </label>
+              <select
+                className="form-select"
+                value={form.dept}
+                onChange={(e) => setForm({ ...form, dept: e.target.value })}
+                required
+              >
+                <option value="">Select department</option>
+                {DEPARTMENTS.slice(1).map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
                 ))}
-              </datalist>
+                {form.dept && !DEPARTMENTS.slice(1).includes(form.dept) && (
+                  <option value={form.dept}>{form.dept}</option>
+                )}
+              </select>
             </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Location</label>
-            <input
-              className="form-input"
-              list="emp-loc-options"
-              placeholder="Enter location"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-            />
-            <datalist id="emp-loc-options">
-              {locationsList.map((l) => (
-                <option key={l.id || l.name} value={l.name} />
-              ))}
-            </datalist>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">
+                Position / Designation <span className="required">*</span>
+              </label>
+              <select
+                className="form-select"
+                value={form.designation}
+                onChange={(e) => setForm({ ...form, designation: e.target.value })}
+                required
+              >
+                <option value="">Select position / designation</option>
+                {allDesignationOptions.map((desig) => (
+                  <option key={desig} value={desig}>
+                    {desig}
+                  </option>
+                ))}
+                {form.designation && !allDesignationOptions.includes(form.designation) && (
+                  <option value={form.designation}>{form.designation}</option>
+                )}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Location</label>
+              <select
+                className="form-select"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+              >
+                <option value="">Select location</option>
+                {allLocationOptions.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {loc}
+                  </option>
+                ))}
+                {form.location && !allLocationOptions.includes(form.location) && (
+                  <option value={form.location}>{form.location}</option>
+                )}
+              </select>
+            </div>
           </div>
           <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: "13.5px", fontWeight: 600, color: "#1e293b", cursor: "pointer" }}>
@@ -832,16 +909,32 @@ export default function Employees() {
             {form.createUserAccount !== false && (
               <div style={{ marginTop: 10, marginLeft: 25 }}>
                 <label className="form-label" style={{ fontSize: "12px", marginBottom: 4 }}>
-                  Initial Password <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span>
+                  Password <span className="required">*</span>
                 </label>
-                <input
-                  className="form-input"
-                  type="password"
-                  placeholder="Leave empty to email the employee an activation link"
-                  value={form.password || ""}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  style={{ maxWidth: 320, fontSize: "13px" }}
-                />
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    className="form-input"
+                    type="text"
+                    placeholder="Enter password"
+                    value={form.password || ""}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    style={{ maxWidth: 320, fontSize: "13px" }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    onClick={() => {
+                      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+                      let pwd = "";
+                      for (let i = 0; i < 10; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+                      setForm({ ...form, password: pwd });
+                    }}
+                    style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer" }}
+                  >
+                    Generate
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1004,20 +1097,22 @@ export default function Employees() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Target Department *</label>
-                          <input
-                            type="text"
+                          <select
                             required
-                            list="department-options"
-                            placeholder="Select or enter department"
                             value={transferForm.to_department}
                             onChange={(e) => setTransferForm({ ...transferForm, to_department: e.target.value })}
-                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
-                          />
-                          <datalist id="department-options">
+                            className="form-select w-full p-2 border border-slate-300 rounded-lg text-slate-800 bg-white"
+                          >
+                            <option value="">Select department</option>
                             {departmentsList.map((d) => (
-                              <option key={d.id} value={d.name} />
+                              <option key={d.id || d.name} value={d.name}>
+                                {d.name}
+                              </option>
                             ))}
-                          </datalist>
+                            {transferForm.to_department && !departmentsList.some((d) => d.name === transferForm.to_department) && (
+                              <option value={transferForm.to_department}>{transferForm.to_department}</option>
+                            )}
+                          </select>
                         </div>
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Effective Date *</label>
@@ -1107,20 +1202,25 @@ export default function Employees() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Promoted Designation *</label>
-                          <input
-                            type="text"
+                          <select
                             required
-                            list="designation-options"
-                            placeholder="Select or enter designation"
                             value={promotionForm.new_designation}
                             onChange={(e) => setPromotionForm({ ...promotionForm, new_designation: e.target.value })}
-                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
-                          />
-                          <datalist id="designation-options">
-                            {designationsList.map((d) => (
-                              <option key={d.id} value={d.title || d.name} />
-                            ))}
-                          </datalist>
+                            className="form-select w-full p-2 border border-slate-300 rounded-lg text-slate-800 bg-white"
+                          >
+                            <option value="">Select designation</option>
+                            {designationsList.map((d) => {
+                              const val = d.title || d.name;
+                              return (
+                                <option key={d.id || val} value={val}>
+                                  {val}
+                                </option>
+                              );
+                            })}
+                            {promotionForm.new_designation && !designationsList.some((d) => (d.title || d.name) === promotionForm.new_designation) && (
+                              <option value={promotionForm.new_designation}>{promotionForm.new_designation}</option>
+                            )}
+                          </select>
                         </div>
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Effective Date *</label>

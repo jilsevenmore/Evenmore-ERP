@@ -5,6 +5,7 @@ import { useAssetStore } from "../../../stores/assetStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
 import PageInfoButton from "../../../components/common/PageInfoButton";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   Laptop,
@@ -387,6 +388,30 @@ export function AssetsPage() {
   const reqFulfilled = requests.filter((r) => r.status === "Fulfilled").length;
   const reqRejected = requests.filter((r) => r.status === "Rejected").length;
 
+  const [assetPage, setAssetPage] = useState(1);
+  const [assetPageSize, setAssetPageSize] = useState(10);
+
+  useEffect(() => {
+    setAssetPage(1);
+  }, [search, statusFilter, categoryFilter, deptFilter, assetPageSize]);
+
+  const paginatedAssets = useMemo(() => {
+    const start = (assetPage - 1) * assetPageSize;
+    return filtered.slice(start, start + assetPageSize);
+  }, [filtered, assetPage, assetPageSize]);
+
+  const [reqPage, setReqPage] = useState(1);
+  const [reqPageSize, setReqPageSize] = useState(10);
+
+  useEffect(() => {
+    setReqPage(1);
+  }, [reqSearch, reqStatusFilter, reqPriorityFilter, reqPageSize]);
+
+  const paginatedRequests = useMemo(() => {
+    const start = (reqPage - 1) * reqPageSize;
+    return filteredRequests.slice(start, start + reqPageSize);
+  }, [filteredRequests, reqPage, reqPageSize]);
+
   const availableAssets = useMemo(() => {
     return assets.filter((a) => a.status === "Available");
   }, [assets]);
@@ -742,7 +767,7 @@ export function AssetsPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => (
+                paginatedAssets.map((r) => (
                   <tr key={r.id} className="hover:bg-off/60 transition-colors">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-3">
@@ -870,6 +895,16 @@ export function AssetsPage() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-bdr bg-white">
+          <Pagination
+            total={filtered.length}
+            page={assetPage}
+            pageSize={assetPageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setAssetPageSize(sz); setAssetPage(1); }}
+            onChange={setAssetPage}
+          />
         </div>
       </div>
       </>
@@ -1035,7 +1070,7 @@ export function AssetsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredRequests.map((req) => (
+                    paginatedRequests.map((req) => (
                       <tr key={req.id} className="hover:bg-off/60 transition-colors">
                         <td className="py-3.5 px-5 font-mono text-[12px] font-semibold text-slate-700">
                           {req.id}
@@ -1160,6 +1195,16 @@ export function AssetsPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="border-t border-bdr bg-white">
+              <Pagination
+                total={filteredRequests.length}
+                page={reqPage}
+                pageSize={reqPageSize}
+                pageSizeOptions={[10, 20, 50, 100]}
+                onPageSizeChange={(sz) => { setReqPageSize(sz); setReqPage(1); }}
+                onChange={setReqPage}
+              />
             </div>
           </div>
         </>

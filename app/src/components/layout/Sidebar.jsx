@@ -47,10 +47,6 @@ import {
   Sliders,
   Search,
   X,
-  Sun,
-  Moon,
-  Sparkles,
-  TreePine,
   BookOpen,
   Check,
   LogOut,
@@ -66,13 +62,6 @@ import { UserGuideModal } from '../common/UserGuideModal';
 import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
 import { logout } from '../../services/authService';
 import { filterNavByPermission, canOpenPath, canUseDashboard } from '../../utils/navAccess';
-
-const SIDEBAR_THEMES = [
-  { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
-  { id: 'dark', name: 'Dark', icon: Moon, color: '#3b82f6' },
-  { id: 'midnight', name: 'Midnight', icon: Sparkles, color: '#818cf8' },
-  { id: 'emerald', name: 'Emerald', icon: TreePine, color: '#10b981' },
-];
 
 // ── Navigation Structure ──────────────────────────────────────
 const NAV = [
@@ -571,7 +560,6 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const setMobileSidebarOpen = useAppStore((s) => s.setMobileSidebarOpen);
   const currentUser = useAppStore((s) => s.currentUser);
-  const theme = useAppStore((s) => s.theme) || 'light';
   const setTheme = useAppStore((s) => s.setTheme);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -773,35 +761,6 @@ export default function Sidebar() {
               </div>
             </div>
 
-            {/* Quick Theme Switcher */}
-            <div className="pb-2.5 mb-2.5 border-b border-white/10">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
-                <span>Theme Mode</span>
-                <span className="text-[9px] text-blue-400 capitalize">{theme}</span>
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                {SIDEBAR_THEMES.map((t) => {
-                  const Icon = t.icon;
-                  const isSelected = theme === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setTheme(t.id)}
-                      className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition cursor-pointer text-center ${
-                        isSelected
-                          ? 'bg-blue-600 text-white font-bold shadow-xs'
-                          : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5'
-                      }`}
-                      title={t.name}
-                    >
-                      <Icon size={12} className="mb-0.5" />
-                      <span className="text-[9px] leading-none">{t.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
             {/* Quick Navigation Links */}
             <div className="space-y-0.5 text-xs">
@@ -834,16 +793,6 @@ export default function Sidebar() {
                     >
                       <ShieldCheck size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
                       <span className="text-[11px] font-medium">Administration & Roles</span>
-                    </Link>
-                  )}
-                  {canOpenPath('/administration/settings', permissions) && (
-                    <Link
-                      to="/administration/settings"
-                      onClick={() => setIsProfileOpen(false)}
-                      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-                    >
-                      <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
-                      <span className="text-[11px] font-medium">System Preferences & Currency</span>
                     </Link>
                   )}
                 </>

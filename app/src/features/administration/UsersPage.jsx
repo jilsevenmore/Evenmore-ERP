@@ -1,3 +1,4 @@
+import Pagination from '../../components/ui/Pagination';
 import InfoBanner from '../../components/ui/InfoBanner';
 import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
@@ -48,7 +49,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
-const USERS_PER_PAGE = 16;
+const DEFAULT_USERS_PER_PAGE = 16;
 
 /**
  * A random temporary password from the browser's CSPRNG. A guessable pattern
@@ -116,18 +117,20 @@ function UserInitials({ name, className = 'w-12 h-12 text-sm' }) {
 }
 
 /** Roles from `/admin/roles/`; the value is the role id the API writes. */
-function RoleSelect({ value, onChange, roles, currentName }) {
+function RoleSelect({ value, onChange, roles, currentName, required = true }) {
   const known = roles.some((r) => String(r.id) === String(value));
   return (
     <div>
-      <label className="block font-semibold text-slate-700 mb-1">Role *</label>
+      <label className="block font-semibold text-slate-700 mb-1">
+        Role / Position {required && <span className="text-rose-500">*</span>}
+      </label>
       <select
-        required={roles.length > 0}
+        required={required}
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
         className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
-        <option value="">{roles.length ? 'Select a role' : 'No roles available'}</option>
+        <option value="">{roles.length ? 'Select a role / position' : 'No roles available'}</option>
         {value && !known && <option value={value}>{currentName || 'Current role'}</option>}
         {roles.map((r) => (
           <option key={r.id} value={r.id}>
@@ -140,18 +143,21 @@ function RoleSelect({ value, onChange, roles, currentName }) {
 }
 
 /** Departments from `/hrms/departments/` (Organization), by name. */
-function DepartmentSelect({ value, onChange, departments }) {
+function DepartmentSelect({ value, onChange, departments, required = false }) {
   const names = departments.map((d) => d.name).filter(Boolean);
   const known = names.some((n) => n.toLowerCase() === String(value || '').toLowerCase());
   return (
     <div>
-      <label className="block font-semibold text-slate-700 mb-1">Department</label>
+      <label className="block font-semibold text-slate-700 mb-1">
+        Department {required && <span className="text-rose-500">*</span>}
+      </label>
       <select
+        required={required}
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
         className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
-        <option value="">No department</option>
+        <option value="">{required ? 'Select a department' : 'No department'}</option>
         {value && !known && <option value={value}>{value}</option>}
         {names.map((n) => (
           <option key={n} value={n}>
@@ -254,6 +260,7 @@ export function UsersPage() {
   const [selectedStatus, setSelectedStatus] = useState('All Status');
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_USERS_PER_PAGE);
 
   // ── Selected User for Side Drawer ────────────────────────────
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -335,14 +342,14 @@ export function UsersPage() {
   }, [users, searchQuery, selectedRole, selectedDepartment, selectedStatus]);
 
   // ── Pagination Calculation ───────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const paginatedUsers = useMemo(() => {
-    const start = (currentPage - 1) * USERS_PER_PAGE;
-    return filteredUsers.slice(start, start + USERS_PER_PAGE);
-  }, [filteredUsers, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return filteredUsers.slice(start, start + pageSize);
+  }, [filteredUsers, currentPage, pageSize]);
 
-  const startCount = filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1;
-  const endCount = Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length);
+  const startCount = filteredUsers.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endCount = Math.min(currentPage * pageSize, filteredUsers.length);
 
   // ── Stats Summary Calculation ────────────────────────────────
   const stats = useMemo(() => {
@@ -366,6 +373,10 @@ export function UsersPage() {
     setSelectedStatus('All Status');
     setCurrentPage(1);
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize]);
 
   const handleCardClick = (user) => {
     setSelectedUserId(user.id);
@@ -391,7 +402,17 @@ export function UsersPage() {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    if (!userForm.name || !userForm.email || isSubmitting) return;
+    if (isSubmitting) return;
+
+    if (!userForm.name || !userForm.name.trim()) {
+      showNotification('Full Name is required.');
+      return;
+    }
+
+    if (!userForm.email || !userForm.email.trim()) {
+      showNotification('Email Address is required.');
+      return;
+    }
 
     const emailRes = validateEmail(userForm.email, true);
     if (!emailRes.isValid) {
@@ -399,12 +420,35 @@ export function UsersPage() {
       return;
     }
 
-    if (userForm.phone && userForm.phone.trim() !== '+91') {
-      const phoneRes = validatePhone(userForm.phone);
-      if (!phoneRes.isValid) {
-        showNotification(phoneRes.message);
-        return;
-      }
+    if (!userForm.phone || !userForm.phone.trim() || userForm.phone.trim() === '+91') {
+      showNotification('Phone Number is required.');
+      return;
+    }
+
+    const phoneRes = validatePhone(userForm.phone);
+    if (!phoneRes.isValid) {
+      showNotification(phoneRes.message);
+      return;
+    }
+
+    if (!userForm.roleId) {
+      showNotification('Role / Position is required.');
+      return;
+    }
+
+    if (!userForm.department || !userForm.department.trim()) {
+      showNotification('Department is required.');
+      return;
+    }
+
+    if (!userForm.password || !userForm.password.trim()) {
+      showNotification('Password is required.');
+      return;
+    }
+
+    if (userForm.password.trim().length < 6) {
+      showNotification('Password must be at least 6 characters.');
+      return;
     }
 
     let newUser;
@@ -839,44 +883,15 @@ export function UsersPage() {
           )}
 
           {/* ── Footer / Pagination ─────────────────────────────── */}
-          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-            <div>
-              Showing <span className="font-semibold text-slate-800">{startCount}</span> to{' '}
-              <span className="font-semibold text-slate-800">{endCount}</span> of{' '}
-              <span className="font-semibold text-slate-800">{filteredUsers.length}</span> users
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft size={16} />
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                <button
-                  key={pg}
-                  onClick={() => setCurrentPage(pg)}
-                  className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === pg
-                      ? 'bg-[#1f6bff] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {pg}
-                </button>
-              ))}
-
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+          <div className="bg-white border border-slate-200 rounded-2xl">
+            <Pagination
+              total={filteredUsers.length}
+              page={currentPage}
+              pageSize={pageSize}
+              pageSizeOptions={[8, 16, 32, 64]}
+              onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+              onChange={setCurrentPage}
+            />
           </div>
         </div>
 
@@ -1112,9 +1127,12 @@ export function UsersPage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Phone Number <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="text"
+                    required
                     placeholder="+91 98765 43210"
                     value={userForm.phone}
                     onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
@@ -1140,6 +1158,7 @@ export function UsersPage() {
                   value={userForm.department}
                   onChange={(department) => setUserForm({ ...userForm, department })}
                   departments={departments}
+                  required={true}
                 />
 
                 <div>
@@ -1167,12 +1186,13 @@ export function UsersPage() {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Password <span className="font-normal text-slate-400">(leave empty to email the user an activation link)</span>
+                  Password <span className="text-rose-500">*</span> <span className="font-normal text-slate-400">(enter password or click Generate)</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="Leave empty to send an activation link"
+                    required
+                    placeholder="Enter or generate password"
                     value={userForm.password || ''}
                     onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                     className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
@@ -1185,7 +1205,7 @@ export function UsersPage() {
                         password: generateTempPassword(),
                       })
                     }
-                    className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
+                    className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors cursor-pointer"
                   >
                     Generate
                   </button>

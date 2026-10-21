@@ -45,7 +45,6 @@ const GUIDE_MODULES = [
       }
     ],
     tips: [
-      'Toggle color themes (Light, Dark, Midnight, Emerald) via the top-bar theme selector or user profile popup.',
       'Use Ctrl+K anywhere to bring up the universal command palette and fast search.'
     ]
   },

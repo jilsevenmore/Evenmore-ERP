@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import Pagination from "../../../components/ui/Pagination";
+import { useMemo, useState, useEffect } from "react";
 import {
   CalendarDays,
   ChevronDown,
@@ -33,6 +34,13 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
   const [sortOrder, setSortOrder] = useState("Newest First");
   const [viewMode, setViewMode] = useState("grid");
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, sortOrder, pageSize]);
+
   const filteredForms = useMemo(() => {
     const nextForms = forms.filter((form) => {
       const matchesStatus =
@@ -51,6 +59,11 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
 
     return nextForms;
   }, [forms, sortOrder, statusFilter]);
+
+  const pagedForms = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredForms.slice(start, start + pageSize);
+  }, [filteredForms, page, pageSize]);
 
   return (
     <section className="w-full">
@@ -176,9 +189,9 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredForms.map((form, index) => (
+                  {pagedForms.map((form, index) => (
                     <tr key={form.id} className="text-sm text-slate-700 transition hover:bg-slate-50/60">
-                      <td className="px-5 py-4 font-medium text-slate-500 whitespace-nowrap">{index + 1}</td>
+                      <td className="px-5 py-4 font-medium text-slate-500 whitespace-nowrap">{(page - 1) * pageSize + index + 1}</td>
                       <td className="px-5 py-4 min-w-[210px]">
                         <div className="flex items-center gap-3">
                           <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shrink-0">
@@ -241,7 +254,7 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
           </div>
         ) : (
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {filteredForms.map((form) => (
+            {pagedForms.map((form) => (
               <article
                 key={form.id}
                 className="rounded-[18px] border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300"
@@ -310,35 +323,15 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
           </div>
         )}
 
-        <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            Showing {filteredForms.length === 0 ? 0 : 1} to {filteredForms.length} of {filteredForms.length} forms
-          </div>
-
-          <div className="flex items-center gap-1.5 self-start sm:self-auto">
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400"
-              disabled
-              aria-label="Previous page"
-            >
-              <ChevronDown size={14} className="rotate-90" />
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-white"
-            >
-              1
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400"
-              disabled
-              aria-label="Next page"
-            >
-              <ChevronDown size={14} className="-rotate-90" />
-            </button>
-          </div>
+        <div className="mt-5 border-t border-slate-100 pt-2">
+          <Pagination
+            total={filteredForms.length}
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            onChange={setPage}
+          />
         </div>
       </div>
     </section>

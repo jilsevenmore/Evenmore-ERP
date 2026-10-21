@@ -89,6 +89,7 @@ export const useLeadDetailStore = create((set, get) => {
       const saved = await pushLeadDetail(leadId, section, sectionToApi(section, row));
       if (!saved) throw new Error('Sign in to save changes to this lead.');
       const next = sectionFromApi(section, saved);
+      if (!next.image && row.image) next.image = row.image;
       put(leadId, section, [next, ...rowsOf(leadId, section)]);
       if (TIMELINE_SOURCES.has(section)) get().refreshSection(leadId, 'timeline');
       return next;
@@ -99,6 +100,7 @@ export const useLeadDetailStore = create((set, get) => {
       const saved = await updateLeadDetailRow(leadId, section, rowId, sectionToApi(section, changes));
       if (!saved) throw new Error('Sign in to save changes to this lead.');
       const next = sectionFromApi(section, saved);
+      if (!next.image && changes.image) next.image = changes.image;
       put(leadId, section, rowsOf(leadId, section).map((row) => (String(row.id) === String(rowId) ? next : row)));
       return next;
     },

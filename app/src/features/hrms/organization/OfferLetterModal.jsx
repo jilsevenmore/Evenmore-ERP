@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { useERP } from "../../../context/ERPContext";
 import { downloadElementAsPdf } from "../../../services/exportUtils";
+import { validateEmail } from "../../../utils/validators";
 import {
   X,
   Printer,
@@ -137,6 +138,13 @@ export default function OfferLetterModal({
   };
 
   const handleAcceptAndHire = () => {
+    if (formData.email?.trim()) {
+      const emailRes = validateEmail(formData.email.trim(), false);
+      if (!emailRes.isValid) {
+        showToast(emailRes.message, 'error');
+        return;
+      }
+    }
     const updated = {
       ...offer,
       candidateName: formData.candidateName,
@@ -165,6 +173,13 @@ export default function OfferLetterModal({
   };
 
   const handleSave = () => {
+    if (formData.email?.trim()) {
+      const emailRes = validateEmail(formData.email.trim(), false);
+      if (!emailRes.isValid) {
+        showToast(emailRes.message, 'error');
+        return;
+      }
+    }
     if (onUpdateOffer) {
       const updated = {
         ...offer,

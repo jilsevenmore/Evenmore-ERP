@@ -20,11 +20,7 @@ function applyThemeAttributes(theme) {
 
 function loadTheme() {
   try {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved && ["light", "dark", "midnight", "emerald"].includes(saved)) {
-      applyThemeAttributes(saved);
-      return saved;
-    }
+    localStorage.setItem(THEME_KEY, "light");
   } catch {}
   applyThemeAttributes("light");
   return "light";
@@ -53,6 +49,8 @@ const useAppStoreBase = create((set) => ({
   setPermissions: (permissions) => set({ permissions: permissions || [] }),
   hasPermission: (code) => {
     if (!code) return true;
+    const user = useAppStore.getState().currentUser;
+    if (user?.isSuperuser || user?.isAdmin) return true;
     const granted = useAppStore.getState().permissions || [];
     return granted.includes(code);
   },

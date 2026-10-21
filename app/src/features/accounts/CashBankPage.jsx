@@ -5,6 +5,7 @@ import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Landmark, Plus, DollarSign, CheckCircle2, X } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { validateAccountNumber } from '../../utils/validators';
 const cashBankGuide = {
     title: 'Cash & Bank Accounts (Treasury)',
     subtitle: 'Treasury liquidity monitoring, corporate banking, and automated reconciliation',
@@ -110,21 +111,25 @@ export const CashBankPage = () => {
     };
     const handleAccountNumberChange = (e) => {
         const val = e.target.value;
-        if (val && !/^\d*$/.test(val)) {
-            setAccountNumError('Account number must contain only digits.');
+        const digitsOnly = val.replace(/\D/g, '').slice(0, 18);
+        if (digitsOnly) {
+            const accRes = validateAccountNumber(digitsOnly, false);
+            setAccountNumError(accRes.isValid ? '' : accRes.message);
         } else {
             setAccountNumError('');
         }
-        const digitsOnly = val.replace(/\D/g, '');
         setNewAcc((prev) => ({ ...prev, accountNumber: digitsOnly }));
     };
     const handleCreate = (e) => {
         e.preventDefault();
         if (!newAcc.bankName)
             return;
-        if (newAcc.accountNumber && !/^\d+$/.test(newAcc.accountNumber)) {
-            setAccountNumError('Account number must contain only digits.');
-            return;
+        if (newAcc.accountNumber) {
+            const accRes = validateAccountNumber(newAcc.accountNumber, false);
+            if (!accRes.isValid) {
+                setAccountNumError(accRes.message);
+                return;
+            }
         }
         addBankAccount({
             bankName: newAcc.bankName,
@@ -263,6 +268,7 @@ export const CashBankPage = () => {
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
+                  maxLength={18}
                   placeholder="e.g. 50200084920194"
                   value={newAcc.accountNumber}
                   onChange={handleAccountNumberChange}

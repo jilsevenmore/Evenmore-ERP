@@ -21,7 +21,7 @@ import {
     Sparkles,
     AlertCircle
 } from 'lucide-react';
-import { validateEmail, validatePhone, validatePincode } from '../../utils/validators';
+import { validateEmail, validatePhone, validatePincode, validateAccountNumber, validateIFSC } from '../../utils/validators';
 
 const STEPS = [
     { id: 1, label: 'Basic Info', sublabel: 'Identity & Type', icon: User },
@@ -261,29 +261,53 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
     const validateStep = (currentStep) => {
         if (currentStep === 1) {
-            if (!formData.name.trim()) {
-                setErrorMsg('Legal Company / Entity Name is required to proceed.');
+            if (!formData.type) {
+                setErrorMsg('Entity Role (Customer / Vendor / Dual Partner) is required to proceed.');
                 return false;
             }
-            if (formData.email) {
-                const emailRes = validateEmail(formData.email);
-                if (!emailRes.isValid) {
-                    setErrorMsg(emailRes.message);
-                    return false;
-                }
+            if (!formData.name || !formData.name.trim()) {
+                setErrorMsg('Legal Company / Trade Entity Name is required to proceed.');
+                return false;
             }
-            if (formData.phone) {
-                const phoneRes = validatePhone(formData.phone);
-                if (!phoneRes.isValid) {
-                    setErrorMsg(phoneRes.message);
-                    return false;
-                }
+            if (!formData.phone || !formData.phone.trim()) {
+                setErrorMsg('Corporate Phone number is required to proceed.');
+                return false;
+            }
+            const phoneRes = validatePhone(formData.phone);
+            if (!phoneRes.isValid) {
+                setErrorMsg(phoneRes.message);
+                return false;
+            }
+            if (!formData.email || !formData.email.trim()) {
+                setErrorMsg('Official Billing / Accounts Email is required to proceed.');
+                return false;
+            }
+            const emailRes = validateEmail(formData.email);
+            if (!emailRes.isValid) {
+                setErrorMsg(emailRes.message);
+                return false;
             }
         }
         if (currentStep === 2) {
             if (formData.gstTreatment === 'Registered Business') {
                 if (!formData.gstin || formData.gstin.trim().length < 5) {
                     setErrorMsg('A valid 15-character GSTIN is required for Registered Business entities.');
+                    return false;
+                }
+            }
+        }
+        if (currentStep === 5) {
+            if (formData.bankAccountNumber) {
+                const accRes = validateAccountNumber(formData.bankAccountNumber);
+                if (!accRes.isValid) {
+                    setErrorMsg(accRes.message);
+                    return false;
+                }
+            }
+            if (formData.ifscCode) {
+                const ifscRes = validateIFSC(formData.ifscCode);
+                if (!ifscRes.isValid) {
+                    setErrorMsg(ifscRes.message);
                     return false;
                 }
             }
@@ -561,7 +585,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block font-bold text-text mb-1.5">
-                                        Corporate Phone
+                                        Corporate Phone <span className="text-rose-500">*</span>
                                     </label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
@@ -569,17 +593,18 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         </div>
                                         <input
                                             type="text"
+                                            required
                                             value={formData.phone}
                                             onChange={(e) => updateField('phone', e.target.value)}
                                             className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
-                                            placeholder="+1 (555) 000-0000"
+                                            placeholder="+91 98765 43210"
                                         />
                                     </div>
                                 </div>
 
                                 <div>
                                     <label className="block font-bold text-text mb-1.5">
-                                        Official Billing / Accounts Email
+                                        Official Billing / Accounts Email <span className="text-rose-500">*</span>
                                     </label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
@@ -587,6 +612,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         </div>
                                         <input
                                             type="email"
+                                            required
                                             value={formData.email}
                                             onChange={(e) => updateField('email', e.target.value)}
                                             className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
@@ -947,8 +973,9 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                             type="text"
                                             inputMode="numeric"
                                             pattern="[0-9]*"
+                                            maxLength={18}
                                             value={formData.bankAccountNumber}
-                                            onChange={(e) => updateField('bankAccountNumber', e.target.value.replace(/\D/g, ''))}
+                                            onChange={(e) => updateField('bankAccountNumber', e.target.value.replace(/\D/g, '').slice(0, 18))}
                                             className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                             placeholder="992810029311"
                                         />
@@ -1015,8 +1042,10 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                     <div>
                                         <input
                                             type="text"
+                                            inputMode="numeric"
+                                            maxLength={6}
                                             value={formData.billingAddress.pincode}
-                                            onChange={(e) => updateBillingAddress('pincode', e.target.value)}
+                                            onChange={(e) => updateBillingAddress('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
                                             className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                             placeholder="Pincode / Postal Code"
                                         />
@@ -1075,8 +1104,10 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         <div>
                                             <input
                                                 type="text"
+                                                inputMode="numeric"
+                                                maxLength={6}
                                                 value={formData.shippingAddress.pincode}
-                                                onChange={(e) => updateShippingAddress('pincode', e.target.value)}
+                                                onChange={(e) => updateShippingAddress('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
                                                 className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                                 placeholder="Pincode"
                                             />

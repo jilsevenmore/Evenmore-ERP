@@ -1,3 +1,4 @@
+import Pagination from '../../../components/ui/Pagination';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -457,31 +458,15 @@ export default function MasterTasksPage() {
           </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-4 py-3 border-t border-slate-100 text-xs text-slate-500 pr-20 sm:pr-24">
-          <span>Showing {from} to {to} of {filtered.length} tasks</span>
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer" aria-label="Previous page">
-              <ChevronLeft size={14} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPage(p)}
-                className={`min-w-7 h-7 px-2 rounded-lg border text-xs font-bold transition cursor-pointer ${p === safePage ? 'bg-primary border-primary text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-              >
-                {p}
-              </button>
-            ))}
-            <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer" aria-label="Next page">
-              <ChevronRight size={14} />
-            </button>
-            <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 cursor-pointer">
-              {PER_PAGE_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n} per page</option>
-              ))}
-            </select>
-          </div>
+        <div className="border-t border-slate-100">
+          <Pagination
+            total={filtered.length}
+            page={safePage}
+            pageSize={perPage}
+            pageSizeOptions={[5, 10, 20, 50]}
+            onPageSizeChange={(sz) => { setPerPage(sz); setPage(1); }}
+            onChange={setPage}
+          />
         </div>
       </div>
 

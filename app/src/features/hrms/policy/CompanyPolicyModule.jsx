@@ -48,6 +48,7 @@ import { usePolicyStore } from "../../../stores/policyStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
 import PageInfoButton from "../../../components/common/PageInfoButton";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 // Category icon helper
@@ -150,7 +151,9 @@ export function CompanyPolicyModule({ forcedSection }) {
   const [sortBy, setSortBy] = useState("updatedAt");
   const [sortOrder, setSortOrder] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState(10);
+  const [ackPage, setAckPage] = useState(1);
+  const [ackPageSize, setAckPageSize] = useState(10);
 
   // Selected policy for View Detail modal
   const [viewPolicy, setViewPolicy] = useState(null);
@@ -406,6 +409,19 @@ export function CompanyPolicyModule({ forcedSection }) {
   }, [filteredPolicies, currentPage, pageSize]);
 
   const totalPages = Math.ceil(filteredPolicies.length / pageSize) || 1;
+
+  const paginatedAcks = useMemo(() => {
+    const start = (ackPage - 1) * ackPageSize;
+    return acknowledgements.slice(start, start + ackPageSize);
+  }, [acknowledgements, ackPage, ackPageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    setAckPage(1);
+  }, [ackPageSize]);
 
   // Acknowledgement statistics per policy
   const getPolicyAckStats = (policyId) => {
@@ -1290,32 +1306,15 @@ export function CompanyPolicyModule({ forcedSection }) {
               </table>
             </div>
 
-            {/* Pagination & Count */}
-            <div className="p-4 border-t border-bdr flex flex-wrap items-center justify-between gap-3 text-[12.5px] text-muted">
-              <div>
-                Showing <b>{paginatedPolicies.length}</b> of <b>{filteredPolicies.length}</b> policies
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 border border-bdr rounded-xl hover:bg-off disabled:opacity-40 disabled:hover:bg-transparent font-medium cursor-pointer"
-                >
-                  Previous
-                </button>
-                <span className="px-2">
-                  Page <b>{currentPage}</b> of <b>{totalPages}</b>
-                </span>
-                <button
-                  type="button"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-3 py-1.5 border border-bdr rounded-xl hover:bg-off disabled:opacity-40 disabled:hover:bg-transparent font-medium cursor-pointer"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="border-t border-bdr bg-white">
+              <Pagination
+                total={filteredPolicies.length}
+                page={currentPage}
+                pageSize={pageSize}
+                pageSizeOptions={[5, 10, 20, 50]}
+                onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+                onChange={setCurrentPage}
+              />
             </div>
           </div>
         </div>
@@ -1465,7 +1464,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/50">
-                  {acknowledgements.map((ack) => {
+                  {paginatedAcks.map((ack) => {
                     const isCurrentUser = ack.employeeName === currentUser?.name || (myEmployeeId && ack.employeeId === myEmployeeId);
                     return (
                       <tr key={ack.id} className="hover:bg-off/60 transition">
@@ -1520,6 +1519,16 @@ export function CompanyPolicyModule({ forcedSection }) {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="border-t border-bdr bg-white">
+              <Pagination
+                total={acknowledgements.length}
+                page={ackPage}
+                pageSize={ackPageSize}
+                pageSizeOptions={[5, 10, 20, 50]}
+                onPageSizeChange={(sz) => { setAckPageSize(sz); setAckPage(1); }}
+                onChange={setAckPage}
+              />
             </div>
           </div>
         </div>

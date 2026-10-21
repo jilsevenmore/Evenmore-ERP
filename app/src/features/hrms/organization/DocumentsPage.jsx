@@ -4,6 +4,7 @@ import { useDocumentStore } from "../../../stores/documentStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
 import PageInfoButton from "../../../components/common/PageInfoButton";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   FileText,
@@ -337,6 +338,13 @@ export function DocumentsPage() {
     return counts;
   }, [documents]);
 
+  const [docPage, setDocPage] = useState(1);
+  const [docPageSize, setDocPageSize] = useState(10);
+
+  useEffect(() => {
+    setDocPage(1);
+  }, [search, categoryFilter, scopeFilter, statusFilter, docPageSize]);
+
   // Filtered documents for "All Documents"
   const filteredAllDocs = useMemo(() => {
     return documents.filter((d) => {
@@ -364,6 +372,11 @@ export function DocumentsPage() {
       return matchesSearch && matchesCat && matchesStatus && matchesScope;
     });
   }, [documents, search, categoryFilter, statusFilter, scopeFilter]);
+
+  const paginatedAllDocs = useMemo(() => {
+    const start = (docPage - 1) * docPageSize;
+    return filteredAllDocs.slice(start, start + docPageSize);
+  }, [filteredAllDocs, docPage, docPageSize]);
 
   // Selected employee object and documents
   const currentSelectedEmployee = useMemo(() => {
@@ -934,7 +947,7 @@ export function DocumentsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredAllDocs.map((d) => (
+                    paginatedAllDocs.map((d) => (
                       <tr key={d.id} className="hover:bg-slate-50/60 transition">
                         <td className="py-3.5 px-5">
                           <div className="flex items-start gap-2.5">
@@ -1085,6 +1098,16 @@ export function DocumentsPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="border-t border-bdr bg-white">
+              <Pagination
+                total={filteredAllDocs.length}
+                page={docPage}
+                pageSize={docPageSize}
+                pageSizeOptions={[10, 20, 50, 100]}
+                onPageSizeChange={(sz) => { setDocPageSize(sz); setDocPage(1); }}
+                onChange={setDocPage}
+              />
             </div>
           </div>
         </div>

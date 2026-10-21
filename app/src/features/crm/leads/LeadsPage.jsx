@@ -695,8 +695,7 @@ export default function LeadsPage() {
                   page={page}
                   pageSize={pageSize}
                   onChange={setPage}
-                  showTotalRecords
-                  pageSizeOptions={[10, 20, 50]}
+                  pageSizeOptions={[10, 20, 50, 100]}
                   onPageSizeChange={handlePageSizeChange}
                 />
               </div>
@@ -732,8 +731,7 @@ export default function LeadsPage() {
                   page={page}
                   pageSize={pageSize}
                   onChange={setPage}
-                  showTotalRecords
-                  pageSizeOptions={[10, 20, 50]}
+                  pageSizeOptions={[10, 20, 50, 100]}
                   onPageSizeChange={handlePageSizeChange}
                 />
               </div>

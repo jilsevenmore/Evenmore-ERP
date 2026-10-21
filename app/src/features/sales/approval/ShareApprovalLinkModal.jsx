@@ -17,6 +17,7 @@ import {
   revokeApprovalLink,
 } from '../../../services/salesApprovalLinks';
 import { formatCurrency } from '../../../utils/currencyUtils';
+import { validateEmail } from '../../../utils/validators';
 
 /**
  * ShareApprovalLinkModal — issue a customer approval link for an estimate,
@@ -139,8 +140,11 @@ export function ShareApprovalLinkModal({ isOpen, onClose, docType, document: doc
     e.preventDefault();
     const found = {};
     if (!recipientName.trim()) found.recipientName = 'Name the person who will approve it.';
-    if (recipientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
-      found.recipientEmail = 'That does not look like an email address.';
+    if (recipientEmail.trim()) {
+      const emailRes = validateEmail(recipientEmail.trim());
+      if (!emailRes.isValid) {
+        found.recipientEmail = emailRes.message;
+      }
     }
     setErrors(found);
     if (Object.keys(found).length > 0 || busy) return;
