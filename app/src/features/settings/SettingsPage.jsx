@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
 import { Building, Bell, Database, Save, Check, RotateCcw, AlertTriangle, MapPin, Phone, Hash } from 'lucide-react';
+import { validatePhone } from '../../utils/validators';
 export const SettingsPage = () => {
     const {
         resetBusinessData,
@@ -35,6 +36,13 @@ export const SettingsPage = () => {
     }, [companyProfile]);
     const handleSave = (e) => {
         e.preventDefault();
+        if (phone?.trim()) {
+            const phoneRes = validatePhone(phone, false);
+            if (!phoneRes.isValid) {
+                showToast(phoneRes.message, 'error');
+                return;
+            }
+        }
         setGlobalCurrency(currency);
         if (typeof setCompanyProfile === 'function') {
             setCompanyProfile({

@@ -50,6 +50,25 @@ export const validateIFSC = (ifsc) => {
 };
 
 /**
+ * Validates Bank Account Number
+ * Bank account numbers are numeric strings between 9 and 18 digits.
+ * @param {string|number} accountNo
+ * @param {boolean} required
+ */
+export const validateAccountNumber = (accountNo, required = false) => {
+  if (!accountNo || !String(accountNo).trim()) {
+    if (required) return { isValid: false, message: 'Bank account number is required' };
+    return { isValid: true, cleanValue: '' };
+  }
+  const clean = String(accountNo).trim().replace(/[\s-]/g, '');
+  const accRegex = /^\d{9,18}$/;
+  if (!accRegex.test(clean)) {
+    return { isValid: false, message: 'Bank account number must be between 9 and 18 digits' };
+  }
+  return { isValid: true, cleanValue: clean };
+};
+
+/**
  * Validates Standard Email Address
  * @param {string} email
  * @param {boolean} required

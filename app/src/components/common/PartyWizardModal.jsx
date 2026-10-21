@@ -21,7 +21,7 @@ import {
     Sparkles,
     AlertCircle
 } from 'lucide-react';
-import { validateEmail, validatePhone, validatePincode } from '../../utils/validators';
+import { validateEmail, validatePhone, validatePincode, validateAccountNumber, validateIFSC } from '../../utils/validators';
 
 const STEPS = [
     { id: 1, label: 'Basic Info', sublabel: 'Identity & Type', icon: User },
@@ -292,6 +292,22 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
             if (formData.gstTreatment === 'Registered Business') {
                 if (!formData.gstin || formData.gstin.trim().length < 5) {
                     setErrorMsg('A valid 15-character GSTIN is required for Registered Business entities.');
+                    return false;
+                }
+            }
+        }
+        if (currentStep === 5) {
+            if (formData.bankAccountNumber) {
+                const accRes = validateAccountNumber(formData.bankAccountNumber);
+                if (!accRes.isValid) {
+                    setErrorMsg(accRes.message);
+                    return false;
+                }
+            }
+            if (formData.ifscCode) {
+                const ifscRes = validateIFSC(formData.ifscCode);
+                if (!ifscRes.isValid) {
+                    setErrorMsg(ifscRes.message);
                     return false;
                 }
             }
@@ -957,8 +973,9 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                             type="text"
                                             inputMode="numeric"
                                             pattern="[0-9]*"
+                                            maxLength={18}
                                             value={formData.bankAccountNumber}
-                                            onChange={(e) => updateField('bankAccountNumber', e.target.value.replace(/\D/g, ''))}
+                                            onChange={(e) => updateField('bankAccountNumber', e.target.value.replace(/\D/g, '').slice(0, 18))}
                                             className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                             placeholder="992810029311"
                                         />
@@ -1025,8 +1042,10 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                     <div>
                                         <input
                                             type="text"
+                                            inputMode="numeric"
+                                            maxLength={6}
                                             value={formData.billingAddress.pincode}
-                                            onChange={(e) => updateBillingAddress('pincode', e.target.value)}
+                                            onChange={(e) => updateBillingAddress('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
                                             className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                             placeholder="Pincode / Postal Code"
                                         />
@@ -1085,8 +1104,10 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         <div>
                                             <input
                                                 type="text"
+                                                inputMode="numeric"
+                                                maxLength={6}
                                                 value={formData.shippingAddress.pincode}
-                                                onChange={(e) => updateShippingAddress('pincode', e.target.value)}
+                                                onChange={(e) => updateShippingAddress('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
                                                 className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                                 placeholder="Pincode"
                                             />

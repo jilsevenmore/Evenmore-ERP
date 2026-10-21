@@ -18,6 +18,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { validateEmail, validatePhone } from '../../utils/validators';
 import {
   fetchWebhooks,
   createWebhook,
@@ -147,6 +148,19 @@ export default function WebhooksPage() {
     if (!channelForm.recipient || !channelForm.message) {
       showToast('Recipient and message are required', 'error');
       return;
+    }
+    if (channelForm.channel === 'email') {
+      const emailRes = validateEmail(channelForm.recipient, true);
+      if (!emailRes.isValid) {
+        showToast(emailRes.message, 'error');
+        return;
+      }
+    } else if (channelForm.channel === 'sms' || channelForm.channel === 'whatsapp') {
+      const phoneRes = validatePhone(channelForm.recipient, true);
+      if (!phoneRes.isValid) {
+        showToast(phoneRes.message, 'error');
+        return;
+      }
     }
     setBroadcasting(true);
     setBroadcastResult(null);

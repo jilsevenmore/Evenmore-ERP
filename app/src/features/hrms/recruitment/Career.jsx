@@ -5,6 +5,7 @@ import { Modal } from "../../../components/hrms/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
+import { validateEmail, validatePhone } from "../../../utils/validators";
 import {
   Search,
   Building2,
@@ -86,9 +87,21 @@ export default function Career() {
   }
 
   function handleSubmitApplication() {
-    if (!applyForm.name.trim() || !applyForm.email.trim()) {
-      showToast("Please provide your name and email address");
+    if (!applyForm.name.trim()) {
+      showToast("Please provide your name", "error");
       return;
+    }
+    const emailRes = validateEmail(applyForm.email, true);
+    if (!emailRes.isValid) {
+      showToast(emailRes.message, "error");
+      return;
+    }
+    if (applyForm.phone?.trim()) {
+      const phoneRes = validatePhone(applyForm.phone, false);
+      if (!phoneRes.isValid) {
+        showToast(phoneRes.message, "error");
+        return;
+      }
     }
 
     const todayStr = new Date().toLocaleDateString("en-GB", {

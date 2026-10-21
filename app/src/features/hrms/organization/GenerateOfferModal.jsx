@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, Sparkles, Briefcase, MapPin, DollarSign, Calendar, Clock, User } from "lucide-react";
+import { X, Sparkles, Briefcase, MapPin, DollarSign, Calendar, Clock, User, AlertCircle } from "lucide-react";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
+import { validateEmail } from "../../../utils/validators";
 
 export default function GenerateOfferModal({
   isOpen,
@@ -30,6 +31,7 @@ export default function GenerateOfferModal({
     reportingManager: "",
     probationPeriod: "3 Months",
   });
+  const [errorMsg, setErrorMsg] = useState("");
 
   if (!isOpen) return null;
 
@@ -58,6 +60,14 @@ export default function GenerateOfferModal({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.candidateName) return;
+    if (formData.email?.trim()) {
+      const emailRes = validateEmail(formData.email.trim(), false);
+      if (!emailRes.isValid) {
+        setErrorMsg(emailRes.message);
+        return;
+      }
+    }
+    setErrorMsg("");
 
     const newOffer = {
       id: `OFF-${Math.floor(100 + Math.random() * 900)}`,
@@ -97,6 +107,12 @@ export default function GenerateOfferModal({
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 text-xs">
+          {errorMsg && (
+            <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-2">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
           {/* Quick Select Hired Candidate */}
           <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-1.5">
             <div className="flex items-center justify-between">

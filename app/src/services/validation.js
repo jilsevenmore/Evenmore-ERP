@@ -6,11 +6,16 @@ import { z } from 'zod';
  * them automatically so existing behavior is untouched.
  */
 
+export const emailSchema = z.string().trim().email('Valid email is required');
+export const phoneSchema = z.string().trim().regex(/^\+?[0-9\s\-()]{10,20}$/, 'Phone number must contain between 10 and 15 digits');
+export const pincodeSchema = z.string().trim().regex(/^[1-9][0-9]{5}$/, 'Pincode must be a 6-digit number');
+export const accountNumberSchema = z.string().trim().regex(/^\d{9,18}$/, 'Account number must contain between 9 and 18 digits');
+
 export const leadSchema = z.object({
   name: z.string().trim().min(1, 'Lead name is required'),
   company: z.string().trim().min(1, 'Company is required'),
-  email: z.string().trim().email('Valid email is required'),
-  phone: z.string().trim().min(1, 'Phone is required'),
+  email: emailSchema,
+  phone: phoneSchema,
   status: z.string().trim().min(1).default('New'),
   source: z.string().trim().min(1).default('Website'),
   owner: z.string().trim().optional().default(''),

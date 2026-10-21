@@ -328,15 +328,20 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
 
   function handleCreate() {
     setErrorMsg("");
-    if (email) {
-      const emailRes = validateEmail(email, false);
+    const emailField = layout.flatMap((s) => s.fields || []).find((f) => f.id === "email");
+    const phoneField = layout.flatMap((s) => s.fields || []).find((f) => f.id === "phone");
+    const emailRequired = emailField ? isRequired(emailField) : false;
+    const phoneRequired = phoneField ? isRequired(phoneField) : false;
+
+    if (email || emailRequired) {
+      const emailRes = validateEmail(email, emailRequired);
       if (!emailRes.isValid) {
         setErrorMsg(emailRes.message);
         return;
       }
     }
-    if (phone) {
-      const phoneRes = validatePhone(phone, false);
+    if (phone || phoneRequired) {
+      const phoneRes = validatePhone(phone, phoneRequired);
       if (!phoneRes.isValid) {
         setErrorMsg(phoneRes.message);
         return;
