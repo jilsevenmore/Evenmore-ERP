@@ -237,20 +237,23 @@ export default function GenerateOfferModal({
               <label className="block font-semibold text-slate-700 mb-1">
                 Department
               </label>
-              <input
-                list="gen-offer-depts"
+              <select
                 value={formData.dept}
                 onChange={(e) =>
                   setFormData({ ...formData, dept: e.target.value })
                 }
-                placeholder="Enter department"
-                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
-              />
-              <datalist id="gen-offer-depts">
+                className="form-select w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-navy text-slate-800 text-xs"
+              >
+                <option value="">Select department</option>
                 {departmentOptions.map((d) => (
-                  <option key={d} value={d} />
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
                 ))}
-              </datalist>
+                {formData.dept && !departmentOptions.includes(formData.dept) && (
+                  <option value={formData.dept}>{formData.dept}</option>
+                )}
+              </select>
             </div>
           </div>
 

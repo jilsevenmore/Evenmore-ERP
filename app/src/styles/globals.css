@@ -2802,6 +2802,41 @@ html {
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
   padding-right: 34px;
+  color-scheme: light;
+  cursor: pointer;
+}
+
+.form-select option,
+select option {
+  background-color: #ffffff;
+  color: #183153;
+}
+
+[data-theme="dark"] .form-select,
+[data-theme="dark"] select,
+[data-theme="midnight"] .form-select,
+[data-theme="midnight"] select,
+[data-theme="emerald"] .form-select,
+[data-theme="emerald"] select,
+html.dark .form-select,
+html.dark select,
+.dark .form-select,
+.dark select {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .form-select option,
+[data-theme="dark"] select option,
+[data-theme="midnight"] .form-select option,
+[data-theme="midnight"] select option,
+[data-theme="emerald"] .form-select option,
+[data-theme="emerald"] select option,
+html.dark .form-select option,
+html.dark select option,
+.dark .form-select option,
+.dark select option {
+  background-color: var(--card, #1e293b);
+  color: var(--text, #f1f5f9);
 }
 
 .form-error { font-size: 0.8rem; color: var(--danger); margin-top: 2px; }

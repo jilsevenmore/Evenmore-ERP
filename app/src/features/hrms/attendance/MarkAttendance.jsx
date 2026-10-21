@@ -40,6 +40,7 @@ import { hrmsSync } from "../../../services/hrmsSync";
 import { api } from "../../../services/api";
 import { Badge } from "../../../components/hrms/Badge";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { EarlyPunchOutModal } from "./components/EarlyPunchOutModal";
 import { usePunchActions } from "./usePunchActions";
@@ -425,6 +426,18 @@ function TeamMarkAttendance() {
       return true;
     });
   }, [rows, dept, statusFilter, search]);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, dept, statusFilter, date, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   const dirtyIds = Object.keys(edits);
   const selectedIds = filtered.filter((r) => checked[r.employeeId]).map((r) => r.employeeId);
@@ -973,7 +986,7 @@ function TeamMarkAttendance() {
                   </td>
                 </tr>
               )}
-              {filtered.map((r) => {
+              {paginatedRows.map((r) => {
                 const punched = r.source === "punch" || r.punchCount > 0;
                 const dirty = Boolean(edits[r.employeeId]);
                 const isChecked = r.status === "Present";
@@ -1163,6 +1176,16 @@ function TeamMarkAttendance() {
               })}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-bdr bg-white">
+          <Pagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            onChange={setPage}
+          />
         </div>
 
         {/* Bottom Save & Summary Bar */}

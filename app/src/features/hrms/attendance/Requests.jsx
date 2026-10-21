@@ -5,6 +5,7 @@ import { useAttendanceStore } from "../../../stores/attendanceStore";
 import Modal from "../../../components/ui/Modal";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { UserInitials } from "../../../components/common/UserInitials";
 
@@ -155,6 +156,13 @@ export default function Requests() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("");
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, deptFilter, typeFilter, statusFilter, pageSize]);
+
   const [selectedReq, setSelectedReq] = useState(null);
   const [approveId, setApproveId] = useState(null);
   const [rejectId, setRejectId] = useState(null);
@@ -188,6 +196,11 @@ export default function Requests() {
       return true;
     });
   }, [requestsList, tab, search, deptFilter, typeFilter, statusFilter, dateFilter]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   const countForTab = (t) => {
     if (t === "All") return requestsList.length;
@@ -449,7 +462,7 @@ export default function Requests() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {paginatedRows.map((r) => (
                 <tr key={r.id}>
                   <td>
                     <button
@@ -536,6 +549,16 @@ export default function Requests() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-100 bg-white">
+          <Pagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            onChange={setPage}
+          />
         </div>
       </div>
 

@@ -70,10 +70,20 @@ export function describeError(err) {
       }
       return err.message || 'Too many requests. Please try again later.';
     }
+    if (
+      err.message &&
+      err.message !== 'Request could not be completed.' &&
+      err.message !== 'Some fields need attention.'
+    ) {
+      return err.message;
+    }
     const fieldErrors = err.payload?.field_errors;
     if (fieldErrors && typeof fieldErrors === 'object') {
       const [field, messages] = Object.entries(fieldErrors)[0] || [];
-      if (field) return `${field}: ${[].concat(messages)[0]}`;
+      if (field) {
+        const firstMsg = [].concat(messages)[0];
+        return firstMsg || `${field} is invalid`;
+      }
     }
     return err.message;
   }

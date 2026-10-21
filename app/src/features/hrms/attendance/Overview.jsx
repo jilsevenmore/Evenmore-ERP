@@ -4,6 +4,7 @@ import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import Pagination from "../../../components/ui/Pagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { pullPunchTimeline, submitPunchCorrection, pullTracked, hrmsSync } from "../../../services/hrmsSync";
 import { api } from "../../../services/api";
@@ -248,6 +249,18 @@ export default function AttendanceOverview() {
 
     return Array.from(map.values());
   }, [combinedAttendance, search, dateVal, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter]);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, dateVal, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter, pageSize]);
+
+  const paginatedAttendance = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   // Dynamic live STATS strictly for the selected date (dateVal) based on actual employees in the system
   const statsData = useMemo(() => {
@@ -640,7 +653,7 @@ export default function AttendanceOverview() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
+              {paginatedAttendance.map((row) => (
                 <tr key={row.id}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -723,6 +736,16 @@ export default function AttendanceOverview() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-100 bg-white">
+          <Pagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            onChange={setPage}
+          />
         </div>
       </div>
 

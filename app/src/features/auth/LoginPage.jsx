@@ -17,6 +17,7 @@ import {
   Layers,
   HelpCircle,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { login as loginRequest } from '../../services/authService';

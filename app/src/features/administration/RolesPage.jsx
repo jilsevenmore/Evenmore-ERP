@@ -1,3 +1,4 @@
+import Pagination from '../../components/ui/Pagination';
 import InfoBanner from '../../components/ui/InfoBanner';
 import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
@@ -25,7 +26,7 @@ import {
   Lock,
 } from 'lucide-react';
 
-const ROLES_PER_PAGE = 10;
+const DEFAULT_ROLES_PER_PAGE = 10;
 
 /** Lower-cased text, safe on a field the server left unset. */
 function text(value) {
@@ -95,6 +96,7 @@ export function RolesPage() {
 
   const [roleSearchQuery, setRoleSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_ROLES_PER_PAGE);
   const [toastMessage, setToastMessage] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState(null);
@@ -153,14 +155,14 @@ export function RolesPage() {
     });
   }, [roles, roleSearchQuery]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / ROLES_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / pageSize));
   const paginatedRoles = useMemo(() => {
-    const start = (currentPage - 1) * ROLES_PER_PAGE;
-    return filteredRoles.slice(start, start + ROLES_PER_PAGE);
-  }, [filteredRoles, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return filteredRoles.slice(start, start + pageSize);
+  }, [filteredRoles, currentPage, pageSize]);
 
-  const startCount = filteredRoles.length === 0 ? 0 : (currentPage - 1) * ROLES_PER_PAGE + 1;
-  const endCount = Math.min(currentPage * ROLES_PER_PAGE, filteredRoles.length);
+  const startCount = filteredRoles.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endCount = Math.min(currentPage * pageSize, filteredRoles.length);
 
   const stats = useMemo(() => {
     const permissionCount = catalogue.reduce(
@@ -464,40 +466,15 @@ export function RolesPage() {
             })}
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
-            <span>
-              Showing {startCount} to {endCount} of {filteredRoles.length} roles
-            </span>
-
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                <button
-                  key={pg}
-                  onClick={() => setCurrentPage(pg)}
-                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-semibold ${
-                    currentPage === pg
-                      ? 'bg-[#1f6bff] text-white'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {pg}
-                </button>
-              ))}
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
+          <div className="pt-2 border-t border-slate-100">
+            <Pagination
+              total={filteredRoles.length}
+              page={currentPage}
+              pageSize={pageSize}
+              pageSizeOptions={[5, 10, 20, 50]}
+              onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+              onChange={setCurrentPage}
+            />
           </div>
         </div>
 

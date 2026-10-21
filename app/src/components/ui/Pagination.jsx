@@ -9,11 +9,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 export function Pagination({
   total = 0,
   page = 1,
-  pageSize = 20,
+  pageSize = 10,
   onChange,
   showTotalRecords = false,
-  pageSizeOptions,
+  pageSizeOptions = [10, 20, 50, 100],
   onPageSizeChange,
+  className = '',
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = Math.min((page - 1) * pageSize + 1, total);
@@ -31,7 +32,7 @@ export function Pagination({
   }
 
   return (
-    <div className="pagination">
+    <div className={`pagination ${className}`}>
       <div className="flex items-center gap-3">
         {showTotalRecords ? (
           <span className="pagination-total">
@@ -116,4 +117,3 @@ export function Pagination({
 }
 
 export default Pagination;
-

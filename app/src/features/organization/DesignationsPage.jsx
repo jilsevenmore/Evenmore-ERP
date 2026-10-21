@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import Modal from '../../components/ui/Modal';
 import PageInfoButton from '../../components/common/PageInfoButton';
+import Pagination from '../../components/ui/Pagination';
 import { hrmsGuides } from '../../data/hrms/hrmsGuides';
 import { Plus, Award, Search, Edit2, Trash2 } from 'lucide-react';
 import { useOrgCollection, useConfirmDelete } from './useOrgCollection';
@@ -41,6 +42,18 @@ export function DesignationsPage() {
     (!deptFilter || String(d.departmentId) === deptFilter) &&
     (!term || [d.title, d.department, d.level].some((v) => String(v ?? '').toLowerCase().includes(term)))
   );
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, deptFilter, pageSize]);
+
+  const paginatedDesignations = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   function openForm(row) {
     setEditing(row || {});
@@ -118,7 +131,7 @@ export function DesignationsPage() {
                   </td>
                 </tr>
               )}
-              {filtered.map((r) => (
+              {paginatedDesignations.map((r) => (
                 <tr key={r.id} className="hover:bg-off/60 transition-colors">
                   <td className="py-4 px-5 font-semibold text-slate-900">
                     <div className="flex items-center gap-2">
@@ -149,6 +162,16 @@ export function DesignationsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-bdr bg-white">
+          <Pagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 20, 50, 100]}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+            onChange={setPage}
+          />
         </div>
       </div>
 

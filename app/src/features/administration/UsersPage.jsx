@@ -1,3 +1,4 @@
+import Pagination from '../../components/ui/Pagination';
 import InfoBanner from '../../components/ui/InfoBanner';
 import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
@@ -48,7 +49,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
-const USERS_PER_PAGE = 16;
+const DEFAULT_USERS_PER_PAGE = 16;
 
 /**
  * A random temporary password from the browser's CSPRNG. A guessable pattern
@@ -259,6 +260,7 @@ export function UsersPage() {
   const [selectedStatus, setSelectedStatus] = useState('All Status');
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_USERS_PER_PAGE);
 
   // ── Selected User for Side Drawer ────────────────────────────
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -340,14 +342,14 @@ export function UsersPage() {
   }, [users, searchQuery, selectedRole, selectedDepartment, selectedStatus]);
 
   // ── Pagination Calculation ───────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const paginatedUsers = useMemo(() => {
-    const start = (currentPage - 1) * USERS_PER_PAGE;
-    return filteredUsers.slice(start, start + USERS_PER_PAGE);
-  }, [filteredUsers, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return filteredUsers.slice(start, start + pageSize);
+  }, [filteredUsers, currentPage, pageSize]);
 
-  const startCount = filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1;
-  const endCount = Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length);
+  const startCount = filteredUsers.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endCount = Math.min(currentPage * pageSize, filteredUsers.length);
 
   // ── Stats Summary Calculation ────────────────────────────────
   const stats = useMemo(() => {
@@ -371,6 +373,10 @@ export function UsersPage() {
     setSelectedStatus('All Status');
     setCurrentPage(1);
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize]);
 
   const handleCardClick = (user) => {
     setSelectedUserId(user.id);
@@ -877,44 +883,15 @@ export function UsersPage() {
           )}
 
           {/* ── Footer / Pagination ─────────────────────────────── */}
-          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-            <div>
-              Showing <span className="font-semibold text-slate-800">{startCount}</span> to{' '}
-              <span className="font-semibold text-slate-800">{endCount}</span> of{' '}
-              <span className="font-semibold text-slate-800">{filteredUsers.length}</span> users
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft size={16} />
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                <button
-                  key={pg}
-                  onClick={() => setCurrentPage(pg)}
-                  className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === pg
-                      ? 'bg-[#1f6bff] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {pg}
-                </button>
-              ))}
-
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+          <div className="bg-white border border-slate-200 rounded-2xl">
+            <Pagination
+              total={filteredUsers.length}
+              page={currentPage}
+              pageSize={pageSize}
+              pageSizeOptions={[8, 16, 32, 64]}
+              onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+              onChange={setCurrentPage}
+            />
           </div>
         </div>
 
