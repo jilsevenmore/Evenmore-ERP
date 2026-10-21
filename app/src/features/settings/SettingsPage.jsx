@@ -142,29 +142,13 @@ export const SettingsPage = () => {
 
     const handleSave = (e) => {
         e.preventDefault();
-        setSubmitAttempted(true);
-
-        const currentValues = {
-            companyName,
-            fiscalYear,
-            gstin,
-            pan,
-            phone,
-        };
-
-        const formErrors = validateForm(currentValues);
-
-        if (Object.keys(formErrors).length > 0) {
-            setErrors(formErrors);
-            showToast('Please correct the highlighted validation errors.', 'error');
-            const firstErrorKey = Object.keys(formErrors)[0];
-            if (inputRefs[firstErrorKey]?.current) {
-                inputRefs[firstErrorKey].current.focus();
+        if (phone?.trim()) {
+            const phoneRes = validatePhone(phone, false);
+            if (!phoneRes.isValid) {
+                showToast(phoneRes.message, 'error');
+                return;
             }
-            return;
         }
-
-        setErrors({});
         setGlobalCurrency(currency);
         try {
             localStorage.setItem('evenmore_auto_reorder', JSON.stringify(autoReorder));
