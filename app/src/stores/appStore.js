@@ -53,6 +53,8 @@ const useAppStoreBase = create((set) => ({
   setPermissions: (permissions) => set({ permissions: permissions || [] }),
   hasPermission: (code) => {
     if (!code) return true;
+    const user = useAppStore.getState().currentUser;
+    if (user?.isSuperuser || user?.isAdmin) return true;
     const granted = useAppStore.getState().permissions || [];
     return granted.includes(code);
   },

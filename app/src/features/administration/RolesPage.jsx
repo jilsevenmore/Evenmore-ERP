@@ -67,7 +67,12 @@ export function RolesPage() {
   // The server refuses role changes without `manage_roles`; the screen only
   // follows suit so nobody fills in a form that cannot be saved.
   const grantedPermissions = useAppStore((s) => s.permissions) || [];
-  const canManage = grantedPermissions.includes('manage_roles');
+  const currentUser = useAppStore((s) => s.currentUser);
+  const canManage = Boolean(
+    currentUser?.isSuperuser ||
+    currentUser?.isAdmin ||
+    grantedPermissions.includes('manage_roles')
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +190,7 @@ export function RolesPage() {
         name,
         description: editingDescription.trim(),
         permissions: editingPermissions,
+        selectedPermissions: editingPermissions,
       });
       if (saved) {
         // The server's copy replaces ours, so the screen shows what was stored.
@@ -253,6 +259,7 @@ export function RolesPage() {
         name: name.trim(),
         description: description.trim() || undefined,
         permissions: source ? source.permissions : [],
+        selectedPermissions: source ? source.permissions : [],
       });
       if (!created) return;
       setRoles((prev) => [created, ...prev]);
