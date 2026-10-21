@@ -17,6 +17,7 @@ import {
     pushAction,
     pushConvert,
     pullCompanyProfile,
+    pushCompanyProfile,
     resetTenantData,
     isServerId,
     describeError,
@@ -355,7 +356,13 @@ export const ERPProvider = ({ children, }) => {
     const loadCompanyProfile = useCallback(async () => {
         const profile = await pullCompanyProfile();
         if (!profile) return null;
-        setCompanyProfileState((prev) => ({ ...prev, ...profile }));
+        setCompanyProfileState((prev) => {
+            const merged = { ...prev, ...profile };
+            try {
+                localStorage.setItem('evenmore_company_profile', JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+        });
         // Amounts arrive already denominated in this currency, so it is the
         // base every conversion is measured from (api.md §1.6).
         setBaseCurrency(profile.currency);
