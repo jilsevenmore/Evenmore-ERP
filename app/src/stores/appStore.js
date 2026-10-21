@@ -20,11 +20,7 @@ function applyThemeAttributes(theme) {
 
 function loadTheme() {
   try {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved && ["light", "dark", "midnight", "emerald"].includes(saved)) {
-      applyThemeAttributes(saved);
-      return saved;
-    }
+    localStorage.setItem(THEME_KEY, "light");
   } catch {}
   applyThemeAttributes("light");
   return "light";
