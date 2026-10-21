@@ -150,23 +150,27 @@ export const VendorsPage = () => {
     const handleCreate = (e) => {
         e.preventDefault();
         setFormError('');
-        if (!newVend.name.trim()) {
+        if (!newVend.name || !newVend.name.trim()) {
             setFormError('Company / Supplier Name is required.');
             return;
         }
-        if (newVend.email) {
-            const emailRes = validateEmail(newVend.email);
-            if (!emailRes.isValid) {
-                setFormError(emailRes.message);
-                return;
-            }
+        if (!newVend.phone || !newVend.phone.trim()) {
+            setFormError('Phone number is required.');
+            return;
         }
-        if (newVend.phone) {
-            const phoneRes = validatePhone(newVend.phone);
-            if (!phoneRes.isValid) {
-                setFormError(phoneRes.message);
-                return;
-            }
+        const phoneRes = validatePhone(newVend.phone);
+        if (!phoneRes.isValid) {
+            setFormError(phoneRes.message);
+            return;
+        }
+        if (!newVend.email || !newVend.email.trim()) {
+            setFormError('Email address is required.');
+            return;
+        }
+        const emailRes = validateEmail(newVend.email);
+        if (!emailRes.isValid) {
+            setFormError(emailRes.message);
+            return;
         }
         addVendor({
             code: newVend.code || `VEND-${String(vendors.length + 1).padStart(3, '0')}`,
@@ -252,14 +256,18 @@ export const VendorsPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Contact Person</label>
                   <input type="text" value={newVend.contactPerson} onChange={(e) => setNewVend({ ...newVend, contactPerson: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Email</label>
-                  <input type="email" value={newVend.email} onChange={(e) => setNewVend({ ...newVend, email: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                  <label className="font-semibold text-slate-700 block mb-1">Email *</label>
+                  <input type="email" required value={newVend.email} onChange={(e) => setNewVend({ ...newVend, email: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Phone *</label>
+                  <input type="text" required placeholder="+91 98765 43210" value={newVend.phone} onChange={(e) => setNewVend({ ...newVend, phone: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
               </div>
 

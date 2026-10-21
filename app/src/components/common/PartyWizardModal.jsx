@@ -261,23 +261,31 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
     const validateStep = (currentStep) => {
         if (currentStep === 1) {
-            if (!formData.name.trim()) {
-                setErrorMsg('Legal Company / Entity Name is required to proceed.');
+            if (!formData.type) {
+                setErrorMsg('Entity Role (Customer / Vendor / Dual Partner) is required to proceed.');
                 return false;
             }
-            if (formData.email) {
-                const emailRes = validateEmail(formData.email);
-                if (!emailRes.isValid) {
-                    setErrorMsg(emailRes.message);
-                    return false;
-                }
+            if (!formData.name || !formData.name.trim()) {
+                setErrorMsg('Legal Company / Trade Entity Name is required to proceed.');
+                return false;
             }
-            if (formData.phone) {
-                const phoneRes = validatePhone(formData.phone);
-                if (!phoneRes.isValid) {
-                    setErrorMsg(phoneRes.message);
-                    return false;
-                }
+            if (!formData.phone || !formData.phone.trim()) {
+                setErrorMsg('Corporate Phone number is required to proceed.');
+                return false;
+            }
+            const phoneRes = validatePhone(formData.phone);
+            if (!phoneRes.isValid) {
+                setErrorMsg(phoneRes.message);
+                return false;
+            }
+            if (!formData.email || !formData.email.trim()) {
+                setErrorMsg('Official Billing / Accounts Email is required to proceed.');
+                return false;
+            }
+            const emailRes = validateEmail(formData.email);
+            if (!emailRes.isValid) {
+                setErrorMsg(emailRes.message);
+                return false;
             }
         }
         if (currentStep === 2) {
@@ -561,7 +569,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block font-bold text-text mb-1.5">
-                                        Corporate Phone
+                                        Corporate Phone <span className="text-rose-500">*</span>
                                     </label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
@@ -569,17 +577,18 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         </div>
                                         <input
                                             type="text"
+                                            required
                                             value={formData.phone}
                                             onChange={(e) => updateField('phone', e.target.value)}
                                             className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
-                                            placeholder="+1 (555) 000-0000"
+                                            placeholder="+91 98765 43210"
                                         />
                                     </div>
                                 </div>
 
                                 <div>
                                     <label className="block font-bold text-text mb-1.5">
-                                        Official Billing / Accounts Email
+                                        Official Billing / Accounts Email <span className="text-rose-500">*</span>
                                     </label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
@@ -587,6 +596,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         </div>
                                         <input
                                             type="email"
+                                            required
                                             value={formData.email}
                                             onChange={(e) => updateField('email', e.target.value)}
                                             className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"

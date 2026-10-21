@@ -25,7 +25,7 @@ import { dispatchNotification } from "../../../services/crmEventNotifications";
 import PerformanceReportModal from "../performance/PerformanceReportModal";
 import { validateEmail, validatePhone } from "../../../utils/validators";
 
-const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
+const EMPTY_FORM = { name: "", email: "", phone: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
 const STATUSES = ["All Active", "Active", "On Leave", "Probation", "Notice Period", "Resigned", "Terminated", "All Records"];
 
@@ -293,10 +293,23 @@ export default function Employees() {
   }, [filtered, currentPage, pageSize]);
 
   async function handleAdd() {
-    if (!form.name || !form.email) return setToast("Name and email are required.", "error");
+    if (!form.name?.trim()) return setToast("Full Name is required.", "error");
+    if (!form.email?.trim()) return setToast("Email is required.", "error");
 
     const emailRes = validateEmail(form.email, true);
     if (!emailRes.isValid) return setToast(emailRes.message, "error");
+
+    if (!form.phone?.trim()) return setToast("Phone number is required.", "error");
+    const phoneRes = validatePhone(form.phone);
+    if (!phoneRes.isValid) return setToast(phoneRes.message, "error");
+
+    if (!form.dept?.trim()) return setToast("Department is required.", "error");
+    if (!form.designation?.trim()) return setToast("Position / Designation is required.", "error");
+
+    if (form.createUserAccount !== false) {
+      if (!form.password?.trim()) return setToast("Password is required for user account.", "error");
+      if (form.password.trim().length < 6) return setToast("Password must be at least 6 characters.", "error");
+    }
 
     const matchedDept = departmentsList.find((d) => d.name?.toLowerCase() === form.dept?.trim().toLowerCase());
     const matchedDesig = designationsList.find((d) => d.name?.toLowerCase() === form.designation?.trim().toLowerCase());
@@ -305,6 +318,7 @@ export default function Employees() {
     const next = {
       name: form.name.trim(),
       email: form.email.trim(),
+      phone: form.phone.trim(),
       designation: form.designation?.trim() || "",
       designationId: matchedDesig?.id || undefined,
       department: form.dept?.trim() || "",
@@ -754,6 +768,7 @@ export default function Employees() {
                 placeholder="Enter full name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
               />
             </div>
             <div className="form-group">
@@ -766,18 +781,35 @@ export default function Employees() {
                 placeholder="Enter email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
               />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Department</label>
+              <label className="form-label">
+                Phone Number <span className="required">*</span>
+              </label>
+              <input
+                className="form-input"
+                type="tel"
+                placeholder="e.g. +91 98765 43210"
+                value={form.phone || ""}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                Department <span className="required">*</span>
+              </label>
               <input
                 className="form-input"
                 list="emp-dept-options"
                 placeholder="Enter department"
                 value={form.dept}
                 onChange={(e) => setForm({ ...form, dept: e.target.value })}
+                required
               />
               <datalist id="emp-dept-options">
                 {DEPARTMENTS.slice(1).map((d) => (
@@ -785,14 +817,19 @@ export default function Employees() {
                 ))}
               </datalist>
             </div>
+          </div>
+          <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Designation</label>
+              <label className="form-label">
+                Position / Designation <span className="required">*</span>
+              </label>
               <input
                 className="form-input"
                 list="emp-desig-options"
-                placeholder="Enter designation"
+                placeholder="Enter position / designation"
                 value={form.designation}
                 onChange={(e) => setForm({ ...form, designation: e.target.value })}
+                required
               />
               <datalist id="emp-desig-options">
                 {designationsList.map((d) => (
@@ -800,21 +837,21 @@ export default function Employees() {
                 ))}
               </datalist>
             </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Location</label>
-            <input
-              className="form-input"
-              list="emp-loc-options"
-              placeholder="Enter location"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-            />
-            <datalist id="emp-loc-options">
-              {locationsList.map((l) => (
-                <option key={l.id || l.name} value={l.name} />
-              ))}
-            </datalist>
+            <div className="form-group">
+              <label className="form-label">Location</label>
+              <input
+                className="form-input"
+                list="emp-loc-options"
+                placeholder="Enter location"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+              />
+              <datalist id="emp-loc-options">
+                {locationsList.map((l) => (
+                  <option key={l.id || l.name} value={l.name} />
+                ))}
+              </datalist>
+            </div>
           </div>
           <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: "13.5px", fontWeight: 600, color: "#1e293b", cursor: "pointer" }}>
@@ -832,16 +869,32 @@ export default function Employees() {
             {form.createUserAccount !== false && (
               <div style={{ marginTop: 10, marginLeft: 25 }}>
                 <label className="form-label" style={{ fontSize: "12px", marginBottom: 4 }}>
-                  Initial Password <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span>
+                  Password <span className="required">*</span>
                 </label>
-                <input
-                  className="form-input"
-                  type="password"
-                  placeholder="Leave empty to email the employee an activation link"
-                  value={form.password || ""}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  style={{ maxWidth: 320, fontSize: "13px" }}
-                />
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    className="form-input"
+                    type="text"
+                    placeholder="Enter password"
+                    value={form.password || ""}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    style={{ maxWidth: 320, fontSize: "13px" }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    onClick={() => {
+                      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+                      let pwd = "";
+                      for (let i = 0; i < 10; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+                      setForm({ ...form, password: pwd });
+                    }}
+                    style={{ padding: "6px 12px", fontSize: "12px", cursor: "pointer" }}
+                  >
+                    Generate
+                  </button>
+                </div>
               </div>
             )}
           </div>

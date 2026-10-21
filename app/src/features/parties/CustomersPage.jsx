@@ -160,23 +160,27 @@ export const CustomersPage = () => {
     const handleCreate = (e) => {
         e.preventDefault();
         setFormError('');
-        if (!newCust.name.trim()) {
+        if (!newCust.name || !newCust.name.trim()) {
             setFormError('Company Name is required.');
             return;
         }
-        if (newCust.email) {
-            const emailRes = validateEmail(newCust.email);
-            if (!emailRes.isValid) {
-                setFormError(emailRes.message);
-                return;
-            }
+        if (!newCust.phone || !newCust.phone.trim()) {
+            setFormError('Phone number is required.');
+            return;
         }
-        if (newCust.phone) {
-            const phoneRes = validatePhone(newCust.phone);
-            if (!phoneRes.isValid) {
-                setFormError(phoneRes.message);
-                return;
-            }
+        const phoneRes = validatePhone(newCust.phone);
+        if (!phoneRes.isValid) {
+            setFormError(phoneRes.message);
+            return;
+        }
+        if (!newCust.email || !newCust.email.trim()) {
+            setFormError('Email address is required.');
+            return;
+        }
+        const emailRes = validateEmail(newCust.email);
+        if (!emailRes.isValid) {
+            setFormError(emailRes.message);
+            return;
         }
         addCustomer({
             code: newCust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
@@ -281,12 +285,12 @@ export const CustomersPage = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Email</label>
-                  <input type="email" value={newCust.email} onChange={(e) => setNewCust({ ...newCust, email: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                  <label className="font-semibold text-slate-700 block mb-1">Email *</label>
+                  <input type="email" required value={newCust.email} onChange={(e) => setNewCust({ ...newCust, email: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Phone</label>
-                  <input type="text" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                  <label className="font-semibold text-slate-700 block mb-1">Phone *</label>
+                  <input type="text" required placeholder="+91 98765 43210" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
               </div>
 
