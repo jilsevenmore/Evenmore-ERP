@@ -1113,6 +1113,39 @@ export async function pullCompanyProfile() {
  * `POST /settings/reset-demo-data/` — erase this tenant's business data on the
  * server. Nothing is re-seeded: every screen starts empty afterwards.
  */
+
+/**
+ * `PATCH /settings/company-profile/` — persist company legal entity, GSTIN, PAN,
+ * phone, and address to backend.
+ */
+export async function pushCompanyProfile(profile) {
+  if (!isBackendEnabled() || !profile) return profile;
+  try {
+    const payload = {};
+    if (profile.name || profile.legalName) {
+      payload.legal_name = profile.legalName || profile.name;
+      payload.trade_name = profile.name || profile.legalName;
+    }
+    if (profile.gstin !== undefined) payload.gstin = profile.gstin;
+    if (profile.pan !== undefined) payload.pan = profile.pan;
+    if (profile.phone !== undefined) payload.phone = profile.phone;
+    if (profile.currency) {
+      const match = String(profile.currency).match(/^[A-Z]{3}/);
+      payload.currency = match ? match[0] : String(profile.currency).slice(0, 3);
+    }
+    if (profile.address !== undefined) {
+      payload.address = typeof profile.address === 'string'
+        ? { line1: profile.address }
+        : profile.address;
+    }
+    const row = await api.patch('/settings/company-profile/', payload);
+    return row;
+  } catch (err) {
+    console.warn('[backendSync] push company profile failed:', err?.message || err);
+    return null;
+  }
+}
+
 export async function resetTenantData() {
   return api.post('/settings/reset-demo-data/');
 }
